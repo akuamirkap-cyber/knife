@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useLayoutEffect } from 'react';
 
 interface ScaledFrameProps {
   baseWidth: number;
@@ -8,15 +8,16 @@ interface ScaledFrameProps {
 
 export default function ScaledFrame({ baseWidth, baseHeight, children }: ScaledFrameProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState<number | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const updateScale = () => {
       if (!containerRef.current) return;
       const { clientWidth, clientHeight } = containerRef.current;
       if (clientWidth > 0 && clientHeight > 0) {
-        const s = Math.min(clientWidth / baseWidth, clientHeight / baseHeight);
-        setScale(s);
+        // Uniform fit: strictly fit both width and height with small 2px safety margin so no edges touch or get clipped
+        const s = Math.min((clientWidth - 2) / baseWidth, (clientHeight - 2) / baseHeight);
+        setScale(Math.max(0.05, s));
       }
     };
 
@@ -30,18 +31,21 @@ export default function ScaledFrame({ baseWidth, baseHeight, children }: ScaledF
     };
   }, [baseWidth, baseHeight]);
 
+  const currentScale = scale ?? 1;
+
   return (
     <div 
       ref={containerRef} 
-      className="w-full h-full relative overflow-hidden flex items-center justify-center bg-black"
+      className="w-full h-full relative overflow-hidden flex items-center justify-center bg-black select-none"
     >
       <div
         style={{
           width: baseWidth,
           height: baseHeight,
-          transform: `scale(${scale})`,
+          transform: `scale(${currentScale})`,
           transformOrigin: 'center center',
           flexShrink: 0,
+          opacity: scale === null ? 0 : 1,
         }}
         className="relative overflow-hidden"
       >

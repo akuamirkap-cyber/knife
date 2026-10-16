@@ -365,14 +365,12 @@ export class Game {
   }
 
   private resize = () => {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    this.scale = Math.min(vw / W, vh / H);
+    this.scale = 1;
     this.dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    this.canvas.style.width = `${W * this.scale}px`;
-    this.canvas.style.height = `${H * this.scale}px`;
-    this.canvas.width = Math.round(W * this.scale * this.dpr);
-    this.canvas.height = Math.round(H * this.scale * this.dpr);
+    this.canvas.style.width = `${W}px`;
+    this.canvas.style.height = `${H}px`;
+    this.canvas.width = Math.round(W * this.dpr);
+    this.canvas.height = Math.round(H * this.dpr);
   };
 
   private onKey = (e: KeyboardEvent) => {

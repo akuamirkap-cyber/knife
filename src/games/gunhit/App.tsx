@@ -154,9 +154,8 @@ export default function App({ onExit }: { onExit?: () => void }) {
     const cv = previewCanvasRef.current;
     if (!cv) return;
     const dpr = window.devicePixelRatio || 1;
-    // VISUAL SENJATA DI MAIN MENU DIBESARKAN 2X & 100% TIDAK KECROP (CENTER PIVOT SEJATI!)
-    const pw = 280;
-    const ph = 320;
+    const pw = 240;
+    const ph = 210;
     cv.width = pw * dpr;
     cv.height = ph * dpr;
     const ctx = cv.getContext('2d');
@@ -270,9 +269,9 @@ export default function App({ onExit }: { onExit?: () => void }) {
           <span>Pilih Game Lain</span>
         </button>
       )}
-      <div className="relative overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.9)]">
+      <div className="relative overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.9)] w-[420px] h-[760px] flex-shrink-0">
         {/* Canvas Engine */}
-        <canvas ref={canvasRef} className="block touch-none" />
+        <canvas ref={canvasRef} className="block touch-none w-[420px] h-[760px]" />
 
         {/* Transition Overlay (Hypercasual READY GO) */}
         {transitioning && (
@@ -289,66 +288,66 @@ export default function App({ onExit }: { onExit?: () => void }) {
             MAIN MENU: EXACT MATCHING SCREENSHOT 1 KNIFE HIT LAYOUT!
            ------------------------------------------------------------- */}
         {screen === 'menu' && (
-          <div className="absolute inset-0 z-20 flex flex-col justify-between py-6 px-5 text-white">
+          <div className="absolute inset-0 z-20 flex flex-col justify-between py-4 px-4 text-white">
             {/* Top Bar: Settings gear (Left) & Apple/Coin Counter (Right) */}
             <div className="flex items-center justify-between">
               <button
                 onClick={toggleMute}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-xl text-amber-300 shadow-md backdrop-blur-md transition hover:bg-white/20 active:scale-90 border border-white/10"
+                className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-lg text-amber-300 shadow-md backdrop-blur-md transition hover:bg-white/20 active:scale-90 border border-white/10"
                 aria-label="Settings / Audio"
               >
                 ⚙️
               </button>
 
-              <div className="flex items-center gap-1.5 text-xl font-bold font-game text-amber-300 drop-shadow">
-                <span className="font-mono text-2xl font-black tracking-tight">{totalCoins}</span>
-                <span className="text-2xl filter drop-shadow">🍎</span>
+              <div className="flex items-center gap-1.5 text-lg font-bold font-game text-amber-300 drop-shadow">
+                <span className="font-mono text-xl font-black tracking-tight">{totalCoins}</span>
+                <span className="text-xl filter drop-shadow">🍎</span>
               </div>
             </div>
 
-            {/* Title Section: LEBIH BESAR & GAGAH PERSIS SCREENSHOT 1 */}
-            <div className="flex flex-col items-center text-center -mt-2">
+            {/* Title Section */}
+            <div className="flex flex-col items-center text-center -mt-1">
               <div className="relative flex flex-col items-center">
-                {/* GUN word: LEBIH BESAR & TEBAL */}
-                <div className="text-7xl sm:text-8xl font-black tracking-widest text-[#4ade80] drop-shadow-[0_7px_0_#15803d] font-game transform -rotate-1 leading-none">
+                {/* GUN word */}
+                <div className="text-6xl sm:text-7xl font-black tracking-widest text-[#4ade80] drop-shadow-[0_6px_0_#15803d] font-game transform -rotate-1 leading-none">
                   GUN
                 </div>
 
                 {/* Curved blade slice line with sword/gun */}
-                <div className="relative -my-2 h-7 w-72 flex items-center justify-center">
-                  <div className="h-2.5 w-full rounded-full bg-white shadow-[0_0_14px_#ffffff]" />
-                  <span className="absolute right-2 text-2xl transform rotate-12 drop-shadow">🗡️</span>
+                <div className="relative -my-1.5 h-6 w-64 flex items-center justify-center">
+                  <div className="h-2 w-full rounded-full bg-white shadow-[0_0_12px_#ffffff]" />
+                  <span className="absolute right-2 text-xl transform rotate-12 drop-shadow">🗡️</span>
                 </div>
 
-                {/* HIT word: LEBIH BESAR & TEBAL */}
-                <div className="text-7xl sm:text-8xl font-black tracking-widest text-[#fde047] drop-shadow-[0_7px_0_#a16207] font-game transform rotate-1 leading-none">
+                {/* HIT word */}
+                <div className="text-6xl sm:text-7xl font-black tracking-widest text-[#fde047] drop-shadow-[0_6px_0_#a16207] font-game transform rotate-1 leading-none">
                   HIT
                 </div>
               </div>
 
-              {/* Subtitle: STAGE {bestLevel} ◆ SCORE {best} (LEBIH BESAR) */}
-              <div className="mt-3 flex items-center gap-3 text-sm sm:text-base font-black tracking-[0.2em] text-white font-game drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              {/* Subtitle: STAGE {bestLevel} ◆ SCORE {best} */}
+              <div className="mt-2 flex items-center gap-2.5 text-xs sm:text-sm font-black tracking-[0.2em] text-white font-game drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                 <span>STAGE {bestLevel}</span>
-                <span className="text-amber-300 text-lg">◆</span>
+                <span className="text-amber-300 text-base">◆</span>
                 <span>SCORE {best}</span>
               </div>
             </div>
 
-            {/* Upright Floating Gun Avatar (2X LEBIH BESAR, 100% UTUH TIDAK TERPOTONG!) */}
+            {/* Upright Floating Gun Avatar */}
             <div className="flex flex-col items-center justify-center my-auto">
               <canvas
                 ref={previewCanvasRef}
-                style={{ width: 280, height: 320 }}
-                className="block filter drop-shadow-[0_20px_40px_rgba(0,0,0,0.85)] cursor-pointer hover:scale-105 transition-transform"
+                style={{ width: 240, height: 210 }}
+                className="block filter drop-shadow-[0_16px_30px_rgba(0,0,0,0.85)] cursor-pointer hover:scale-105 transition-transform"
                 onClick={() => setArsenalOpen(true)}
               />
-              <div className="text-sm sm:text-base font-black text-amber-300 font-game tracking-widest bg-black/60 px-6 py-2 rounded-full border-2 border-white/20 -mt-2 shadow-2xl">
+              <div className="text-xs sm:text-sm font-black text-amber-300 font-game tracking-widest bg-black/60 px-5 py-1.5 rounded-full border-2 border-white/20 -mt-2 shadow-2xl">
                 {getWeapon(weapon).name}
               </div>
             </div>
 
-            {/* Two Main Action Buttons: LEBIH BESAR, MANTAP & GLOSSY (Exact Screenshot 1) */}
-            <div className="flex w-full items-center justify-center gap-4 mb-3">
+            {/* Two Main Action Buttons */}
+            <div className="flex w-full items-center justify-center gap-3 mb-2">
               {/* CHALLENGES Button */}
               <button
                 onClick={() => {
@@ -356,55 +355,55 @@ export default function App({ onExit }: { onExit?: () => void }) {
                   gameRef.current?.startBossChallenge?.();
                   setScreen('playing');
                 }}
-                className="flex-1 flex items-center justify-center gap-2.5 rounded-2xl border-b-4 border-red-800 bg-gradient-to-b from-[#ff5e3a] to-[#d83110] py-4 px-3 text-base sm:text-lg font-black font-game text-white shadow-[0_10px_24px_rgba(216,49,16,0.45)] transition active:translate-y-1 active:border-b-0 hover:brightness-110"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl border-b-4 border-red-800 bg-gradient-to-b from-[#ff5e3a] to-[#d83110] py-3 px-2 text-sm sm:text-base font-black font-game text-white shadow-[0_8px_20px_rgba(216,49,16,0.45)] transition active:translate-y-1 active:border-b-0 hover:brightness-110"
               >
-                <span className="text-2xl">👹</span>
+                <span className="text-xl">👹</span>
                 <span>CHALLENGES</span>
               </button>
 
               {/* PLAY Button */}
               <button
                 onClick={play}
-                className="pulse-btn flex-1 flex items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-800 bg-gradient-to-b from-[#22c55e] via-[#16a34a] to-[#15803d] py-4 px-3 text-2xl font-black font-game text-white shadow-[0_10px_24px_rgba(34,197,94,0.45)] transition active:translate-y-1 active:border-b-0 hover:brightness-110"
+                className="pulse-btn flex-1 flex items-center justify-center gap-2 rounded-xl border-b-4 border-emerald-800 bg-gradient-to-b from-[#22c55e] via-[#16a34a] to-[#15803d] py-3 px-2 text-xl font-black font-game text-white shadow-[0_8px_20px_rgba(34,197,94,0.45)] transition active:translate-y-1 active:border-b-0 hover:brightness-110"
               >
                 <span>PLAY</span>
-                <span className="text-2xl font-black">▶</span>
+                <span className="text-xl font-black">▶</span>
               </button>
             </div>
 
-            {/* Bottom Icon Bar: DIBESARKAN 2X LIPAT + TULISAN DIBESARKAN 2X LIPAT! */}
-            <div className="flex items-center justify-around border-t-2 border-white/15 pt-3 pb-2 text-white/95">
-              {/* GUN button: DIBESARKAN 2X */}
+            {/* Bottom Icon Bar */}
+            <div className="flex items-center justify-around border-t-2 border-white/15 pt-2 pb-1 text-white/95">
+              {/* GUN button */}
               <button
                 onClick={() => setArsenalOpen(true)}
-                className="flex flex-col items-center gap-2 transition hover:text-white active:scale-95 group"
+                className="flex flex-col items-center gap-1 transition hover:text-white active:scale-95 group"
               >
-                <div className="flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-3xl bg-white/15 text-4xl sm:text-5xl border-[3px] border-white/25 shadow-2xl group-hover:border-amber-400 group-hover:bg-white/20 transition-all">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-2xl border-2 border-white/25 shadow-xl group-hover:border-amber-400 group-hover:bg-white/20 transition-all">
                   🔫
                 </div>
-                <span className="text-base sm:text-lg font-black tracking-widest font-game drop-shadow">GUN</span>
+                <span className="text-xs font-black tracking-widest font-game drop-shadow">GUN</span>
               </button>
 
-              {/* LEADERBOARD button: DIBESARKAN 2X */}
+              {/* LEADERBOARD button */}
               <button
                 onClick={() => setLeaderboardOpen(true)}
-                className="flex flex-col items-center gap-2 transition hover:text-white active:scale-95 group"
+                className="flex flex-col items-center gap-1 transition hover:text-white active:scale-95 group"
               >
-                <div className="flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-3xl bg-white/15 text-4xl sm:text-5xl border-[3px] border-white/25 shadow-2xl group-hover:border-amber-400 group-hover:bg-white/20 transition-all">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-2xl border-2 border-white/25 shadow-xl group-hover:border-amber-400 group-hover:bg-white/20 transition-all">
                   🏆
                 </div>
-                <span className="text-base sm:text-lg font-black tracking-widest font-game drop-shadow">RANKS</span>
+                <span className="text-xs font-black tracking-widest font-game drop-shadow">RANKS</span>
               </button>
 
-              {/* REWARD / MISI button: DIBESARKAN 2X */}
+              {/* REWARD / MISI button */}
               <button
                 onClick={() => setQuestOpen(true)}
-                className="flex flex-col items-center gap-2 transition hover:text-white active:scale-95 group"
+                className="flex flex-col items-center gap-1 transition hover:text-white active:scale-95 group"
               >
-                <div className="flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-3xl bg-white/15 text-4xl sm:text-5xl border-[3px] border-white/25 shadow-2xl group-hover:border-yellow-300 group-hover:bg-white/20 transition-all">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-2xl border-2 border-white/25 shadow-xl group-hover:border-yellow-300 group-hover:bg-white/20 transition-all">
                   🎁
                 </div>
-                <span className="text-base sm:text-lg font-black tracking-widest font-game text-yellow-300 drop-shadow">READY!</span>
+                <span className="text-xs font-black tracking-widest font-game text-yellow-300 drop-shadow">READY!</span>
               </button>
             </div>
           </div>

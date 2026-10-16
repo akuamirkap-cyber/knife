@@ -47,8 +47,8 @@ export default function App() {
       themeColor: 'text-cyan-400',
       borderColor: 'border-cyan-500/40 hover:border-cyan-400/80 shadow-cyan-950/40',
       render: () => (
-        <ScaledFrame baseWidth={480} baseHeight={820}>
-          <RifleRockGame key={keys[0]} />
+        <ScaledFrame baseWidth={480} baseHeight={880}>
+          <RifleRockGame key={keys[0]} onExit={fullscreenId === 0 ? () => setFullscreenId(null) : undefined} />
         </ScaledFrame>
       ),
     },
@@ -61,7 +61,7 @@ export default function App() {
       borderColor: 'border-violet-500/40 hover:border-violet-400/80 shadow-violet-950/40',
       render: () => (
         <div className="w-full h-full relative overflow-hidden bg-[#070418]">
-          <SunburstGame key={keys[1]} />
+          <SunburstGame key={keys[1]} onExit={fullscreenId === 1 ? () => setFullscreenId(null) : undefined} />
         </div>
       ),
     },
@@ -74,7 +74,7 @@ export default function App() {
       borderColor: 'border-amber-500/40 hover:border-amber-400/80 shadow-amber-950/40',
       render: () => (
         <ScaledFrame baseWidth={420} baseHeight={760}>
-          <GunHitGame key={keys[2]} />
+          <GunHitGame key={keys[2]} onExit={fullscreenId === 2 ? () => setFullscreenId(null) : undefined} />
         </ScaledFrame>
       ),
     },
@@ -86,8 +86,8 @@ export default function App() {
       themeColor: 'text-emerald-400',
       borderColor: 'border-emerald-500/40 hover:border-emerald-400/80 shadow-emerald-950/40',
       render: () => (
-        <ScaledFrame baseWidth={380} baseHeight={680}>
-          <KnifeHitGame key={keys[3]} />
+        <ScaledFrame baseWidth={380} baseHeight={760}>
+          <KnifeHitGame key={keys[3]} onExit={fullscreenId === 3 ? () => setFullscreenId(null) : undefined} />
         </ScaledFrame>
       ),
     },
@@ -115,7 +115,7 @@ export default function App() {
             <span>4 Game Berjejer (9:16)</span>
           </span>
           <span className="text-[11px] text-neutral-400 hidden sm:inline">
-            Semua game langsung aktif serentak tanpa ter-crop atas/bawah
+            Game arcade pas tanpa crop • Sunburst FX Lab scrollable ↕
           </span>
         </div>
 
@@ -187,6 +187,12 @@ export default function App() {
                     <div className="flex items-center gap-1.5 truncate">
                       <Icon className={`w-3.5 h-3.5 ${slide.themeColor} flex-shrink-0`} />
                       <span className="font-bold text-white truncate text-xs">{slide.name}</span>
+                      {slide.id === 1 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/25 text-violet-300 font-semibold border border-violet-400/30 flex items-center gap-0.5">
+                          <span>Scrollable</span>
+                          <span className="font-mono">↕</span>
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1 flex-shrink-0">

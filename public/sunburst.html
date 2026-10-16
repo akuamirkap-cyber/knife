@@ -9,13 +9,35 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  body { font-family: 'Inter', sans-serif; background: #070418; }
+  html {
+    min-height: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    background: #070418;
+    scroll-behavior: smooth;
+  }
+  body {
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-y: visible;
+    overflow-x: hidden;
+    font-family: 'Inter', sans-serif;
+    background: #070418;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Modern high-visibility scrollbar khusus Sunburst FX Lab */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: rgba(10, 6, 30, 0.95); border-left: 1px solid rgba(139, 92, 246, 0.25); }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #a855f7, #6366f1); border-radius: 99px; border: 2px solid rgba(10, 6, 30, 0.95); }
+  ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #c084fc, #818cf8); }
+  * { scrollbar-width: thin; scrollbar-color: #a855f7 rgba(10, 6, 30, 0.95); }
   .font-display { font-family: 'Space Grotesk', sans-serif; }
   ::selection { background: #8b5cf6; color: white; }
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: #0d0a26; }
-  ::-webkit-scrollbar-thumb { background: #3b2d7a; border-radius: 8px; }
-  ::-webkit-scrollbar-thumb:hover { background: #5b48b8; }
 
   .grid-bg {
     background-image: linear-gradient(rgba(139,92,246,.07) 1px, transparent 1px),
@@ -182,15 +204,15 @@
   .mode-btn.active { background: linear-gradient(135deg, #7c3aed, #a855f7); border-color: rgba(196,181,253,.6); box-shadow: 0 6px 22px rgba(124,58,237,.4); }
 </style>
 </head>
-<body class="text-white min-h-screen antialiased overflow-x-hidden">
+<body class="text-white min-h-full w-full antialiased m-0 p-0 overflow-y-auto">
 
 <div class="fixed inset-0 grid-bg pointer-events-none z-0"></div>
 <div class="fixed -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[500px] rounded-full pointer-events-none z-0" style="background: radial-gradient(ellipse, rgba(124,58,237,.25), transparent 70%); filter: blur(60px);"></div>
 
-<!-- COMPACT 9:16 PLAYGROUND CONTAINER -->
-<div class="h-screen w-full flex flex-col p-2 select-none overflow-hidden bg-[#070418]">
-  <!-- TABS -->
-  <div class="flex items-center gap-1.5 mb-2 bg-white/5 border border-white/10 rounded-xl p-1 flex-shrink-0">
+<!-- COMPACT PLAYGROUND CONTAINER (SCROLLABLE & ZERO CROPPING) -->
+<div class="w-full min-h-full flex flex-col p-2 bg-[#070418] gap-2 pb-12">
+  <!-- TABS (Sticky at top) -->
+  <div class="sticky top-0 z-40 flex items-center gap-1.5 bg-[#070418]/95 backdrop-blur-md border border-white/10 rounded-xl p-1.5 flex-shrink-0 shadow-lg">
     <button id="tab1" class="tab-btn active !py-1.5 !px-2 !rounded-lg !text-xs flex-1 justify-center" onclick="setStage(1)">
       <span class="tab-num !w-4 !h-4 !text-[10px]">1</span>
       <span class="font-bold">Gacha</span>
@@ -203,12 +225,16 @@
       <span class="tab-num !w-4 !h-4 !text-[10px]">3</span>
       <span class="font-bold">Treasure</span>
     </button>
+    <button onclick="document.getElementById('controlsAnchor')?.scrollIntoView({behavior:'smooth'})" class="tab-btn !py-1.5 !px-2.5 !rounded-lg !text-xs bg-violet-600/30 hover:bg-violet-600/50 border border-violet-400/40 text-violet-200 flex-shrink-0 flex items-center gap-1 font-semibold" title="Scroll ke Kontrol Bawah">
+      <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-violet-300"></i>
+      <span class="text-[11px]">Kontrol ↕</span>
+    </button>
   </div>
 
-  <div class="flex-1 w-full flex flex-col overflow-hidden min-h-0">
+  <div class="w-full flex flex-col gap-2">
     <!-- STAGE AREA -->
-    <div class="glass rounded-2xl p-1 flex-1 w-full flex flex-col overflow-hidden min-h-0">
-      <div id="stageArea" class="relative rounded-xl flex-1 w-full h-full overflow-hidden">
+    <div class="glass rounded-2xl p-1 w-full flex flex-col overflow-hidden">
+      <div id="stageArea" class="relative rounded-xl w-full h-[390px] overflow-hidden">
 
         <!-- ============ STAGE 1 : GACHA ============ -->
         <div id="stg1" class="sunstage pulsing sweep-on absolute inset-0 select-none" style="--bg-glow:#2b1c63; --bg-deep:#050316; --burst:210,192,255;">
@@ -371,21 +397,21 @@
       </div>
 
       <!-- STAGE 1 ACTION BAR -->
-      <div id="s1bar" class="flex flex-wrap items-center gap-2.5 p-3 md:p-4">
-        <button onclick="triggerBurst()" class="flex-1 min-w-[160px] flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-bold text-sm shadow-xl shadow-amber-500/30 hover:scale-[1.02] active:scale-95 transition text-black" style="background: linear-gradient(135deg,#fde047,#f59e0b);">
-          <i data-lucide="zap" class="w-5 h-5"></i> TRIGGER BURST!
+      <div id="s1bar" class="flex flex-wrap items-center gap-2 p-2 flex-shrink-0">
+        <button onclick="triggerBurst()" class="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-xs shadow-xl shadow-amber-500/30 hover:scale-[1.02] active:scale-95 transition text-black" style="background: linear-gradient(135deg,#fde047,#f59e0b);">
+          <i data-lucide="zap" class="w-4 h-4"></i> TRIGGER BURST!
         </button>
-        <button id="btnSpin" class="flex items-center gap-2 px-5 py-3.5 rounded-2xl font-bold text-sm glass hover:bg-white/10 transition">
-          <i data-lucide="pause" class="w-4 h-4"></i> <span>Jeda</span>
+        <button id="btnSpin" class="flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-xs glass hover:bg-white/10 transition">
+          <i data-lucide="pause" class="w-3.5 h-3.5"></i> <span>Jeda</span>
         </button>
-        <button onclick="randomize1()" class="flex items-center gap-2 px-5 py-3.5 rounded-2xl font-bold text-sm glass hover:bg-white/10 transition">
-          <i data-lucide="dices" class="w-4 h-4 text-violet-300"></i> Acak
+        <button onclick="randomize1()" class="flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-xs glass hover:bg-white/10 transition">
+          <i data-lucide="dices" class="w-3.5 h-3.5 text-violet-300"></i> Acak
         </button>
       </div>
     </div>
-    <div style="display:none">
-    <!-- CONTROL PANELS -->
-    <div class="glass rounded-3xl p-5 md:p-6 lg:max-h-[760px] lg:overflow-y-auto">
+
+    <!-- CONTROL PANELS (SCROLLABLE BELOW STAGE) -->
+    <div id="controlsAnchor" class="glass rounded-2xl p-4 w-full border border-white/10 mt-2">
 
       <!-- PANEL 1 -->
       <div id="panel1">
@@ -473,9 +499,16 @@
         </div>
       </div>
 
+      <!-- Quick Back to Top Button -->
+      <div class="flex justify-center mt-5 pt-3 border-t border-white/10">
+        <button onclick="window.scrollTo({top:0, behavior:'smooth'})" class="px-4 py-2 rounded-xl text-xs font-bold glass hover:bg-white/15 text-violet-200 transition flex items-center gap-2 cursor-pointer shadow-md">
+          <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i> Kembali ke Layar Atas ↑
+        </button>
+      </div>
+
     </div>
   </div>
-</section>
+</div>
 
 <!-- NAMA EFEK -->
 <section id="nama" class="relative z-10 max-w-7xl mx-auto px-5 mt-16 md:mt-24">
