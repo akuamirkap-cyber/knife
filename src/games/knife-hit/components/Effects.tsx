@@ -1,19 +1,195 @@
 import { useMemo } from "react";
+import { useSunburstMode, type SunburstMode } from "../sunburstState";
 
 type CSSVars = React.CSSProperties & Record<string, string | number>;
 
-/** Starburst rapi — 12 sinar tipis, pendek, terpusat di tengah. */
-export function GodRays({
-  size = 520, color = "215,220,255", intensity = 1, className = "", style, core = true,
-}: { size?: number; color?: string; intensity?: number; className?: string; style?: React.CSSProperties; core?: boolean }) {
+function parseColorToRgb(color: string): [number, number, number] {
+  if (color.startsWith("#")) {
+    const h = color.replace("#", "");
+    if (h.length === 3) {
+      return [
+        parseInt(h[0] + h[0], 16),
+        parseInt(h[1] + h[1], 16),
+        parseInt(h[2] + h[2], 16),
+      ];
+    }
+    return [
+      parseInt(h.slice(0, 2), 16),
+      parseInt(h.slice(2, 4), 16),
+      parseInt(h.slice(4, 6), 16),
+    ];
+  }
+  const parts = color.split(",").map((s) => Number(s.trim()));
+  return [parts[0] ?? 255, parts[1] ?? 220, parts[2] ?? 120];
+}
+
+/**
+ * SUNBURST FX LAB (Replika akurat dari Sunburst FX Lab / Stage 1 Gacha)
+ * Multi-layer: Halo (blur 24px) + Conic Rays (masking fade pangkal & ekor) +
+ * Glow (blur 10px, screen) + Hot-Core (glarePulse) + Bintang latar twinkle
+ */
+export function SunburstFX({
+  size = 520,
+  color = "210,192,255",
+  intensity = 1,
+  className = "",
+  style,
+  rays = 10,
+  speed = 32,
+  core = true,
+  stars = true,
+}: {
+  size?: number;
+  color?: string;
+  intensity?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  rays?: number;
+  speed?: number;
+  core?: boolean;
+  stars?: boolean;
+}) {
+  const [r, g, b] = useMemo(() => parseColorToRgb(color), [color]);
+
+  // Generate stable ambient stars inside central burst area
+  const starDots = useMemo(() => {
+    if (!stars) return [];
+    return Array.from({ length: 18 }).map((_, i) => {
+      const angle = (i / 18) * Math.PI * 2 + (Math.sin(i * 3.7) * 0.4);
+      const rad = 15 + ((i * 7) % 35); // 15% to 50% radius
+      const x = 50 + Math.cos(angle) * rad;
+      const y = 50 + Math.sin(angle) * rad;
+      const sz = 1.2 + (i % 3) * 0.7;
+      const tw = 2 + (i % 4) * 0.8;
+      const dl = (i * 0.35) % 2.5;
+      return { x, y, sz, tw, dl };
+    });
+  }, [stars]);
+
+  const slice = 360 / rays;
+  const solid = (slice * 0.5).toFixed(1);
+  const rayAlpha = Math.min(0.75, 0.44 * intensity).toFixed(2);
+  const conicBg = `repeating-conic-gradient(from 0deg at 50% 50%, rgba(${r},${g},${b},${rayAlpha}) 0deg ${solid}deg, transparent ${solid}deg ${slice.toFixed(1)}deg)`;
+  const maskImg = "radial-gradient(circle, transparent 0%, #000 2%, #000 7.5%, transparent 18%)";
+
+  return (
+    <div
+      className={`pointer-events-none absolute select-none ${className}`}
+      style={{
+        width: size,
+        height: size,
+        left: "50%",
+        top: "50%",
+        marginLeft: -size / 2,
+        marginTop: -size / 2,
+        ...style,
+      }}
+    >
+      {/* 1. Outer Halo Diffuse (blur 24px) */}
+      <div
+        className="sunburst-halo"
+        style={{
+          width: size * 1.35,
+          height: size * 1.35,
+          background: `radial-gradient(circle, rgba(${r},${g},${b},${Math.min(0.5, 0.32 * intensity)}) 0%, rgba(${r},${g},${b},${Math.min(0.25, 0.14 * intensity)}) 34%, transparent 68%)`,
+        }}
+      />
+
+      {/* 2. Rotating Conic Rays with Mask (screen blend mode) */}
+      <div
+        className="sunburst-rays"
+        style={{
+          width: size * 2.2,
+          height: size * 2.2,
+          background: conicBg,
+          WebkitMaskImage: maskImg,
+          maskImage: maskImg,
+          animationDuration: `${speed}s`,
+        }}
+      />
+
+      {/* 3. Mid Glow (screen blend, blur 10px) */}
+      {core && (
+        <div
+          className="sunburst-glow"
+          style={{
+            width: size * 0.74,
+            height: size * 0.74,
+            background: `radial-gradient(circle, rgba(${r},${g},${b},${Math.min(1, 0.95 * intensity)}) 0%, rgba(${r},${g},${b},${Math.min(0.7, 0.55 * intensity)}) 26%, rgba(${r},${g},${b},${Math.min(0.3, 0.18 * intensity)}) 48%, transparent 70%)`,
+          }}
+        />
+      )}
+
+      {/* 4. Hot Glare Core (screen blend, blur 5px, glarePulse) */}
+      {core && (
+        <div
+          className="sunburst-hot"
+          style={{
+            width: size * 0.42,
+            height: size * 0.42,
+            background: `radial-gradient(circle, rgba(${r},${g},${b},${Math.min(1, 1 * intensity)}) 0%, rgba(${r},${g},${b},${Math.min(0.95, 0.9 * intensity)}) 22%, rgba(${r},${g},${b},${Math.min(0.5, 0.38 * intensity)}) 48%, transparent 72%)`,
+          }}
+        />
+      )}
+
+      {/* 5. Ambient Twinkling Stars */}
+      {stars && (
+        <div className="absolute inset-0 pointer-events-none">
+          {starDots.map((dot, idx) => (
+            <div
+              key={idx}
+              className="star-dot-fx"
+              style={{
+                left: `${dot.x}%`,
+                top: `${dot.y}%`,
+                width: `${dot.sz}px`,
+                height: `${dot.sz}px`,
+                backgroundColor: `rgb(${Math.min(255, r + 40)}, ${Math.min(255, g + 40)}, ${Math.min(255, b + 40)})`,
+                boxShadow: `0 0 6px rgba(${r},${g},${b},0.9)`,
+                animationDuration: `${dot.tw}s`,
+                animationDelay: `${dot.dl}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * SUNBURST LAMA / CLASSIC (12 sinar tipis, pendek, terpusat di tengah)
+ */
+export function ClassicGodRays({
+  size = 520,
+  color = "215,220,255",
+  intensity = 1,
+  className = "",
+  style,
+  core = true,
+}: {
+  size?: number;
+  color?: string;
+  intensity?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  core?: boolean;
+}) {
   const a1 = Math.min(0.3, 0.21 * intensity);
   const a2 = Math.min(0.22, 0.15 * intensity);
-  // mask pendek — sinar hanya di sekitar pusat, cepat memudar ke tepi
   const mask = "radial-gradient(circle, #000 0%, #000 38%, rgba(0,0,0,.6) 55%, transparent 68%)";
   return (
     <div
       className={`pointer-events-none absolute ${className}`}
-      style={{ width: size, height: size, left: "50%", top: "50%", marginLeft: -size / 2, marginTop: -size / 2, ...style }}
+      style={{
+        width: size,
+        height: size,
+        left: "50%",
+        top: "50%",
+        marginLeft: -size / 2,
+        marginTop: -size / 2,
+        ...style,
+      }}
     >
       <div className="rays-in absolute inset-0">
         {/* lapisan utama: 12 sinar tipis */}
@@ -21,7 +197,8 @@ export function GodRays({
           className="spin-khas absolute inset-0 rounded-full"
           style={{
             background: `repeating-conic-gradient(from -6deg, rgba(${color},${a1}) 0deg 8deg, rgba(${color},0) 8deg 30deg)`,
-            WebkitMaskImage: mask, maskImage: mask,
+            WebkitMaskImage: mask,
+            maskImage: mask,
           }}
         />
         {/* lapisan offset: kilau halus di celah */}
@@ -29,19 +206,76 @@ export function GodRays({
           className="spin-khas-rev absolute inset-0 rounded-full"
           style={{
             background: `repeating-conic-gradient(from 9deg, rgba(255,255,255,${a2}) 0deg 5deg, rgba(255,255,255,0) 5deg 30deg)`,
-            WebkitMaskImage: mask, maskImage: mask,
+            WebkitMaskImage: mask,
+            maskImage: mask,
           }}
         />
         {core && (
           <div
             className="absolute inset-[38%] rounded-full"
-            style={{ background: `radial-gradient(circle, rgba(255,255,255,${Math.min(0.7, 0.5 * intensity)}) 0%, rgba(${color},${Math.min(0.35, 0.28 * intensity)}) 45%, rgba(${color},0) 70%)` }}
+            style={{
+              background: `radial-gradient(circle, rgba(255,255,255,${Math.min(
+                0.7,
+                0.5 * intensity
+              )}) 0%, rgba(${color},${Math.min(0.35, 0.28 * intensity)}) 45%, rgba(${color},0) 70%)`,
+            }}
           />
         )}
       </div>
     </div>
   );
 }
+
+/**
+ * GOD RAYS / ADAPTIVE SUNBURST
+ * Secara otomatis menggunakan mode 'new' (FX Lab) atau 'classic' (Lama),
+ * atau dapat diatur via prop 'mode'.
+ */
+export function GodRays({
+  size = 520,
+  color = "215,220,255",
+  intensity = 1,
+  className = "",
+  style,
+  core = true,
+  mode: propMode,
+}: {
+  size?: number;
+  color?: string;
+  intensity?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  core?: boolean;
+  mode?: SunburstMode;
+}) {
+  const [globalMode] = useSunburstMode();
+  const activeMode = propMode ?? globalMode;
+
+  if (activeMode === "new") {
+    return (
+      <SunburstFX
+        size={size}
+        color={color}
+        intensity={intensity}
+        className={className}
+        style={style}
+        core={core}
+      />
+    );
+  }
+
+  return (
+    <ClassicGodRays
+      size={size}
+      color={color}
+      intensity={intensity}
+      className={className}
+      style={style}
+      core={core}
+    />
+  );
+}
+
 
 export function Shockwave({ size = 420, color = "rgba(255,255,255,.9)", delay = 0, duration = 0.8 }: { size?: number; color?: string; delay?: number; duration?: number }) {
   return (

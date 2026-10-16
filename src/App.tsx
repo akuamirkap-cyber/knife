@@ -193,6 +193,12 @@ export default function App() {
                           <span className="font-mono">↕</span>
                         </span>
                       )}
+                      {slide.id === 3 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/25 text-emerald-300 font-semibold border border-emerald-400/30 flex items-center gap-0.5">
+                          <span>Sunburst FX</span>
+                          <span>✨</span>
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1 flex-shrink-0">

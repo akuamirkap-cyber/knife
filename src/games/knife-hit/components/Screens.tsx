@@ -5,6 +5,7 @@ import { Burst, Confetti, Dust, Flare, GodRays, GreenButton, LetterPop, Shockwav
 import { RARITY_STYLE, ShinyWeapon, WeaponArt, type Rarity, type WeaponDef } from "../weapons";
 import { ACHIEVEMENTS, MILESTONES, type Stats } from "../achievements";
 import { sfx, vibrate } from "../sfx";
+import { SunburstToggle } from "../sunburstState";
 
 const STAGE = 6;
 const BOSS = "CHEESE";
@@ -402,6 +403,11 @@ export function BoxScreen({ weapon, onDone, bossName = BOSS, level, score }: { w
       <Hud score={score ?? 46} dim level={level} />
       <div className={`absolute inset-0 transition-colors duration-700 ${isOpen ? "bg-black/20" : "bg-black/45"}`} />
 
+      {/* Sunburst Toggle in BoxScreen */}
+      <div className="absolute top-3 right-3 z-30 pointer-events-auto">
+        <SunburstToggle size="xs" />
+      </div>
+
       <div className="absolute inset-x-0 top-[96px] text-center">
         {!showInfo ? (
           <div className={`transition-all duration-300 ${isOpen ? "scale-75 opacity-0" : ""}`}>
@@ -659,11 +665,12 @@ export function RewardScreen({ weapon, equipped, onEquip, onClose, onReplay, bos
               {revealed && <GodRays size={500} intensity={1.15} color={ray} />}
             </div>
 
-            {/* ribbon */}
-            <div className="relative mb-1 flex justify-center">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/45 px-4 py-1 text-[13px] font-black tracking-[0.22em] text-amber-200">
+            {/* ribbon + sunburst mode switch */}
+            <div className="relative mb-1 flex items-center justify-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/45 px-3 py-0.5 text-[12px] font-black tracking-[0.2em] text-amber-200">
                 ★ BOSS LOOT ★
               </span>
+              <SunburstToggle size="xs" />
             </div>
             <h2 className="title-float relative text-[36px] font-black leading-[0.95] text-emerald-300" style={{ textShadow: "0 4px 0 #0a3d28, 0 0 28px rgba(74,222,128,.55)" }}>
               <LetterPop text={bossName} delay={0.25} /><br /><LetterPop text="DEFEATED!" delay={0.45} />

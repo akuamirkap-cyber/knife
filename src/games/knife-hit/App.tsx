@@ -10,6 +10,7 @@ import { ACHIEVEMENTS } from "./achievements";
 import { BONUS_COIN_VALUE, bossesDefeated, completionPct, useSave } from "./progress";
 import { MAX_LEVEL, STAGE_META, bossReward, destroyHP, destroyReward, getStage, normalReward } from "./stages";
 import { audio, sfx } from "./sfx";
+import { SunburstToggle } from "./sunburstState";
 
 type Phase = "menu" | "challenges" | "stage" | "normal" | "box" | "bonus" | "destroy" | "treasure" | "ad" | "reward" | "skipped";
 
@@ -332,6 +333,20 @@ export default function App({ onExit }: { onExit?: () => void }) {
       )}
       <div className="relative h-full w-full overflow-hidden bg-[radial-gradient(ellipse_at_50%_38%,#21454e_0%,#13292f_45%,#0a1519_100%)]">
         <div className="pointer-events-none absolute inset-0 z-40 rounded-[30px] shadow-[inset_0_0_80px_rgba(0,0,0,.55)]" />
+
+        {/* Global Sunburst Mode Toggle (Baru FX Lab / Lama) */}
+        <div className="absolute top-3 right-3 z-40 pointer-events-auto">
+          <SunburstToggle
+            size="sm"
+            onToggled={(m) => {
+              showToast(
+                m === "new"
+                  ? "✨ Sunburst Baru (FX Lab) Aktif!"
+                  : "⚡ Sunburst Lama (God Rays) Aktif!"
+              );
+            }}
+          />
+        </div>
 
         {inGame && (
           <>
