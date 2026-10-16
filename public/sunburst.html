@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunburst FX — Gacha • Bonus Wheel • Treasure Hunt</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; background: #070418; }
+  .font-display { font-family: 'Space Grotesk', sans-serif; }
+  ::selection { background: #8b5cf6; color: white; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #0d0a26; }
+  ::-webkit-scrollbar-thumb { background: #3b2d7a; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: #5b48b8; }
+
+  .grid-bg {
+    background-image: linear-gradient(rgba(139,92,246,.07) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(139,92,246,.07) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+  }
+
+  /* ===== SUNBURST CORE ===== */
+  .sunstage {
+    background: radial-gradient(ellipse 90% 80% at 50% 45%, var(--bg-glow, #1c1350) 0%, var(--bg-deep, #0a0620) 55%, #050312 100%);
+    overflow: hidden;
+  }
+  .spin-layer { position: absolute; inset: -35%; will-change: transform; }
+  .spin-a { animation: spinCW linear infinite; }
+  .spin-b { animation: spinCCW linear infinite; }
+  @keyframes spinCW { to { transform: rotate(360deg); } }
+  @keyframes spinCCW { to { transform: rotate(-360deg); } }
+
+  .rays {
+    position: absolute; inset: 0;
+    /* solid penuh sampai --f1, baru fade halus di ujung sampai --f3 */
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, black 0%, black var(--f1, 55%), rgba(0,0,0,.45) var(--f2, 70%), transparent var(--f3, 84%));
+    mask-image: radial-gradient(circle at 50% 50%, black 0%, black var(--f1, 55%), rgba(0,0,0,.45) var(--f2, 70%), transparent var(--f3, 84%));
+  }
+  /* ===== SUNBURST TUNGGAL — replika "reward 529" (1 lapis, 1 warna) ===== */
+  .reward-halo {
+    position:absolute; left:50%; top:42%; transform:translate(-50%,-50%);
+    width:min(110vw,760px); aspect-ratio:1; border-radius:50%; pointer-events:none; filter:blur(24px);
+    background: radial-gradient(circle, rgba(var(--burst,210,192,255),.30) 0%, rgba(var(--burst,210,192,255),.13) 34%, transparent 68%);
+  }
+  .reward-rays {
+    position:absolute; left:50%; top:42%; width:250%; height:250%; transform:translate(-50%,-50%);
+    pointer-events:none; mix-blend-mode:screen;
+    -webkit-mask-image: radial-gradient(circle, transparent 0%, #000 var(--fade-inner,5%), #000 var(--fade-start,30%), transparent var(--fade-end,42%));
+    mask-image: radial-gradient(circle, transparent 0%, #000 var(--fade-inner,5%), #000 var(--fade-start,30%), transparent var(--fade-end,42%));
+    animation: spinCenter 32s linear infinite;
+  }
+  .reward-glow {
+    position:absolute; left:50%; top:42%; transform:translate(-50%,-50%);
+    width:min(64vw,400px); aspect-ratio:1; border-radius:50%; pointer-events:none;
+    mix-blend-mode:screen; filter:blur(10px);
+    background: radial-gradient(circle, rgba(var(--burst,210,192,255),.95) 0%, rgba(var(--burst,210,192,255),.55) 26%, rgba(var(--burst,210,192,255),.18) 48%, transparent 70%);
+  }
+  .reward-hot {
+    position:absolute; left:50%; top:42%; transform:translate(-50%,-50%);
+    width:min(36vw,200px); aspect-ratio:1; border-radius:50%; pointer-events:none;
+    mix-blend-mode:screen; filter:blur(5px);
+    background: radial-gradient(circle, rgba(var(--burst,210,192,255),1) 0%, rgba(var(--burst,210,192,255),.9) 22%, rgba(var(--burst,210,192,255),.38) 48%, transparent 72%);
+  }
+  .pulsing .reward-hot { animation: glarePulse 2.6s ease-in-out infinite; }
+  #swordFloat { animation: swordFloat 3.4s ease-in-out infinite; }
+  @keyframes spinCenter { from { transform: translate(-50%,-50%) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg); } }
+  @keyframes glarePulse { 0%,100% { opacity:.9; transform: translate(-50%,-50%) scale(1); } 50% { opacity:1; transform: translate(-50%,-50%) scale(1.07); } }
+  @keyframes corePulse { 0%,100% { transform: translate(-50%,-50%) scale(1); opacity: .9; } 50% { transform: translate(-50%,-50%) scale(1.14); opacity: 1; } }
+  @keyframes swordFloat { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-10px) rotate(2deg); } }
+  #stg1 { background: radial-gradient(circle at 50% 42%, var(--bg-glow,#2b1c63) 0%, #180f42 30%, #0b0724 58%, var(--bg-deep,#050316) 100%); }
+  #stg1 .vignette { background: radial-gradient(115% 95% at 50% 42%, transparent 52%, rgba(3,1,14,.68) 100%); }
+
+  .flash-ring {
+    position: absolute; left: 50%; top: 42%; transform: translate(-50%,-50%) scale(.2);
+    width: 30%; aspect-ratio: 1; border-radius: 9999px; pointer-events: none;
+    border: 3px solid rgba(255,255,255,.9); opacity: 0;
+  }
+  .bursting .flash-ring { animation: ringOut .9s cubic-bezier(.16,1,.3,1) forwards; }
+  .bursting .flash-ring.r2 { animation-delay: .12s; }
+  @keyframes ringOut { 0% { opacity: .9; transform: translate(-50%,-50%) scale(.2); } 100% { opacity: 0; transform: translate(-50%,-50%) scale(2.6); } }
+  .bursting #burstFlash { animation: flashOut .7s ease-out forwards; }
+  #burstFlash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.95), transparent 60%); opacity: 0; pointer-events: none; }
+  @keyframes flashOut { 0% { opacity: .85; } 100% { opacity: 0; } }
+  .bursting #swordPop { animation: swordPop .8s cubic-bezier(.34,1.56,.64,1) forwards; }
+  @keyframes swordPop { 0% { transform: scale(1); } 30% { transform: scale(1.35) rotate(-8deg); } 60% { transform: scale(.94); } 100% { transform: scale(1); } }
+
+  .shine-sweep {
+    position: absolute; top: -20%; bottom: -20%; width: 120px; pointer-events: none;
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,.35) 45%, rgba(255,255,255,.7) 50%, rgba(255,255,255,.35) 55%, transparent);
+    filter: blur(6px); transform: skewX(-18deg); left: -30%;
+  }
+  .sweep-on .shine-sweep { animation: sweep 3.8s ease-in-out infinite; }
+  @keyframes sweep { 0% { left: -30%; opacity: 0; } 15% { opacity: 1; } 55% { left: 110%; opacity: 1; } 70%,100% { left: 110%; opacity: 0; } }
+
+  .star-dot { position: absolute; border-radius: 9999px; background: white; animation: twinkle var(--tw,3s) ease-in-out infinite; }
+  @keyframes twinkle { 0%,100% { opacity: .15; transform: scale(.7); } 50% { opacity: .9; transform: scale(1.15); } }
+
+  .vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 90% 85% at 50% 50%, transparent 55%, rgba(3,0,15,.55) 100%); }
+
+  /* sliders */
+  input[type="range"] { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 9999px; background: linear-gradient(90deg, #8b5cf6 var(--fill,50%), #2a2350 var(--fill,50%)); outline: none; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 9999px; background: white; border: 4px solid #8b5cf6; box-shadow: 0 0 12px rgba(139,92,246,.8); transition: transform .15s; }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type="color"] { -webkit-appearance: none; appearance: none; width: 100%; height: 40px; border: none; border-radius: 12px; background: none; cursor: pointer; padding: 0; }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type="color"]::-webkit-color-swatch { border: 2px solid rgba(255,255,255,.2); border-radius: 12px; }
+
+  .toggle { width: 46px; height: 26px; border-radius: 9999px; background: #2a2350; position: relative; cursor: pointer; transition: background .25s; flex-shrink: 0; border: 1px solid rgba(255,255,255,.12); }
+  .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 9999px; background: #8b8fa8; transition: all .25s cubic-bezier(.34,1.56,.64,1); }
+  .toggle.on { background: linear-gradient(90deg, #7c3aed, #a855f7); }
+  .toggle.on::after { left: 22px; background: white; box-shadow: 0 0 10px rgba(255,255,255,.6); }
+
+  .glass { background: rgba(20,14,50,.6); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,.09); }
+  .preset-btn { transition: all .2s; cursor: pointer; }
+  .preset-btn:hover { transform: translateY(-2px); }
+  .preset-btn.active { outline: 2px solid white; outline-offset: 2px; }
+
+  .code-block { font-family: 'JetBrains Mono', 'Space Grotesk', monospace; }
+  .reveal { opacity: 0; transform: translateY(28px); transition: all .8s cubic-bezier(.16,1,.3,1); }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  .marquee-track { display: flex; gap: 1rem; width: max-content; animation: marquee 22s linear infinite; }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+
+  #swordSVG { filter: drop-shadow(0 0 18px rgba(var(--burst,210,192,255),.85)) drop-shadow(0 0 46px rgba(var(--burst,210,192,255),.55)) drop-shadow(0 10px 30px rgba(0,0,0,.6)); }
+
+  /* ===== STAGE TABS ===== */
+  .tab-btn { display: flex; align-items: center; gap: .6rem; padding: .6rem 1rem; border-radius: 16px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); transition: all .25s; cursor: pointer; }
+  .tab-btn:hover { background: rgba(255,255,255,.09); transform: translateY(-1px); }
+  .tab-btn.active { background: linear-gradient(135deg, rgba(124,58,237,.55), rgba(217,70,239,.4)); border-color: rgba(196,181,253,.55); box-shadow: 0 8px 28px rgba(124,58,237,.35); }
+  .tab-num { width: 26px; height: 26px; border-radius: 9px; display: grid; place-items: center; font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px; background: rgba(255,255,255,.12); }
+  .tab-btn.active .tab-num { background: white; color: #4c1d95; }
+
+  /* HUD chips */
+  .hud-chip { display: flex; align-items: center; gap: .5rem; padding: .5rem .9rem; border-radius: 9999px; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.15); backdrop-filter: blur(10px); font-weight: 700; }
+  .chip-pop { animation: chipPop .35s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes chipPop { 40% { transform: scale(1.22); } 100% { transform: scale(1); } }
+
+  /* ===== WHEEL STAGE ===== */
+  .dir-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .7rem; border-radius: 14px; font-weight: 700; font-size: 14px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); transition: all .2s; cursor: pointer; }
+  .dir-btn:hover { background: rgba(255,255,255,.1); }
+  .dir-btn.active { background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #451a03; border-color: #fde68a; box-shadow: 0 6px 22px rgba(245,158,11,.4); }
+
+  .fade-preset { padding:.55rem; border-radius:12px; font-weight:700; font-size:12px; font-family:'Space Grotesk'; letter-spacing:.05em; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.05); transition:all .2s; cursor:pointer; }
+  .fade-preset:hover { background:rgba(255,255,255,.1); transform:translateY(-1px); }
+  .fade-preset.active { background:linear-gradient(135deg,#7c3aed,#a855f7); border-color:rgba(196,181,253,.6); box-shadow:0 5px 18px rgba(124,58,237,.35); }
+
+  /* ===== WEAPON CARDS ===== */
+  .wcard { position: relative; display: flex; align-items: center; gap: .8rem; width: 100%; padding: .8rem; border-radius: 16px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); transition: all .2s; cursor: pointer; overflow: hidden; text-align: left; }
+  .wcard:hover { background: rgba(255,255,255,.08); transform: translateX(3px); }
+  .wcard.active { border-color: rgba(253,230,138,.7); background: linear-gradient(135deg, rgba(245,158,11,.22), rgba(124,58,237,.15)); box-shadow: 0 6px 24px rgba(245,158,11,.22); }
+  .wcard.deny { animation: denyShake .3s; }
+  @keyframes denyShake { 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(3px); } }
+  .wicon { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; flex-shrink: 0; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15); }
+  .wcard.active .wicon { background: rgba(253,230,138,.2); border-color: rgba(253,230,138,.5); }
+  .wcd-fill { position: absolute; left: 0; bottom: 0; height: 3px; background: rgba(255,255,255,.25); width: 0; transition: width .05s linear; }
+  .wchg { position: absolute; left: 0; bottom: 3px; height: 3px; background: linear-gradient(90deg, #fde047, #f59e0b); width: 0; box-shadow: 0 0 10px #f59e0b; }
+
+  /* ===== TREASURE ===== */
+  #chestSvg { transition: filter .2s; }
+  #chestSvg.punch { animation: chestPunch .38s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes chestPunch { 0% { transform: scale(1); } 30% { transform: scale(1.2) rotate(-3deg); } 60% { transform: scale(.96) rotate(1deg); } 100% { transform: scale(1); } }
+  .chest-glow { position: absolute; inset: -55% -30%; background: radial-gradient(ellipse at 50% 30%, rgba(253,224,71,.5), transparent 65%); filter: blur(14px); animation: glowPulse 2.4s ease-in-out infinite; pointer-events: none; }
+  @keyframes glowPulse { 0%,100% { opacity: .55; } 50% { opacity: .95; } }
+  #chestWrap { animation: chestBob 3.4s ease-in-out infinite; }
+  @keyframes chestBob { 0%,100% { transform: translate(-50%,-58%) translateY(0); } 50% { transform: translate(-50%,-58%) translateY(-8px); } }
+
+  #impactStar { position: absolute; left: 50%; top: 46%; width: 90px; height: 90px; transform: translate(-50%,-50%); opacity: 0; pointer-events: none; z-index: 30; }
+  #impactStar.boom { animation: starBoom .45s ease-out forwards; }
+  @keyframes starBoom { 0% { opacity: 1; transform: translate(-50%,-50%) scale(.3) rotate(-15deg); } 70% { opacity: .9; } 100% { opacity: 0; transform: translate(-50%,-50%) scale(1.5) rotate(10deg); } }
+
+  .floater { position: absolute; z-index: 35; font-family: 'Space Grotesk'; font-weight: 700; font-size: 22px; color: #fde68a; text-shadow: 0 0 14px rgba(251,191,36,.9), 0 2px 4px rgba(0,0,0,.6); pointer-events: none; animation: floatUp 1s cubic-bezier(.16,1,.3,1) forwards; }
+  @keyframes floatUp { 0% { opacity: 0; transform: translateY(6px) scale(.6); } 20% { opacity: 1; transform: translateY(-8px) scale(1.15); } 100% { opacity: 0; transform: translateY(-72px) scale(1); } }
+
+  .mode-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .7rem; border-radius: 14px; font-weight: 700; font-size: 13px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); transition: all .2s; cursor: pointer; }
+  .mode-btn:hover { background: rgba(255,255,255,.1); }
+  .mode-btn.active { background: linear-gradient(135deg, #7c3aed, #a855f7); border-color: rgba(196,181,253,.6); box-shadow: 0 6px 22px rgba(124,58,237,.4); }
+</style>
+</head>
+<body class="text-white min-h-screen antialiased overflow-x-hidden">
+
+<div class="fixed inset-0 grid-bg pointer-events-none z-0"></div>
+<div class="fixed -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[500px] rounded-full pointer-events-none z-0" style="background: radial-gradient(ellipse, rgba(124,58,237,.25), transparent 70%); filter: blur(60px);"></div>
+
+<!-- COMPACT 9:16 PLAYGROUND CONTAINER -->
+<div class="h-screen w-full flex flex-col p-2 select-none overflow-hidden bg-[#070418]">
+  <!-- TABS -->
+  <div class="flex items-center gap-1.5 mb-2 bg-white/5 border border-white/10 rounded-xl p-1 flex-shrink-0">
+    <button id="tab1" class="tab-btn active !py-1.5 !px-2 !rounded-lg !text-xs flex-1 justify-center" onclick="setStage(1)">
+      <span class="tab-num !w-4 !h-4 !text-[10px]">1</span>
+      <span class="font-bold">Gacha</span>
+    </button>
+    <button id="tab2" class="tab-btn !py-1.5 !px-2 !rounded-lg !text-xs flex-1 justify-center" onclick="setStage(2)">
+      <span class="tab-num !w-4 !h-4 !text-[10px]">2</span>
+      <span class="font-bold">Wheel</span>
+    </button>
+    <button id="tab3" class="tab-btn !py-1.5 !px-2 !rounded-lg !text-xs flex-1 justify-center" onclick="setStage(3)">
+      <span class="tab-num !w-4 !h-4 !text-[10px]">3</span>
+      <span class="font-bold">Treasure</span>
+    </button>
+  </div>
+
+  <div class="flex-1 w-full flex flex-col overflow-hidden min-h-0">
+    <!-- STAGE AREA -->
+    <div class="glass rounded-2xl p-1 flex-1 w-full flex flex-col overflow-hidden min-h-0">
+      <div id="stageArea" class="relative rounded-xl flex-1 w-full h-full overflow-hidden">
+
+        <!-- ============ STAGE 1 : GACHA ============ -->
+        <div id="stg1" class="sunstage pulsing sweep-on absolute inset-0 select-none" style="--bg-glow:#2b1c63; --bg-deep:#050316; --burst:210,192,255;">
+          <div id="starField" class="absolute inset-0 pointer-events-none"></div>
+          <div id="rewardHalo" class="reward-halo"></div>
+          <div id="rewardRays" class="reward-rays"></div>
+          <div id="rewardGlow" class="reward-glow"></div>
+          <div id="rewardHot" class="reward-hot"></div>
+          <canvas id="cv1" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
+          <div id="sweep" class="shine-sweep z-10"></div>
+          <div id="burstFlash"></div>
+          <div class="flash-ring z-10"></div>
+          <div class="flash-ring r2 z-10"></div>
+
+          <div class="absolute top-0 inset-x-0 p-4 md:p-5 flex items-start justify-between pointer-events-none z-20">
+            <div class="w-10 h-10 rounded-xl grid place-items-center bg-yellow-400/90 text-black shadow-lg shadow-yellow-500/30">
+              <i data-lucide="chevron-left" class="w-6 h-6"></i>
+            </div>
+            <div class="flex items-center gap-2 rounded-full pl-3 pr-1.5 py-1.5 hud-chip">
+              <i data-lucide="coins" class="w-4 h-4 text-yellow-300"></i>
+              <span id="coinCount" class="font-display">529</span>
+              <span class="w-7 h-7 rounded-full grid place-items-center text-white font-bold" style="background: linear-gradient(135deg,#7c3aed,#a855f7);">+</span>
+            </div>
+          </div>
+          <div class="absolute top-[72px] md:top-[78px] inset-x-0 px-4 md:px-5 flex items-center justify-between pointer-events-none z-20">
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-bold tracking-widest text-white/70">USE ALL</span>
+              <div class="w-11 h-6 rounded-full bg-white/15 border border-white/20 relative"><div class="absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white/50"></div></div>
+            </div>
+            <div class="hud-chip !text-xs" style="background: rgba(124,58,237,.7);">
+              <i data-lucide="ticket" class="w-4 h-4"></i> <span id="leftCount">6</span> LEFT
+            </div>
+          </div>
+          <div class="absolute top-[120px] md:top-[130px] inset-x-0 flex justify-center pointer-events-none z-20">
+            <div class="flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] md:text-xs font-display font-bold tracking-[.25em] bg-black/40 border border-violet-400/40 backdrop-blur text-violet-200">
+              <i data-lucide="crown" class="w-3.5 h-3.5 text-yellow-300"></i> LEGENDARY
+            </div>
+          </div>
+
+          <div class="absolute z-20 pointer-events-none" style="left:50%; top:42%; transform:translate(-50%,-50%);">
+            <div id="swordPop"><div id="swordFloat">
+              <svg id="swordSVG" width="200" height="200" viewBox="0 0 200 200" fill="none" class="w-44 h-44 md:w-60 md:h-60">
+                <g transform="rotate(45 100 100)">
+                  <path d="M100 8 L110 34 L110 108 L100 118 L90 108 L90 34 Z" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+                  <path d="M100 8 L104 34 L104 104 L100 110 L96 104 L96 34 Z" fill="#ef4444"/>
+                  <path d="M100 8 L110 34 L110 44 L90 44 L90 34 Z" fill="#e2e8f0" opacity=".6"/>
+                  <path d="M52 118 C62 108, 72 128, 82 120 C90 114, 92 122, 100 122 C108 122, 110 114, 118 120 C128 128, 138 108, 148 118 L142 132 C132 124, 124 140, 114 132 C108 127, 106 132, 100 132 C94 132, 92 127, 86 132 C76 140, 68 124, 58 132 Z" fill="#fbbf24" stroke="#b45309" stroke-width="2.5"/>
+                  <circle cx="52" cy="125" r="5" fill="#fde68a" stroke="#b45309" stroke-width="2"/>
+                  <circle cx="148" cy="125" r="5" fill="#fde68a" stroke="#b45309" stroke-width="2"/>
+                  <circle cx="100" cy="124" r="7" fill="#ef4444" stroke="#b45309" stroke-width="2"/>
+                  <circle cx="100" cy="124" r="2.5" fill="#fecaca"/>
+                  <rect x="94" y="132" width="12" height="30" rx="5" fill="#f97316" stroke="#9a3412" stroke-width="2"/>
+                  <line x1="94" y1="140" x2="106" y2="140" stroke="#9a3412" stroke-width="1.5"/>
+                  <line x1="94" y1="147" x2="106" y2="147" stroke="#9a3412" stroke-width="1.5"/>
+                  <line x1="94" y1="154" x2="106" y2="154" stroke="#9a3412" stroke-width="1.5"/>
+                  <circle cx="100" cy="172" r="9" fill="#fbbf24" stroke="#b45309" stroke-width="2.5"/>
+                  <circle cx="100" cy="172" r="3" fill="#fef3c7"/>
+                </g>
+                <path d="M130 52 l2.5 7 7 2.5 -7 2.5 -2.5 7 -2.5 -7 -7 -2.5 7 -2.5z" fill="white"/>
+                <path d="M62 130 l2 5.5 5.5 2 -5.5 2 -2 5.5 -2 -5.5 -5.5 -2 5.5 -2z" fill="white" opacity=".9"/>
+              </svg>
+            </div></div>
+          </div>
+
+          <div class="absolute bottom-0 inset-x-0 p-4 pointer-events-none z-20">
+            <div class="flex justify-center gap-2 md:gap-3">
+              <div class="w-14 h-16 md:w-20 md:h-24 rounded-t-2xl bg-gradient-to-b from-violet-500/50 to-violet-900/60 border border-t-2 border-x-2 border-b-0 border-violet-300/40 translate-y-4"></div>
+              <div class="w-14 h-20 md:w-20 md:h-28 rounded-t-2xl bg-gradient-to-b from-fuchsia-500/50 to-fuchsia-900/60 border border-t-2 border-x-2 border-b-0 border-fuchsia-300/40 translate-y-4 shadow-lg shadow-fuchsia-600/30"></div>
+              <div class="w-14 h-20 md:w-20 md:h-28 rounded-t-2xl bg-gradient-to-b from-violet-500/60 to-violet-900/70 border border-t-2 border-x-2 border-b-0 border-white/60 translate-y-4 shadow-xl shadow-violet-500/40"></div>
+              <div class="w-14 h-20 md:w-20 md:h-28 rounded-t-2xl bg-gradient-to-b from-indigo-500/50 to-indigo-900/60 border border-t-2 border-x-2 border-b-0 border-indigo-300/40 translate-y-4"></div>
+              <div class="w-14 h-16 md:w-20 md:h-24 rounded-t-2xl bg-gradient-to-b from-violet-500/50 to-violet-900/60 border border-t-2 border-x-2 border-b-0 border-violet-300/40 translate-y-4"></div>
+            </div>
+          </div>
+          <div class="vignette rounded-2xl z-20"></div>
+        </div>
+
+        <!-- ============ STAGE 2 : BONUS WHEEL ============ -->
+        <div id="stg2" class="sunstage pulsing absolute inset-0 select-none hidden" style="--bg-glow:#2a1c07; --bg-deep:#0d0803;">
+          <div id="coreGlow2" class="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none" style="width:42%; aspect-ratio:1; background: radial-gradient(circle, rgba(255,240,190,.8) 0%, rgba(217,119,6,.4) 34%, transparent 70%); filter: blur(14px);"></div>
+          <div id="spinA2" class="spin-layer spin-a"><div id="raysA2" class="rays"></div></div>
+          <div id="spinB2" class="spin-layer spin-b"><div id="raysB2" class="rays" style="opacity:.45; display:none;"></div></div>
+          <canvas id="cv2" class="absolute inset-0 w-full h-full z-10 cursor-pointer"></canvas>
+          <div class="absolute top-4 left-4 z-20 hud-chip !text-sm">
+            <i data-lucide="coins" class="w-5 h-5 text-yellow-300"></i>
+            <span class="text-white/60 text-xs font-semibold">COLECTED</span>
+            <span id="wheelCollect" class="font-display text-yellow-200">0</span>
+          </div>
+          <div class="absolute top-4 right-4 z-20 hud-chip !text-xs !text-amber-100">
+            <i data-lucide="hand" class="w-4 h-4"></i> Klik coin buat ngecollect
+          </div>
+          <div class="absolute bottom-4 inset-x-0 flex justify-center z-20 pointer-events-none">
+            <div class="hud-chip !text-xs !text-amber-200/80"><i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> Bonus Stage — coin merata di semua sisi, mutar satu arah</div>
+          </div>
+          <div class="vignette rounded-2xl z-20"></div>
+        </div>
+
+        <!-- ============ STAGE 3 : TREASURE ============ -->
+        <div id="stg3" class="sunstage pulsing absolute inset-0 select-none hidden" style="--bg-glow:#2c1508; --bg-deep:#100804;">
+          <div class="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none" style="width:44%; aspect-ratio:1; background: radial-gradient(circle, rgba(255,220,150,.85) 0%, rgba(234,88,12,.45) 34%, transparent 70%); filter: blur(14px); animation: corePulse 2.2s ease-in-out infinite;"></div>
+          <div id="spinA3" class="spin-layer spin-a"><div id="raysA3" class="rays"></div></div>
+          <div id="spinB3" class="spin-layer spin-b"><div id="raysB3" class="rays" style="opacity:.5; display:none;"></div></div>
+          <canvas id="cv3" class="absolute inset-0 w-full h-full z-[25] cursor-crosshair"></canvas>
+
+          <!-- treasure chest -->
+          <div id="chestWrap" class="absolute z-20 pointer-events-none" style="left:50%; top:46%; width:150px;">
+            <div class="chest-glow"></div>
+            <svg id="chestSvg" viewBox="0 0 150 118" fill="none" class="w-full drop-shadow-[0_14px_30px_rgba(0,0,0,.7)]">
+              <defs>
+                <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a16207"/><stop offset="1" stop-color="#451a03"/></linearGradient>
+                <linearGradient id="lid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ca8a04"/><stop offset="1" stop-color="#713f12"/></linearGradient>
+                <linearGradient id="goldg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fef3c7"/><stop offset=".5" stop-color="#fbbf24"/><stop offset="1" stop-color="#b45309"/></linearGradient>
+                <radialGradient id="inner" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#fff7cc"/><stop offset=".6" stop-color="#fbbf24"/><stop offset="1" stop-color="#92400e"/></radialGradient>
+              </defs>
+              <ellipse cx="75" cy="14" rx="46" ry="12" fill="url(#inner)" opacity=".9"/>
+              <path d="M17 58 Q17 16 75 13 Q133 16 133 58 L133 66 L17 66 Z" fill="url(#lid)" stroke="#3b1c05" stroke-width="2.5"/>
+              <path d="M30 58 Q30 27 75 25 Q120 27 120 58" stroke="#fbbf24" stroke-width="2" opacity=".55" fill="none"/>
+              <rect x="17" y="60" width="116" height="50" rx="9" fill="url(#wood)" stroke="#3b1c05" stroke-width="2.5"/>
+              <rect x="17" y="60" width="116" height="8" fill="#fbbf24" opacity=".9"/>
+              <rect x="27" y="58" width="10" height="52" rx="3" fill="url(#goldg)" stroke="#78350f" stroke-width="1.5"/>
+              <rect x="66" y="58" width="18" height="52" rx="3" fill="url(#goldg)" stroke="#78350f" stroke-width="1.5"/>
+              <rect x="113" y="58" width="10" height="52" rx="3" fill="url(#goldg)" stroke="#78350f" stroke-width="1.5"/>
+              <rect x="60" y="52" width="30" height="26" rx="6" fill="url(#goldg)" stroke="#78350f" stroke-width="2"/>
+              <circle cx="75" cy="63" r="5" fill="#78350f"/>
+              <rect x="72.5" y="63" width="5" height="9" rx="2" fill="#78350f"/>
+              <circle cx="75" cy="94" r="3.5" fill="#fde68a" opacity=".8"/>
+              <path d="M104 30 l1.8 5 5 1.8 -5 1.8 -1.8 5 -1.8 -5 -5 -1.8 5 -1.8z" fill="white" opacity=".9"/>
+              <circle cx="42" cy="40" r="2" fill="#fef9c3" opacity=".8"/>
+            </svg>
+          </div>
+          <svg id="impactStar" viewBox="0 0 100 100"><path d="M50 2 L58 40 L98 50 L58 60 L50 98 L42 60 L2 50 L42 40 Z" fill="#fff" opacity=".95"/><path d="M50 18 L55 44 L82 50 L55 56 L50 82 L45 56 L18 50 L45 44 Z" fill="#fde047"/></svg>
+
+          <div class="absolute top-4 left-4 z-30 hud-chip !text-sm">
+            <i data-lucide="coins" class="w-5 h-5 text-yellow-300"></i>
+            <span id="treScore" class="font-display text-yellow-200 text-base">0</span>
+          </div>
+          <div id="timerChip" class="absolute top-4 right-4 z-30 hud-chip !text-sm hidden">
+            <i data-lucide="timer" class="w-4 h-4 text-rose-300"></i>
+            <span id="timerVal" class="font-display text-rose-200">30.0</span>
+          </div>
+          <div class="absolute bottom-4 inset-x-0 flex justify-center z-30 pointer-events-none">
+            <div class="hud-chip !text-xs !text-amber-200/80"><i data-lucide="crosshair" class="w-3.5 h-3.5"></i> Klik buat lempar pisau • nabrak pisau lain = YAH (miss)!</div>
+          </div>
+
+          <!-- result overlay -->
+          <div id="resultBox" class="absolute inset-0 z-40 hidden grid place-items-center bg-black/60 backdrop-blur-sm">
+            <div class="glass rounded-3xl p-8 text-center max-w-xs w-[86%] border-2" style="border-color: rgba(251,191,36,.45);">
+              <div class="w-14 h-14 mx-auto rounded-2xl grid place-items-center mb-4" style="background: linear-gradient(135deg,#f59e0b,#fde047);"><i data-lucide="trophy" class="w-7 h-7 text-amber-900"></i></div>
+              <p class="text-xs font-bold tracking-[.3em] text-white/50 uppercase">Round Selesai</p>
+              <p class="font-display font-bold text-5xl my-2 bg-clip-text text-transparent" style="background-image: linear-gradient(90deg,#fde047,#f59e0b);"><span id="resCoins">0</span></p>
+              <p class="text-white/60 text-sm">coin terkumpul • Rekor: <b class="text-yellow-300" id="resBest">0</b></p>
+              <div class="flex gap-2 mt-6">
+                <button onclick="startRound()" class="flex-1 py-2.5 rounded-xl font-bold text-sm text-black" style="background: linear-gradient(135deg,#fde047,#f59e0b);">Main Lagi</button>
+                <button onclick="backToFree()" class="flex-1 py-2.5 rounded-xl font-bold text-sm glass hover:bg-white/10 transition">Bebas</button>
+              </div>
+            </div>
+          </div>
+          <div class="vignette rounded-2xl z-30 pointer-events-none"></div>
+        </div>
+
+      </div>
+
+      <!-- STAGE 1 ACTION BAR -->
+      <div id="s1bar" class="flex flex-wrap items-center gap-2.5 p-3 md:p-4">
+        <button onclick="triggerBurst()" class="flex-1 min-w-[160px] flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-bold text-sm shadow-xl shadow-amber-500/30 hover:scale-[1.02] active:scale-95 transition text-black" style="background: linear-gradient(135deg,#fde047,#f59e0b);">
+          <i data-lucide="zap" class="w-5 h-5"></i> TRIGGER BURST!
+        </button>
+        <button id="btnSpin" class="flex items-center gap-2 px-5 py-3.5 rounded-2xl font-bold text-sm glass hover:bg-white/10 transition">
+          <i data-lucide="pause" class="w-4 h-4"></i> <span>Jeda</span>
+        </button>
+        <button onclick="randomize1()" class="flex items-center gap-2 px-5 py-3.5 rounded-2xl font-bold text-sm glass hover:bg-white/10 transition">
+          <i data-lucide="dices" class="w-4 h-4 text-violet-300"></i> Acak
+        </button>
+      </div>
+    </div>
+    <div style="display:none">
+    <!-- CONTROL PANELS -->
+    <div class="glass rounded-3xl p-5 md:p-6 lg:max-h-[760px] lg:overflow-y-auto">
+
+      <!-- PANEL 1 -->
+      <div id="panel1">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-display font-bold text-lg flex items-center gap-2"><i data-lucide="sliders-horizontal" class="w-5 h-5 text-violet-300"></i> Kontrol Sunburst</h3>
+          <button onclick="reset1()" class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset</button>
+        </div>
+        <p class="text-xs font-bold tracking-widest text-white/50 uppercase mb-2.5">Preset Fade (pangkal → solid → ekor)</p>
+        <div class="grid grid-cols-3 gap-2 mb-4">
+          <button class="fade-preset" data-f="3,33,6">TAJAM</button>
+          <button class="fade-preset" data-f="5,30,12">SEIMBANG</button>
+          <button class="fade-preset" data-f="8,24,18">LEMBUT</button>
+        </div>
+        <p class="text-xs font-bold tracking-widest text-white/50 uppercase mb-2.5">Preset Rarity</p>
+        <div id="presets" class="grid grid-cols-3 gap-2 mb-4"></div>
+        <div class="h-px bg-white/10 mb-4"></div>
+        <div class="flex flex-col gap-4">
+          <div><div class="flex justify-between text-sm mb-2"><span class="font-semibold flex items-center gap-1.5"><i data-lucide="sun" class="w-4 h-4 text-yellow-300"></i> Jumlah Sinar</span><span id="v-rays" class="font-display font-bold text-violet-300">10</span></div><input id="c-rays" type="range" min="2" max="36" value="10" step="2" class="w-full"></div>
+          <div><div class="flex justify-between text-sm mb-2"><span class="font-semibold flex items-center gap-1.5"><i data-lucide="rotate-cw" class="w-4 h-4 text-cyan-300"></i> Kecepatan Putar</span><span id="v-speed" class="font-display font-bold text-violet-300">32s</span></div><input id="c-speed" type="range" min="0" max="100" value="100" class="w-full"></div>
+          <div><div class="flex justify-between text-sm mb-2"><span class="font-semibold flex items-center gap-1.5"><i data-lucide="droplet" class="w-4 h-4 text-violet-300"></i> Opasitas Sinar (alpha)</span><span id="v-opacity" class="font-display font-bold text-violet-300">42%</span></div><input id="c-opacity" type="range" min="2" max="85" value="42" class="w-full"></div>
+          <div><div class="flex justify-between text-sm mb-2"><span class="font-semibold flex items-center gap-1.5"><i data-lucide="scissors" class="w-4 h-4 text-teal-300"></i> Fade Pangkal (fade-in)</span><span id="v-fdi" class="font-display font-bold text-violet-300">2%</span></div><input id="c-fdi" type="range" min="0" max="16" value="2" class="w-full"></div>
+          <div><div class="flex justify-between text-sm mb-2"><span class="font-semibold flex items-center gap-1.5"><i data-lucide="minus" class="w-4 h-4 text-teal-300"></i> Panjang Solid</span><span id="v-fds" class="font-display font-bold text-violet-300">7%</span></div><input id="c-fds" type="range" min="2" max="38" value="7" class="w-full"></div>
+          <div><div class="flex justify-between text-sm mb-2"><span class="font-semibold flex items-center gap-1.5"><i data-lucide="eraser" class="w-4 h-4 text-teal-300"></i> Ekor Ujung (+ ke solid)</span><span id="v-fdt" class="font-display font-bold text-violet-300">+10%</span></div><input id="c-fdt" type="range" min="2" max="22" value="10" class="w-full"></div>
+          <div><div class="flex justify-between text-sm mb-2"><span class="font-semibold flex items-center gap-1.5"><i data-lucide="sparkle" class="w-4 h-4 text-emerald-300"></i> Partikel Sparkle</span><span id="v-parts" class="font-display font-bold text-violet-300">70</span></div><input id="c-parts" type="range" min="0" max="160" value="70" class="w-full"></div>
+        </div>
+        <div class="h-px bg-white/10 my-4"></div>
+        <p class="text-xs font-bold tracking-widest text-white/50 uppercase mb-2.5">Warna</p>
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          <div><input id="c-ray" type="color" value="#d2c0ff"><p class="text-[11px] text-center mt-1.5 text-white/60 font-semibold">Warna Utama (semua)</p></div>
+          <div><input id="c-glow" type="color" value="#7c3aed"><p class="text-[11px] text-center mt-1.5 text-white/60 font-semibold">Partikel</p></div>
+          <div><input id="c-bg" type="color" value="#2b1c63"><p class="text-[11px] text-center mt-1.5 text-white/60 font-semibold">BG</p></div>
+        </div>
+        <div class="h-px bg-white/10 my-4"></div>
+        <div class="flex flex-col gap-3 text-sm font-semibold">
+          <div class="flex items-center justify-between"><span class="flex items-center gap-2"><i data-lucide="heart-pulse" class="w-4 h-4 text-rose-300"></i> Pulse hot-core</span><div id="t-pulse" class="toggle on" onclick="flipToggle(this,'pulse')"></div></div>
+          <div class="flex items-center justify-between"><span class="flex items-center gap-2"><i data-lucide="wand-2" class="w-4 h-4 text-cyan-300"></i> Shine sweep (kilau lewat)</span><div id="t-sweep" class="toggle on" onclick="flipToggle(this,'sweep')"></div></div>
+          <div class="flex items-center justify-between"><span class="flex items-center gap-2"><i data-lucide="star" class="w-4 h-4 text-yellow-300"></i> Bintang latar</span><div id="t-stars" class="toggle on" onclick="flipToggle(this,'stars')"></div></div>
+        </div>
+      </div>
+
+      <!-- PANEL 2 : WHEEL -->
+      <div id="panel2" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-display font-bold text-lg flex items-center gap-2"><i data-lucide="coins" class="w-5 h-5 text-amber-300"></i> Bonus Wheel</h3>
+          <button onclick="resetWheel()" class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset</button>
+        </div>
+        <p class="text-xs font-bold tracking-widest text-white/50 uppercase mb-2.5">Arah Rotasi (satu arah doang)</p>
+        <div class="flex gap-2 mb-5">
+          <button id="dirL" class="dir-btn" onclick="setWheelDir(-1)"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> Muter Kiri</button>
+          <button id="dirR" class="dir-btn active" onclick="setWheelDir(1)"><i data-lucide="rotate-cw" class="w-4 h-4"></i> Muter Kanan</button>
+        </div>
+        <div class="flex flex-col gap-4">
+          <div><div class="flex justify-between text-sm mb-2"><span class="font-semibold flex items-center gap-1.5"><i data-lucide="gauge" class="w-4 h-4 text-amber-300"></i> Kecepatan (nyaman pelan)</span><span id="v-wspeed" class="font-display font-bold text-amber-300">40</span></div><input id="c-wspeed" type="range" min="0" max="100" value="40" class="w-full"></div>
+          <div><div class="flex justify-between text-sm mb-2"><span class="font-semibold flex items-center gap-1.5"><i data-lucide="orbit" class="w-4 h-4 text-amber-300"></i> Coin per Lingkaran</span><span id="v-wcount" class="font-display font-bold text-amber-300">12</span></div><input id="c-wcount" type="range" min="2" max="24" value="12" step="2" class="w-full"></div>
+          <div><div class="flex justify-between text-sm mb-2"><span class="font-semibold flex items-center gap-1.5"><i data-lucide="maximize-2" class="w-4 h-4 text-amber-300"></i> Ukuran Coin</span><span id="v-wsize" class="font-display font-bold text-amber-300">1.0×</span></div><input id="c-wsize" type="range" min="2" max="140" value="100" class="w-full"></div>
+        </div>
+        <div class="h-px bg-white/10 my-4"></div>
+        <div class="flex flex-col gap-3 text-sm font-semibold">
+          <div class="flex items-center justify-between"><span class="flex items-center gap-2"><i data-lucide="sparkle" class="w-4 h-4 text-yellow-300"></i> Kilau & blink coin</span><div id="t-wglint" class="toggle on" onclick="flipToggle(this,'wglint')"></div></div>
+        </div>
+        <div class="mt-5 p-4 rounded-2xl bg-amber-500/10 border border-amber-400/25 text-sm text-white/70 leading-relaxed">
+          <span class="font-bold text-amber-200">Tips:</span> papan mutar terus satu arah (kiri <i>atau</i> kanan), coin terdistribusi merata di keliling. Klik coin-nya buat ngecollect!
+        </div>
+      </div>
+
+      <!-- PANEL 3 : WEAPONS -->
+      <div id="panel3" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-display font-bold text-lg flex items-center gap-2"><i data-lucide="crosshair" class="w-5 h-5 text-amber-300"></i> Senjata</h3>
+          <button onclick="resetTre()" class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset</button>
+        </div>
+        <p class="text-xs text-white/50 mb-3 leading-relaxed">Gaya <b class="text-amber-300">Knife Hit</b>: pisau nancap di peti di titik kamu klik! Semakin berat lemparannya, semakin besar damage-nya — tapi hati-hati, nabrak pisau yang sudah nancap = <b class="text-rose-300">YAH!</b></p>
+        <div id="weaponList" class="flex flex-col gap-2.5 mb-5"></div>
+
+        <p class="text-xs font-bold tracking-widest text-white/50 uppercase mb-2.5">Mode</p>
+        <div class="flex gap-2 mb-5">
+          <button id="modeFree" class="mode-btn active" onclick="backToFree()"><i data-lucide="infinity" class="w-4 h-4"></i> Main Bebas</button>
+          <button id="modeRound" class="mode-btn" onclick="startRound()"><i data-lucide="timer" class="w-4 h-4"></i> Round 30 Detik</button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2.5">
+          <div class="glass rounded-2xl p-3 text-center"><p class="text-[10px] font-bold tracking-widest text-white/40 uppercase">Lemparan</p><p id="stShots" class="font-display font-bold text-xl mt-1">0</p></div>
+          <div class="glass rounded-2xl p-3 text-center"><p class="text-[10px] font-bold tracking-widest text-white/40 uppercase">Rekor 30s</p><p id="stBest" class="font-display font-bold text-xl mt-1 text-yellow-300">0</p></div>
+          <div class="glass rounded-2xl p-3 text-center"><p class="text-[10px] font-bold tracking-widest text-white/40 uppercase">Coin</p><p id="stTotal" class="font-display font-bold text-xl mt-1 text-amber-300">0</p></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- NAMA EFEK -->
+<section id="nama" class="relative z-10 max-w-7xl mx-auto px-5 mt-16 md:mt-24">
+  <div class="text-center max-w-2xl mx-auto reveal">
+    <p class="text-xs font-bold tracking-[.3em] text-violet-300 uppercase mb-3">— Terminologi —</p>
+    <h2 class="font-display font-bold text-3xl md:text-5xl tracking-tight">Jadi, Namanya Apa Sih?</h2>
+    <p class="text-white/60 mt-4 text-sm md:text-base">Jawaban singkat: <span class="text-white font-bold">SUNBURST</span>. Tapi di industri game & motion, efek ini punya banyak nama tergantung konteksnya:</p>
+  </div>
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-10">
+    <div class="glass rounded-3xl p-6 reveal hover:border-violet-400/40 hover:-translate-y-1 transition-all duration-300">
+      <div class="w-12 h-12 rounded-2xl grid place-items-center mb-4" style="background: linear-gradient(135deg,#f59e0b,#ef4444);"><i data-lucide="sun" class="w-6 h-6"></i></div>
+      <h3 class="font-display font-bold text-lg">Sunburst / Radial Burst</h3>
+      <p class="text-white/55 text-sm mt-2 leading-relaxed">Nama paling umum. Sinar lurus memancar dari satu titik pusat (radial), biasanya berputar pelan. Dipakai di poster, komik, dan background reward game.</p>
+      <span class="inline-block mt-4 text-[11px] font-bold px-3 py-1 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30">ISTILAH UMUM</span>
+    </div>
+    <div class="glass rounded-3xl p-6 reveal hover:border-violet-400/40 hover:-translate-y-1 transition-all duration-300" style="transition-delay:.08s">
+      <div class="w-12 h-12 rounded-2xl grid place-items-center mb-4" style="background: linear-gradient(135deg,#22d3ee,#3b82f6);"><i data-lucide="cloud-sun" class="w-6 h-6"></i></div>
+      <h3 class="font-display font-bold text-lg">God Rays / Light Shafts</h3>
+      <p class="text-white/55 text-sm mt-2 leading-relaxed">Istilah sinematik untuk berkas cahaya volumetrik. Di game, versi 2D-nya = sunburst yang dikasih blur + fade biar terlihat seperti cahaya beneran.</p>
+      <span class="inline-block mt-4 text-[11px] font-bold px-3 py-1 rounded-full bg-cyan-400/15 text-cyan-300 border border-cyan-400/30">FILM & 3D</span>
+    </div>
+    <div class="glass rounded-3xl p-6 reveal hover:border-violet-400/40 hover:-translate-y-1 transition-all duration-300" style="transition-delay:.16s">
+      <div class="w-12 h-12 rounded-2xl grid place-items-center mb-4" style="background: linear-gradient(135deg,#a855f7,#ec4899);"><i data-lucide="sparkles" class="w-6 h-6"></i></div>
+      <h3 class="font-display font-bold text-lg">Starburst / Star Glow</h3>
+      <p class="text-white/55 text-sm mt-2 leading-relaxed">Varian dengan sinar lebih runcing & jumlah sedikit (4–8), plus flare bintang 4-point di tengah. Khas efek "item bersinar".</p>
+      <span class="inline-block mt-4 text-[11px] font-bold px-3 py-1 rounded-full bg-fuchsia-400/15 text-fuchsia-300 border border-fuchsia-400/30">VFX ITEM</span>
+    </div>
+    <div class="glass rounded-3xl p-6 reveal hover:border-violet-400/40 hover:-translate-y-1 transition-all duration-300">
+      <div class="w-12 h-12 rounded-2xl grid place-items-center mb-4" style="background: linear-gradient(135deg,#10b981,#84cc16);"><i data-lucide="gem" class="w-6 h-6"></i></div>
+      <h3 class="font-display font-bold text-lg">Rarity Glow / Loot Beam</h3>
+      <p class="text-white/55 text-sm mt-2 leading-relaxed">Nama di game design: warna = kelangkaan. Abu = common, biru = rare, ungu = epic, emas = legendary. Persis yang kamu lihat di screenshot!</p>
+      <span class="inline-block mt-4 text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-400/15 text-emerald-300 border border-emerald-400/30">GAME DESIGN</span>
+    </div>
+    <div class="glass rounded-3xl p-6 reveal hover:border-violet-400/40 hover:-translate-y-1 transition-all duration-300" style="transition-delay:.08s">
+      <div class="w-12 h-12 rounded-2xl grid place-items-center mb-4" style="background: linear-gradient(135deg,#f472b6,#fb7185);"><i data-lucide="zap" class="w-6 h-6"></i></div>
+      <h3 class="font-display font-bold text-lg">Shine Loop / Glint</h3>
+      <p class="text-white/55 text-sm mt-2 leading-relaxed">Kilau putih yang "lewat" berkala + kedip kecil di permukaan item. Selalu dipasangkan dengan sunburst biar item terlihat hidup & premium.</p>
+      <span class="inline-block mt-4 text-[11px] font-bold px-3 py-1 rounded-full bg-rose-400/15 text-rose-300 border border-rose-400/30">MICRO-DETAIL</span>
+    </div>
+    <div class="glass rounded-3xl p-6 reveal hover:border-violet-400/40 hover:-translate-y-1 transition-all duration-300" style="transition-delay:.16s">
+      <div class="w-12 h-12 rounded-2xl grid place-items-center mb-4" style="background: linear-gradient(135deg,#6366f1,#8b5cf6);"><i data-lucide="party-popper" class="w-6 h-6"></i></div>
+      <h3 class="font-display font-bold text-lg">Burst / Impact Flash</h3>
+      <p class="text-white/55 text-sm mt-2 leading-relaxed">Ledakan kilat sesaat saat item muncul: layar putih sekilas + ring mengembang + partikel muncrat. Coba tombol "TRIGGER BURST!" di demo.</p>
+      <span class="inline-block mt-4 text-[11px] font-bold px-3 py-1 rounded-full bg-violet-400/15 text-violet-300 border border-violet-400/30">MOMEN PUNCAK</span>
+    </div>
+  </div>
+</section>
+
+<!-- BEDAH LAYER -->
+<section id="lapisan" class="relative z-10 max-w-7xl mx-auto px-5 mt-16 md:mt-24">
+  <div class="grid lg:grid-cols-2 gap-6 items-stretch">
+    <div class="reveal">
+      <p class="text-xs font-bold tracking-[.3em] text-violet-300 uppercase mb-3">— Cara Kerja —</p>
+      <h2 class="font-display font-bold text-3xl md:text-4xl tracking-tight leading-tight">Bedah Layer:<br>5 Tumpukan Bikin Efeknya Hidup</h2>
+      <p class="text-white/60 mt-4 text-sm md:text-base leading-relaxed">Rahasianya bukan satu gambar, tapi <span class="text-white font-semibold">5 layer transparan ditumpuk</span> dan dianimasikan dengan kecepatan beda. Klik tiap layer buat nyala/matikan di Stage 1.</p>
+      <div class="flex flex-col gap-2.5 mt-6" id="layerList">
+        <button data-layer="bg" class="layer-btn flex items-center gap-4 p-3.5 rounded-2xl glass hover:bg-white/10 transition text-left">
+          <span class="w-9 h-9 rounded-xl grid place-items-center font-display font-bold text-sm shrink-0" style="background:#312e81">1</span>
+          <span><span class="font-bold text-sm block">Background radial gelap</span><span class="text-xs text-white/50">Gradasi ungu tua → hitam, pusat sedikit terang</span></span>
+          <i data-lucide="eye" class="w-4 h-4 ml-auto text-emerald-300"></i>
+        </button>
+        <button data-layer="rays" class="layer-btn flex items-center gap-4 p-3.5 rounded-2xl glass hover:bg-white/10 transition text-left">
+          <span class="w-9 h-9 rounded-xl grid place-items-center font-display font-bold text-sm shrink-0" style="background:#7c3aed">2</span>
+          <span><span class="font-bold text-sm block">Sinar conic — 1 LAPIS doang</span><span class="text-xs text-white/50">24 sinar + mask 3 zona: fade pangkal → solid → fade ekor</span></span>
+          <i data-lucide="eye" class="w-4 h-4 ml-auto text-emerald-300"></i>
+        </button>
+        <button data-layer="core" class="layer-btn flex items-center gap-4 p-3.5 rounded-2xl glass hover:bg-white/10 transition text-left">
+          <span class="w-9 h-9 rounded-xl grid place-items-center font-display font-bold text-sm shrink-0" style="background:#a855f7">3</span>
+          <span><span class="font-bold text-sm block">Inti 3 lapis (halo + glow + hot-core)</span><span class="text-xs text-white/50">Satu warna dengan sinar, blend screen, hot-core denyut 1 → 1.07</span></span>
+          <i data-lucide="eye" class="w-4 h-4 ml-auto text-emerald-300"></i>
+        </button>
+        <button data-layer="parts" class="layer-btn flex items-center gap-4 p-3.5 rounded-2xl glass hover:bg-white/10 transition text-left">
+          <span class="w-9 h-9 rounded-xl grid place-items-center font-display font-bold text-sm shrink-0" style="background:#ec4899">4</span>
+          <span><span class="font-bold text-sm block">Partikel sparkle (canvas)</span><span class="text-xs text-white/50">Debu cahaya melayang + muncrat saat burst</span></span>
+          <i data-lucide="eye" class="w-4 h-4 ml-auto text-emerald-300"></i>
+        </button>
+        <button data-layer="item" class="layer-btn flex items-center gap-4 p-3.5 rounded-2xl glass hover:bg-white/10 transition text-left">
+          <span class="w-9 h-9 rounded-xl grid place-items-center font-display font-bold text-sm shrink-0" style="background:#f59e0b">5</span>
+          <span><span class="font-bold text-sm block">Item + shine sweep</span><span class="text-xs text-white/50">Pedang mengambang + kilau lewat berkala</span></span>
+          <i data-lucide="eye" class="w-4 h-4 ml-auto text-emerald-300"></i>
+        </button>
+      </div>
+    </div>
+    <div class="glass rounded-3xl p-6 md:p-8 reveal flex flex-col justify-center" style="transition-delay:.1s">
+      <h3 class="font-display font-bold text-xl flex items-center gap-2"><i data-lucide="lightbulb" class="w-5 h-5 text-yellow-300"></i> Resep Warna Rarity (standar game)</h3>
+      <div class="flex flex-col gap-3 mt-5">
+        <div class="flex items-center gap-3"><span class="w-24 text-xs font-bold text-white/60">COMMON</span><div class="flex-1 h-10 rounded-xl" style="background: linear-gradient(90deg,#475569,#94a3b8)"></div><code class="text-xs text-white/50 hidden sm:block">#94a3b8</code></div>
+        <div class="flex items-center gap-3"><span class="w-24 text-xs font-bold text-white/60">RARE</span><div class="flex-1 h-10 rounded-xl" style="background: linear-gradient(90deg,#0369a1,#38bdf8)"></div><code class="text-xs text-white/50 hidden sm:block">#38bdf8</code></div>
+        <div class="flex items-center gap-3"><span class="w-24 text-xs font-bold text-white/60">EPIC</span><div class="flex-1 h-10 rounded-xl shadow-lg shadow-violet-600/40" style="background: linear-gradient(90deg,#6d28d9,#c084fc)"></div><code class="text-xs text-white/50 hidden sm:block">#a855f7</code></div>
+        <div class="flex items-center gap-3"><span class="w-24 text-xs font-bold text-white/60">LEGENDARY</span><div class="flex-1 h-10 rounded-xl" style="background: linear-gradient(90deg,#b45309,#fde047)"></div><code class="text-xs text-white/50 hidden sm:block">#fbbf24</code></div>
+        <div class="flex items-center gap-3"><span class="w-24 text-xs font-bold text-white/60">MYTHIC</span><div class="flex-1 h-10 rounded-xl" style="background: linear-gradient(90deg,#be123c,#fb7185)"></div><code class="text-xs text-white/50 hidden sm:block">#f43f5e</code></div>
+      </div>
+      <div class="mt-6 p-4 rounded-2xl bg-violet-600/10 border border-violet-400/25 text-sm text-white/70 leading-relaxed">
+        <span class="font-bold text-violet-200">Fun fact:</span> warna ungu di screenshot kamu = <span class="text-white font-semibold">EPIC</span>. Itulah kenapa ada label "6 LEFT" & bingkai ungu — game sengaja bikin deg-degan sebelum reveal!
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- KODE -->
+<section id="kode" class="relative z-10 max-w-7xl mx-auto px-5 mt-16 md:mt-24 pb-10">
+  <div class="glass rounded-3xl overflow-hidden reveal">
+    <div class="flex flex-wrap items-center justify-between gap-3 p-5 md:p-6 border-b border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl grid place-items-center" style="background: linear-gradient(135deg,#10b981,#22d3ee);"><i data-lucide="code-2" class="w-5 h-5"></i></div>
+        <div>
+          <h2 class="font-display font-bold text-lg md:text-xl">Kode CSS Sunburst — Ikuti Settingan Stage 1</h2>
+          <p class="text-white/50 text-xs md:text-sm">Ubah kontrol di Stage 1, kode ini ikut berubah otomatis. Tinggal copy!</p>
+        </div>
+      </div>
+      <button id="btnCopy" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-black hover:scale-105 active:scale-95 transition" style="background: linear-gradient(135deg,#a7f3d0,#34d399);">
+        <i data-lucide="copy" class="w-4 h-4"></i> <span>Copy CSS</span>
+      </button>
+    </div>
+    <div class="grid md:grid-cols-2">
+      <pre class="code-block text-[12px] md:text-[13px] leading-relaxed p-5 md:p-6 overflow-x-auto text-white/85 bg-black/40"><code id="codeOut"></code></pre>
+      <div class="p-5 md:p-6 border-t md:border-t-0 md:border-l border-white/10 text-sm text-white/60 leading-relaxed">
+        <h3 class="font-display font-bold text-white text-base mb-3">Cara pakai di project-mu</h3>
+        <ol class="flex flex-col gap-3 list-none">
+          <li class="flex gap-3"><span class="w-6 h-6 rounded-lg grid place-items-center text-xs font-bold shrink-0 bg-violet-600">1</span> Copy CSS di samping ke file style-mu.</li>
+          <li class="flex gap-3"><span class="w-6 h-6 rounded-lg grid place-items-center text-xs font-bold shrink-0 bg-violet-600">2</span> Buat <code class="text-violet-300 bg-white/10 px-1.5 py-0.5 rounded">&lt;div class="sunburst"&gt;</code> sebagai wadah, taruh item di tengahnya.</li>
+          <li class="flex gap-3"><span class="w-6 h-6 rounded-lg grid place-items-center text-xs font-bold shrink-0 bg-violet-600">3</span> Ganti warna sinar sesuai rarity item (lihat tabel di atas).</li>
+          <li class="flex gap-3"><span class="w-6 h-6 rounded-lg grid place-items-center text-xs font-bold shrink-0 bg-violet-600">4</span> Tambahkan <code class="text-violet-300 bg-white/10 px-1.5 py-0.5 rounded">mix-blend-mode: screen</code> biar sinar menyatu dengan background.</li>
+        </ol>
+        <div class="mt-5 flex items-center gap-2 text-xs text-white/40">
+          <i data-lucide="cpu" class="w-4 h-4"></i> Murni CSS + canvas — ringan, 60fps, tanpa gambar.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="relative z-10 border-t border-white/10 mt-6">
+  <div class="max-w-7xl mx-auto px-5 py-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/40">
+    <p class="flex items-center gap-2"><i data-lucide="sun" class="w-4 h-4 text-violet-400"></i> SunburstFX — Gacha • Bonus Wheel • Treasure Hunt</p>
+    <p>Namanya <span class="text-white/70 font-semibold">Sunburst / God Rays</span> — sekarang kamu sudah bisa bikin & main semuanya.</p>
+  </div>
+</footer>
+</div> <!-- /display:none -->
+</div> <!-- /main container -->
+
+<script>
+lucide.createIcons();
+const $ = id => document.getElementById(id);
+const TAU = Math.PI*2;
+const rand = (a,b) => a + Math.random()*(b-a);
+const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
+
+function hexToRgb(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+function rgba(h,a){ const [r,g,b]=hexToRgb(h); return `rgba(${r},${g},${b},${a})`; }
+function mixWhite(h,t){ const [r,g,b]=hexToRgb(h); const m=c=>Math.round(c+(255-c)*t); return `rgb(${m(r)},${m(g)},${m(b)})`; }
+function setFill(input){ const p=(input.value-input.min)/(input.max-input.min)*100; input.style.setProperty('--fill',p+'%'); }
+document.querySelectorAll('input[type=range]').forEach(setFill);
+
+/* spark 4-point (twinkle) */
+function spark4(ctx,x,y,r){
+  ctx.beginPath();
+  ctx.moveTo(x, y-r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.quadraticCurveTo(x, y, x, y+r);
+  ctx.quadraticCurveTo(x, y, x-r, y);
+  ctx.quadraticCurveTo(x, y, x, y-r);
+  ctx.closePath();
+}
+/* star 5-point */
+function star5(ctx,x,y,R,r){
+  ctx.beginPath();
+  for(let i=0;i<10;i++){
+    const a=-Math.PI/2 + i*Math.PI/5, rad=i%2? r : R;
+    const px=x+Math.cos(a)*rad, py=y+Math.sin(a)*rad;
+    i? ctx.lineTo(px,py) : ctx.moveTo(px,py);
+  }
+  ctx.closePath();
+}
+/* GOLD COIN — dengan flip 3D & glimmer blink */
+function drawCoin(ctx, x, y, r, flip, glint, t, phase, alpha=1){
+  if(alpha<=0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x,y);
+  ctx.scale(Math.max(0.12,Math.abs(flip))>=0.999? 1 : Math.max(0.12,Math.abs(flip)), 1);
+  ctx.shadowColor='rgba(251,191,36,.85)'; ctx.shadowBlur=r*1.1;
+  const g=ctx.createRadialGradient(-r*.3,-r*.35,r*.1, 0,0,r);
+  g.addColorStop(0,'#fff7d6'); g.addColorStop(.45,'#fcd34d'); g.addColorStop(1,'#d97706');
+  ctx.fillStyle=g;
+  ctx.beginPath(); ctx.arc(0,0,r,0,TAU); ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.lineWidth=Math.max(1.4,r*.14);
+  ctx.strokeStyle='#92400e';
+  ctx.beginPath(); ctx.arc(0,0,r-ctx.lineWidth/2,0,TAU); ctx.stroke();
+  ctx.lineWidth=1;
+  ctx.strokeStyle='rgba(146,64,14,.65)';
+  ctx.beginPath(); ctx.arc(0,0,r*.68,0,TAU); ctx.stroke();
+  ctx.fillStyle='#b45309';
+  star5(ctx,0,0,r*.42,r*.18); ctx.fill();
+  /* highlight statis */
+  ctx.fillStyle='rgba(255,255,255,.45)';
+  ctx.beginPath(); ctx.ellipse(-r*.35,-r*.45,r*.28,r*.14,-.6,0,TAU); ctx.fill();
+  /* glimmer sweep — arc kilat yang berjalan */
+  if(glint>0.03){
+    ctx.strokeStyle=`rgba(255,255,255,${(glint*.9).toFixed(2)})`;
+    ctx.lineWidth=r*.24; ctx.lineCap='round';
+    const a=(t*1.4+phase)%TAU;
+    ctx.beginPath(); ctx.arc(0,0,r*.78, a, a+1.15); ctx.stroke();
+    /* blink sparkle */
+    if(glint>0.65){
+      ctx.fillStyle=`rgba(255,255,255,${((glint-.65)*2.2).toFixed(2)})`;
+      spark4(ctx, r*.5, -r*.55, r*.42); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/* ================================================================
+   STAGE MANAGEMENT
+================================================================ */
+let activeStage = 1;
+function setStage(n){
+  activeStage = n;
+  [1,2,3].forEach(i=>{
+    $('stg'+i).classList.toggle('hidden', i!==n);
+    $('tab'+i).classList.toggle('active', i===n);
+    $('panel'+i).classList.toggle('hidden', i!==n);
+  });
+  $('s1bar').style.display = n===1 ? 'flex':'none';
+  if(n===2){ sizeCv(cv2); if(!wheel.init){ wheel.init=true; wheel.rebuild(); wheel.tinkles=makeTinkles(); } }
+  if(n===3){ sizeCv(cv3); if(!tre.init){ tre.init=true; } }
+  lucide.createIcons();
+}
+
+function sizeCv(cv){
+  const st = cv.closest('.sunstage');
+  const w = st.clientWidth, h = st.clientHeight;
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  cv.width = Math.max(1,w*dpr); cv.height = Math.max(1,h*dpr);
+  cv.getContext('2d').setTransform(dpr,0,0,dpr,0,0);
+  cv._w = w; cv._h = h;
+}
+window.addEventListener('resize', ()=>{ sizeCv(cv1); if(!$('stg2').classList.contains('hidden')) sizeCv(cv2); if(!$('stg3').classList.contains('hidden')) sizeCv(cv3); });
+
+/* gold rays for stage 2 & 3 */
+function raysBg(n, sharp, color, op){
+  const slice=360/n, solid=slice*(sharp/100);
+  return `repeating-conic-gradient(from 0deg at 50% 50%, ${rgba(color,op)} 0deg ${solid.toFixed(1)}deg, transparent ${solid.toFixed(1)}deg ${slice.toFixed(1)}deg)`;
+}
+$('raysA2').style.background = raysBg(16, 42, '#f59e0b', .34);
+$('raysB2').style.background = raysBg(8, 80, '#fbbf24', .3);
+$('spinA2').style.animationDuration = '30s';
+$('spinB2').style.animationDuration = '52s';
+$('raysA3').style.background = raysBg(12, 50, '#f59e0b', .38);
+$('raysB3').style.background = raysBg(6, 78, '#fde047', .32);
+$('spinA3').style.animationDuration = '22s';
+$('spinB3').style.animationDuration = '40s';
+
+/* ================================================================
+   STAGE 1 — SUNBURST GACHA
+================================================================ */
+const state = { rays:10, speed:100, opacity:42, fdi:2, fds:7, fdt:10, parts:70, rayColor:'#d2c0ff', glowColor:'#7c3aed', bgColor:'#2b1c63', pulse:true, sweep:true, stars:true, spinning:true, hidden:{bg:false,rays:false,core:false,parts:false,item:false} };
+const DEFAULTS = JSON.parse(JSON.stringify(state));
+
+const stage1=$('stg1'), starField=$('starField'), sweepEl=$('sweep'), cv1=$('cv1'),
+      rewardRays=$('rewardRays'), rewardHalo=$('rewardHalo'), rewardGlow=$('rewardGlow'), rewardHot=$('rewardHot');
+const ctx1 = cv1.getContext('2d');
+
+function apply1(){
+  /* SATU warna untuk semua: sinar, halo, glow, hot-core, glow pedang */
+  stage1.style.setProperty('--burst', hexToRgb(state.rayColor).join(','));
+  stage1.style.setProperty('--ray-alpha', (state.opacity/100).toFixed(2));
+  /* 1 LAPIS sinar: unit = 360/n, terisi = 50% (polanya tajam-simetris) */
+  const slice=360/state.rays, solid=(slice*.5).toFixed(1);
+  rewardRays.style.background = `repeating-conic-gradient(from 0deg at 50% 50%, rgba(var(--burst), var(--ray-alpha)) 0deg ${solid}deg, transparent ${solid}deg ${slice.toFixed(2)}deg)`;
+  const secs = (!state.spinning || state.speed<=1) ? 0 : Math.round(52 - state.speed*.2);
+  rewardRays.style.animationDuration = secs ? secs+'s' : '0s';
+  /* MASK 3 ZONA: fade pangkal → SOLID → fade ekor (ekor = solid + ekor, BUKAN angka bebas) */
+  stage1.style.setProperty('--fade-inner', state.fdi+'%');
+  stage1.style.setProperty('--fade-start', state.fds+'%');
+  stage1.style.setProperty('--fade-end', (state.fds + Math.max(4,state.fdt))+'%');
+  stage1.style.setProperty('--bg-glow', state.hidden.bg ? '#0a0620' : state.bgColor);
+  stage1.classList.toggle('pulsing', state.pulse);
+  stage1.classList.toggle('sweep-on', state.sweep);
+  starField.style.display = state.stars?'block':'none';
+  rewardRays.style.visibility = state.hidden.rays?'hidden':'visible';
+  rewardHalo.style.visibility = state.hidden.core?'hidden':'visible';
+  rewardGlow.style.visibility = state.hidden.core?'hidden':'visible';
+  rewardHot.style.visibility = state.hidden.core?'hidden':'visible';
+  cv1.style.visibility = state.hidden.parts?'hidden':'visible';
+  $('swordPop').parentElement.style.visibility = state.hidden.item?'hidden':'visible';
+  sweepEl.style.display = (state.sweep && !state.hidden.item)?'block':'none';
+  $('v-rays').textContent=state.rays;
+  $('v-speed').textContent = secs ? secs+'s' : 'OFF';
+  $('v-opacity').textContent=state.opacity+'%';
+  $('v-fdi').textContent=state.fdi+'%';
+  $('v-fds').textContent=state.fds+'%';
+  $('v-fdt').textContent='+'+Math.max(4,state.fdt)+'%';
+  $('v-parts').textContent=state.parts;
+  buildCode(); buildStars();
+}
+
+function buildCode(){
+  const [r,g,b]=hexToRgb(state.rayColor), al=(state.opacity/100).toFixed(2);
+  const slice=(360/state.rays).toFixed(1), solid=(slice*.5).toFixed(1);
+  const secs=Math.max(1,Math.round(52-state.speed*.2));
+  const fe=state.fds+Math.max(4,state.fdt);
+  $('codeOut').textContent =
+`.reward-rays {
+  position: absolute; left: 50%; top: 42%;
+  width: 250%; height: 250%;
+  transform: translate(-50%,-50%);
+  background: repeating-conic-gradient(from 0deg at 50% 50%,
+    rgba(${r},${g},${b},${al}) 0deg ${solid}deg,
+    transparent ${solid}deg ${slice}deg);
+  -webkit-mask-image: radial-gradient(circle,
+    transparent 0%, #000 ${state.fdi}%,
+    #000 ${state.fds}%, transparent ${fe}%);
+  mask-image: radial-gradient(circle,
+    transparent 0%, #000 ${state.fdi}%,
+    #000 ${state.fds}%, transparent ${fe}%);
+  animation: spinCenter ${secs}s linear infinite;
+  mix-blend-mode: screen;
+}
+.reward-glow {
+  /* SEWARNA sinar — satu variable warna */
+  position: absolute; left: 50%; top: 42%;
+  width: min(64vw,400px); aspect-ratio: 1;
+  transform: translate(-50%,-50%); border-radius: 50%;
+  mix-blend-mode: screen; filter: blur(10px);
+  background: radial-gradient(circle,
+    rgba(${r},${g},${b},.95) 0%,
+    rgba(${r},${g},${b},.55) 26%,
+    rgba(${r},${g},${b},.18) 48%, transparent 70%);
+}
+.reward-hot {
+  /* hot-core — silau karena opasitas 1.0, BUKAN warna putih */
+  position: absolute; left: 50%; top: 42%;
+  width: min(36vw,200px); aspect-ratio: 1;
+  transform: translate(-50%,-50%); border-radius: 50%;
+  mix-blend-mode: screen; filter: blur(5px);
+  background: radial-gradient(circle,
+    rgba(${r},${g},${b},1) 0%,
+    rgba(${r},${g},${b},.9) 22%,
+    rgba(${r},${g},${b},.38) 48%, transparent 72%);
+  animation: glarePulse 2.6s ease-in-out infinite;
+}
+@keyframes spinCenter {
+  from { transform: translate(-50%,-50%) rotate(0deg); }
+  to   { transform: translate(-50%,-50%) rotate(360deg); }
+}
+@keyframes glarePulse {
+  0%,100% { opacity:.9; transform: translate(-50%,-50%) scale(1); }
+  50%     { opacity:1;  transform: translate(-50%,-50%) scale(1.07); }
+}`;
+}
+
+function buildStars(){
+  starField.innerHTML='';
+  if(!state.stars) return;
+  for(let i=0;i<40;i++){
+    let x,y,guard=0;
+    /* bintang latar HANYA di area tengah — ujung sinar harus bersih biar fade-nya keliatan */
+    do { x=Math.random()*100; y=Math.random()*100; guard++; }
+    while(Math.hypot(x-50,y-50)>38 && guard<50);
+    const s=document.createElement('div'); s.className='star-dot';
+    const sz=(Math.random()*2.2+.8).toFixed(1);
+    s.style.cssText=`left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;width:${sz}px;height:${sz}px;--tw:${(Math.random()*3+2).toFixed(1)}s;animation-delay:${(Math.random()*3).toFixed(1)}s;`;
+    starField.appendChild(s);
+  }
+}
+
+/* s1 particles */
+let dots=[], boom1=[];
+function spawnAmbient(){
+  dots=[];
+  for(let i=0;i<160;i++){
+    dots.push({x:Math.random(),y:Math.random(),r:rand(.6,2.8),vy:-rand(.0002,.0011),vx:rand(-.0002,.0002),tw:rand(0,TAU),ts:rand(.01,.06),big:Math.random()<.12});
+  }
+}
+function update1(dt){
+  const W=cv1._w||cv1.clientWidth, H=cv1._h||cv1.clientHeight;
+  ctx1.clearRect(0,0,W,H);
+  const [gr,gg,gb]=hexToRgb(state.glowColor);
+  const n=Math.min(160,Math.round(state.parts));
+  for(let i=0;i<n;i++){
+    const p=dots[i];
+    p.y+=p.vy; p.x+=p.vx; p.tw+=p.ts;
+    if(p.y<-.05){p.y=1.05;p.x=Math.random();}
+    const a=.25+Math.abs(Math.sin(p.tw))*.65;
+    const dist=Math.hypot(p.x*W-W/2, p.y*H-H*.46)/(W*.5);
+    /* partikel ikut memudar di area ujung sinar — biar ujung bersih, ga ada bintang */
+    const fade=Math.max(0,1-dist*1.35);
+    if(fade<=0) continue;
+    ctx1.beginPath();
+    ctx1.fillStyle = p.big ? `rgba(255,255,255,${(a*fade+.1).toFixed(2)})` : `rgba(${gr},${gg},${gb},${(a*.7+.05).toFixed(2)})`;
+    ctx1.shadowBlur=p.big?10:7; ctx1.shadowColor=`rgba(${gr},${gg},${gb},.8)`;
+    ctx1.arc(p.x*W,p.y*H,p.r*(p.big?1.4:1),0,TAU); ctx1.fill();
+  }
+  boom1=boom1.filter(p=>p.life>0);
+  for(const p of boom1){
+    p.x+=p.vx; p.y+=p.vy; p.vy+=.12; p.vx*=.985; p.vy*=.985; p.life-=.012;
+    ctx1.beginPath(); ctx1.fillStyle=`rgba(255,255,255,${Math.max(0,p.life).toFixed(2)})`;
+    ctx1.shadowBlur=10; ctx1.shadowColor=`rgba(${gr},${gg},${gb},1)`;
+    ctx1.arc(p.x,p.y,p.r*p.life+.5,0,TAU); ctx1.fill();
+  }
+  ctx1.shadowBlur=0;
+}
+function s1Explode(){
+  const W=cv1._w, H=cv1._h;
+  for(let i=0;i<90;i++){
+    const a=rand(0,TAU), sp=rand(2,11);
+    boom1.push({x:W/2+rand(-20,20),y:H*.46+rand(-20,20),vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,r:rand(1.2,4.2),life:1});
+  }
+}
+function triggerBurst(){
+  stage1.classList.remove('bursting'); void stage1.offsetWidth; stage1.classList.add('bursting');
+  s1Explode();
+  const c=$('coinCount'); c.textContent=+c.textContent+10;
+  const l=$('leftCount'); if(+l.textContent>0) l.textContent=+l.textContent-1;
+  setTimeout(()=>stage1.classList.remove('bursting'),1000);
+}
+
+/* s1 controls */
+function bindRange(id,key){ const el=$(id); el.addEventListener('input',()=>{ state[key]=+el.value; setFill(el); apply1(); }); }
+['c-rays','c-speed','c-opacity','c-fdi','c-fds','c-fdt','c-parts'].forEach(id=>bindRange(id,id.replace('c-','')));
+function bindColor(id,key){ $(id).addEventListener('input',e=>{ state[key]=e.target.value; apply1(); markPreset(); }); }
+bindColor('c-ray','rayColor'); bindColor('c-glow','glowColor'); bindColor('c-bg','bgColor');
+function flipToggle(el,key){ state[key]=!state[key]; el.classList.toggle('on',state[key]); apply1(); }
+
+function reset1(){
+  Object.assign(state,JSON.parse(JSON.stringify(DEFAULTS)));
+  $('c-rays').value=state.rays; $('c-speed').value=state.speed; $('c-opacity').value=state.opacity;
+  $('c-fdi').value=state.fdi; $('c-fds').value=state.fds; $('c-fdt').value=state.fdt; $('c-parts').value=state.parts;
+  $('c-ray').value=state.rayColor; $('c-glow').value=state.glowColor; $('c-bg').value=state.bgColor;
+  document.querySelectorAll('input[type=range]').forEach(setFill);
+  ['pulse','sweep','stars'].forEach(k=>$('t-'+k).classList.add('on'));
+  document.querySelectorAll('.layer-btn').forEach(b=>{ b.style.opacity=1; const i=b.querySelector('i'); if(i) i.setAttribute('data-lucide','eye'); });
+  apply1(); markPreset(); markFadePreset();
+}
+function randomize1(){
+  const hue=()=> '#'+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0');
+  state.rays=[12,16,18,20,24,28][Math.floor(Math.random()*6)];
+  state.speed=Math.floor(rand(55,100)); state.opacity=Math.floor(rand(35,85));
+  state.fdi=Math.floor(rand(0,12)); state.fds=Math.floor(rand(22,36)); state.fdt=Math.floor(rand(6,20));
+  state.rayColor=hue(); state.glowColor=hue();
+  $('c-rays').value=state.rays; $('c-speed').value=state.speed; $('c-opacity').value=state.opacity;
+  $('c-fdi').value=state.fdi; $('c-fds').value=state.fds; $('c-fdt').value=state.fdt;
+  $('c-ray').value=state.rayColor; $('c-glow').value=state.glowColor;
+  document.querySelectorAll('input[type=range]').forEach(setFill);
+  apply1(); markPreset(); markFadePreset(); triggerBurst();
+}
+$('btnSpin').onclick=()=>{
+  state.spinning=!state.spinning; apply1();
+  $('btnSpin').querySelector('span').textContent=state.spinning?'Jeda':'Putar';
+  $('btnSpin').querySelector('i')?.setAttribute('data-lucide', state.spinning?'pause':'play');
+  lucide.createIcons();
+};
+
+/* presets */
+const presets=[
+  {name:'Epic Ungu', ray:'#d2c0ff', glow:'#7c3aed', bg:'#2b1c63', grad:'linear-gradient(135deg,#7c3aed,#c084fc)'},
+  {name:'Gold SSR', ray:'#fde68a', glow:'#f59e0b', bg:'#2a1a05', grad:'linear-gradient(135deg,#b45309,#fde047)'},
+  {name:'Aqua Rare', ray:'#67e8f9', glow:'#0891b2', bg:'#062a33', grad:'linear-gradient(135deg,#0e7490,#67e8f9)'},
+  {name:'Mythic', ray:'#fda4af', glow:'#e11d48', bg:'#2e0a14', grad:'linear-gradient(135deg,#9f1239,#fb7185)'},
+  {name:'Emerald', ray:'#6ee7b7', glow:'#059669', bg:'#052e22', grad:'linear-gradient(135deg,#065f46,#34d399)'},
+  {name:'Sakura', ray:'#f9a8d4', glow:'#db2777', bg:'#2e0a26', grad:'linear-gradient(135deg,#9d174d,#f9a8d4)'},
+];
+const presetWrap=$('presets');
+presets.forEach((p,i)=>{
+  const b=document.createElement('button');
+  b.className='preset-btn rounded-2xl p-2.5 text-left border border-white/10'+(i===0?' active':'');
+  b.innerHTML=`<div class="h-9 rounded-xl mb-1.5" style="background:${p.grad}"></div><p class="text-[11px] font-bold leading-tight">${p.name}</p>`;
+  b.onclick=()=>{ state.rayColor=p.ray; state.glowColor=p.glow; state.bgColor=p.bg;
+    $('c-ray').value=p.ray; $('c-glow').value=p.glow; $('c-bg').value=p.bg; apply1(); markPreset(); };
+  b.dataset.i=i; presetWrap.appendChild(b);
+});
+function markPreset(){
+  document.querySelectorAll('#presets .preset-btn').forEach(b=>{
+    const p=presets[+b.dataset.i];
+    b.classList.toggle('active', p.ray===state.rayColor&&p.glow===state.glowColor&&p.bg===state.bgColor);
+  });
+}
+
+/* preset fade: TAJAM / SEIMBANG / LEMBUT */
+document.querySelectorAll('.fade-preset').forEach(b=>{
+  b.onclick=()=>{
+    [state.fdi,state.fds,state.fdt]=b.dataset.f.split(',').map(Number);
+    $('c-fdi').value=state.fdi; $('c-fds').value=state.fds; $('c-fdt').value=state.fdt;
+    ['c-fdi','c-fds','c-fdt'].forEach(id=>setFill($(id)));
+    apply1(); markFadePreset();
+  };
+});
+function markFadePreset(){
+  document.querySelectorAll('.fade-preset').forEach(b=>{
+    const [a,c,d]=b.dataset.f.split(',').map(Number);
+    b.classList.toggle('active', a===state.fdi&&c===state.fds&&d===state.fdt);
+  });
+}
+
+/* copy */
+$('btnCopy').onclick=async()=>{
+  try{ await navigator.clipboard.writeText($('codeOut').textContent);
+    $('btnCopy').querySelector('span').textContent='Tersalin!';
+    setTimeout(()=>$('btnCopy').querySelector('span').textContent='Copy CSS',1800);
+  }catch(e){}
+};
+
+/* layer buttons → switch to stage 1 */
+document.querySelectorAll('.layer-btn').forEach(btn=>{
+  btn.onclick=()=>{
+    const k=btn.dataset.layer; state.hidden[k]=!state.hidden[k];
+    btn.style.opacity=state.hidden[k]?.45:1;
+    const i=btn.querySelector('i'); if(i){ i.setAttribute('data-lucide', state.hidden[k]?'eye-off':'eye'); i.className='w-4 h-4 ml-auto '+(state.hidden[k]?'text-white/30':'text-emerald-300'); }
+    lucide.createIcons(); apply1(); setStage(1);
+    $('demo').scrollIntoView({behavior:'smooth',block:'start'});
+  };
+});
+
+/* ================================================================
+   STAGE 2 — BONUS WHEEL (papan muter 1 arah, coin merata)
+================================================================ */
+const cv2=$('cv2'), ctx2=cv2.getContext('2d');
+const wheel={ init:false, angle:0, dir:1, dirT:1, speed:40, count:12, size:1, coins:[], sparks:[], tinkles:[], collected:0, glint:true };
+
+function makeTinkles(){
+  const a=[];
+  for(let i=0;i<26;i++) a.push({x:Math.random(),y:Math.random(),ph:rand(0,TAU),sp:rand(.6,1.6),r:rand(1.5,3.5)});
+  return a;
+}
+function wheelRebuild(){
+  wheel.coins=[];
+  const outer=wheel.count;
+  let inner=Math.round(outer*2/3/2)*2; if(inner<6) inner=6;
+  for(let i=0;i<outer;i++) wheel.coins.push({ring:0, a0:i/outer*TAU, bob:rand(0,TAU), gl:rand(0,TAU), state:'idle', t:0});
+  for(let i=0;i<inner;i++) wheel.coins.push({ring:1, a0:(i+.5)/inner*TAU, bob:rand(0,TAU), gl:rand(0,TAU), state:'idle', t:0});
+}
+const wheelRebuildRef = wheelRebuild;
+wheel.rebuild = wheelRebuildRef;
+
+function setWheelDir(d){
+  wheel.dirT=d;
+  $('dirL').classList.toggle('active', d===-1);
+  $('dirR').classList.toggle('active', d===1);
+}
+function resetWheel(){
+  wheel.collected=0; $('wheelCollect').textContent='0';
+  wheel.angle=0; setWheelDir(1);
+  wheel.speed=40; $('c-wspeed').value=40; $('v-wspeed').textContent='40'; setFill($('c-wspeed'));
+  wheel.count=12; $('c-wcount').value=12; $('v-wcount').textContent='12'; setFill($('c-wcount'));
+  wheel.size=1; $('c-wsize').value=100; $('v-wsize').textContent='1.0×'; setFill($('c-wsize'));
+  wheelRebuild();
+}
+
+$('c-wspeed').addEventListener('input',e=>{ wheel.speed=+e.target.value; $('v-wspeed').textContent=wheel.speed; setFill(e.target); });
+$('c-wcount').addEventListener('input',e=>{ wheel.count=+e.target.value; $('v-wcount').textContent=wheel.count; setFill(e.target); wheelRebuild(); });
+$('c-wsize').addEventListener('input',e=>{ wheel.size=e.target.value/100; $('v-wsize').textContent=wheel.size.toFixed(1)+'×'; setFill(e.target); });
+(function(){ const el=$('t-wglint'); if(!el.dataset.bound){ el.dataset.bound=1; el.onclick=()=>{ wheel.glint=!wheel.glint; el.classList.toggle('on',wheel.glint); }; } })();
+
+cv2.addEventListener('pointerdown', e=>{
+  const r=cv2.getBoundingClientRect();
+  const x=e.clientX-r.left, y=e.clientY-r.top;
+  const W=cv2._w, H=cv2._h, cx=W/2, cy=H*.46;
+  const R=Math.min(W,H)*.36;
+  let best=null, bd=1e9;
+  for(const c of wheel.coins){
+    if(c.state!=='idle') continue;
+    const a=c.a0+wheel.angle;
+    const rr=(c.ring? R*.62 : R) + Math.sin(T*2+c.bob)*3;
+    const px=cx+Math.cos(a)*rr, py=cy+Math.sin(a)*rr;
+    const d=Math.hypot(px-x,py-y);
+    const hitR=(c.ring? R*.09:R*.11)*wheel.size+12;
+    if(d<hitR && d<bd){ bd=d; best=c; }
+  }
+  if(best){
+    best.state='pop'; best.t=0;
+    wheel.collected++;
+    $('wheelCollect').textContent=wheel.collected;
+    const chip=$('wheelCollect').parentElement; chip.classList.remove('chip-pop'); void chip.offsetWidth; chip.classList.add('chip-pop');
+    const a=best.a0+wheel.angle, rr=(best.ring? R*.62:R);
+    for(let i=0;i<12;i++){
+      const sa=rand(0,TAU), sp=rand(1,4);
+      wheel.sparks.push({x:cx+Math.cos(a)*rr, y:cy+Math.sin(a)*rr, vx:Math.cos(sa)*sp, vy:Math.sin(sa)*sp-1, life:1});
+    }
+  }
+});
+
+function wheelUpdate(dt){
+  wheel.dir += (wheel.dirT-wheel.dir)*Math.min(1,dt*3.2);
+  const omega = Math.pow(wheel.speed/100,1.5)*1.15;
+  wheel.angle += wheel.dir*omega*dt;
+  for(const c of wheel.coins){
+    if(c.state==='pop'){ c.t+=dt/0.38; if(c.t>=1){ c.state='respawn'; c.t=0; } }
+    else if(c.state==='respawn'){ c.t+=dt/0.55; if(c.t>=1){ c.state='idle'; c.t=0; } }
+  }
+  wheel.sparks=wheel.sparks.filter(s=>s.life>0);
+  for(const s of wheel.sparks){ s.x+=s.vx; s.y+=s.vy; s.vy+=.05; s.life-=dt*1.8; }
+}
+function wheelDraw(){
+  const W=cv2._w||cv2.clientWidth, H=cv2._h||cv2.clientHeight;
+  ctx2.clearRect(0,0,W,H);
+  const cx=W/2, cy=H*.46, R=Math.min(W,H)*.36;
+
+  /* ambient twinkles */
+  for(const t of wheel.tinkles){
+    const a=.1+.3*Math.abs(Math.sin(T*t.sp+t.ph));
+    ctx2.fillStyle=`rgba(255,240,200,${a.toFixed(2)})`;
+    ctx2.beginPath(); ctx2.arc(t.x*W,t.y*H,t.r*.7,0,TAU); ctx2.fill();
+  }
+
+  /* papan / disc */
+  const disc=ctx2.createRadialGradient(cx,cy,R*.1,cx,cy,R*1.15);
+  disc.addColorStop(0,'rgba(251,191,36,.10)'); disc.addColorStop(.75,'rgba(251,191,36,.05)'); disc.addColorStop(1,'rgba(251,191,36,0)');
+  ctx2.fillStyle=disc;
+  ctx2.beginPath(); ctx2.arc(cx,cy,R*1.15,0,TAU); ctx2.fill();
+
+  /* ring + tick marks (berputar dengan papan) */
+  ctx2.save(); ctx2.translate(cx,cy); ctx2.rotate(wheel.angle);
+  ctx2.strokeStyle='rgba(251,191,36,.4)'; ctx2.lineWidth=2;
+  ctx2.beginPath(); ctx2.arc(0,0,R,0,TAU); ctx2.stroke();
+  ctx2.strokeStyle='rgba(251,191,36,.28)'; ctx2.lineWidth=1.5;
+  ctx2.beginPath(); ctx2.arc(0,0,R*.62,0,TAU); ctx2.stroke();
+  const tickN=wheel.count*2;
+  for(let i=0;i<tickN;i++){
+    const a=i/tickN*TAU;
+    const r1=R*(i%2? .945:.965), r2=R*1.03;
+    ctx2.strokeStyle=i%2?'rgba(251,191,36,.35)':'rgba(253,230,138,.8)';
+    ctx2.lineWidth=i%2?1:2.5;
+    ctx2.beginPath();
+    ctx2.moveTo(Math.cos(a)*r1,Math.sin(a)*r1);
+    ctx2.lineTo(Math.cos(a)*r2,Math.sin(a)*r2);
+    ctx2.stroke();
+  }
+  ctx2.restore();
+
+  /* coins */
+  const rOut=R*.11*wheel.size, rIn=R*.09*wheel.size;
+  for(const c of wheel.coins){
+    const a=c.a0+wheel.angle;
+    const rr=(c.ring? R*.62:R)+Math.sin(T*2+c.bob)*3;
+    const r=c.ring? rIn:rOut;
+    let scale=1, alpha=1, off=0;
+    if(c.state==='pop'){ scale=1+c.t*.9; alpha=1-c.t; off=c.t*16; }
+    else if(c.state==='respawn'){ const e=1-Math.pow(1-c.t,3); scale=e; alpha=e; }
+    const px=cx+Math.cos(a)*(rr+off), py=cy+Math.sin(a)*(rr+off);
+    const glint = wheel.glint ? Math.pow(Math.max(0,Math.sin(T*1.7+c.gl)),6) : 0;
+    drawCoin(ctx2, px, py, r*scale, Math.cos(T*1.2+c.gl), glint, T, c.gl, alpha);
+  }
+
+  /* center big coin */
+  const rc=R*.16*wheel.size;
+  const gc=Math.pow(Math.max(0,Math.sin(T*1.3)),6);
+  ctx2.save();
+  ctx2.translate(cx,cy); ctx2.rotate(wheel.angle*.5);
+  ctx2.restore();
+  drawCoin(ctx2, cx, cy, rc, Math.cos(T*.9), gc, T, 1.3, 1);
+  /* emblem di atas center coin ikut muter */
+  ctx2.save(); ctx2.globalAlpha=.9;
+  ctx2.translate(cx,cy); ctx2.rotate(wheel.angle);
+  ctx2.fillStyle='rgba(146,64,14,.85)';
+  star5(ctx2,0,0,rc*.5,rc*.22); ctx2.fill();
+  ctx2.restore();
+
+  /* sparks */
+  for(const s of wheel.sparks){
+    ctx2.fillStyle=`rgba(255,246,200,${Math.max(0,s.life).toFixed(2)})`;
+    spark4(ctx2,s.x,s.y,7*s.life+1); ctx2.fill();
+  }
+}
+
+/* ================================================================
+   STAGE 3 — TREASURE HUNT
+================================================================ */
+const cv3=$('cv3'), ctx3=cv3.getContext('2d');
+const chestSvg=$('chestSvg'), impactStar=$('impactStar'), stg3=$('stg3');
+
+const WEAPONS=[
+  {name:'Silet Kilat', icon:'zap', cd:.16, charge:0, coins:1, flight:.22, size:42, spin:16, color:'#7dd3fc', tag:'Cepat banget', dps:'≈ 6 coin/dtk', kind:'knife'},
+  {name:'Karambit', icon:'swords', cd:.45, charge:0, coins:2, flight:.26, size:50, spin:14, color:'#fdba74', tag:'Ngeles neng', dps:'≈ 4 coin/dtk', kind:'knife'},
+  {name:'Bilah Kembar', icon:'swords', cd:.95, charge:.35, coins:3, flight:.3, size:52, spin:15, color:'#c4b5fd', tag:'Dua bilah sekaligus', dps:'≈ 3 coin/dtk', kind:'twin'},
+  {name:'OLITORATOR', icon:'axe', cd:1.6, charge:.9, coins:[4,5], flight:.5, size:86, spin:9, color:'#fca5a5', tag:'Aks gede • 4–5 coin', dps:'≈ 3 coin/dtk', kind:'axe'},
+];
+let weaponIdx=0;
+const coinsFor=w=>Array.isArray(w.coins)? (Math.random()<.5? w.coins[0] : w.coins[1]) : w.coins;
+
+const tre={ init:false, score:0, best:0, shots:0, timeLeft:30, round:false,
+  knives:[], stuck:[], falling:[], coinsA:[], pending:[], pendingThrow:[], sparks3:[], shake:0,
+  lastShot:-9, charging:null, aim:null };
+
+function buildWeaponCards(){
+  const wrap=$('weaponList'); wrap.innerHTML='';
+  WEAPONS.forEach((w,i)=>{
+    const b=document.createElement('button');
+    b.className='wcard'+(i===weaponIdx?' active':'');
+    b.dataset.i=i;
+    const coinTxt = Array.isArray(w.coins)? `${w.coins[0]}–${w.coins[1]} coin/lemparan` : `${w.coins} coin/lemparan`;
+    b.innerHTML=`
+      <div class="wicon"><i data-lucide="${w.icon}" class="w-5 h-5" style="color:${w.color}"></i></div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center justify-between gap-2">
+          <p class="font-bold text-sm truncate">${w.name}</p>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style="background:${rgba(w.color,.18)}; color:${w.color}; border:1px solid ${rgba(w.color,.4)}">${w.dps}</span>
+        </div>
+        <p class="text-[11px] text-white/50 mt-0.5 truncate">${w.cd*1000|0}ms • ${coinTxt}</p>
+        <p class="text-[11px] text-amber-200/80 mt-0.5">${w.tag}</p>
+      </div>
+      <div class="wcd-fill"></div>
+      <div class="wchg"></div>`;
+    b.onclick=()=>selectWeapon(i);
+    wrap.appendChild(b);
+  });
+  lucide.createIcons();
+}
+function selectWeapon(i){
+  weaponIdx=i;
+  document.querySelectorAll('.wcard').forEach(c=>c.classList.toggle('active', +c.dataset.i===i));
+}
+
+function resetTre(){
+  tre.score=0; tre.shots=0; tre.round=false;
+  tre.knives=[]; tre.stuck=[]; tre.falling=[]; tre.coinsA=[]; tre.pending=[]; tre.pendingThrow=[]; tre.shake=0; tre.charging=null; tre.aim=null;
+  $('resultBox').classList.add('hidden');
+  $('timerChip').classList.add('hidden');
+  $('modeRound').classList.remove('active'); $('modeFree').classList.add('active');
+  syncTreHud();
+}
+function startRound(){
+  resetTre();
+  tre.round=true; tre.timeLeft=30;
+  $('modeFree').classList.remove('active'); $('modeRound').classList.add('active');
+  $('timerChip').classList.remove('hidden');
+}
+function backToFree(){ resetTre(); }
+
+function syncTreHud(){
+  $('treScore').textContent=tre.score;
+  $('stTotal').textContent=tre.score;
+  $('stShots').textContent=tre.shots;
+  $('stBest').textContent=tre.best;
+}
+
+/* throwing — KNIPE HIT STYLE: pisau terbang, nancap di titik klik */
+function floatTxt(txt,x,y,color){
+  const f=document.createElement('div');
+  f.className='floater'; f.textContent=txt;
+  if(color) f.style.color=color;
+  f.style.left=(x-18)+'px'; f.style.top=(y-16)+'px';
+  stg3.appendChild(f); setTimeout(()=>f.remove(),1000);
+}
+function chestRect(){
+  const r=chestSvg.getBoundingClientRect(), s=stg3.getBoundingClientRect();
+  return { x:r.left-s.left, y:r.top-s.top, w:r.width, h:r.height };
+}
+/* gambar pisau — ujung (0,0), gagang ke arah +y */
+function drawKnifeLocal(ctx, kind, size, color){
+  if(kind==='axe'){
+    /* tangkai */
+    ctx.fillStyle='#8a5a20';
+    ctx.fillRect(-size*.05, size*.14, size*.1, size*.72);
+    ctx.fillStyle='#3f3f46';
+    ctx.beginPath(); ctx.arc(0, size*.9, size*.07, 0, TAU); ctx.fill();
+    /* kepala aks */
+    const g=ctx.createLinearGradient(-size*.05,0, size*.36,0);
+    g.addColorStop(0,'#f1f5f9'); g.addColorStop(1,'#94a3b8');
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.moveTo(-size*.06, size*.02);
+    ctx.lineTo(size*.34, size*.02);
+    ctx.quadraticCurveTo(size*.42, size*.17, size*.3, size*.34);
+    ctx.lineTo(-size*.06, size*.3);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(-size*.04, size*.05); ctx.lineTo(size*.33, size*.05); ctx.stroke();
+    ctx.fillStyle=color; ctx.fillRect(-size*.06, size*.12, size*.05, size*.12);
+  } else {
+    /* bilah */
+    const g=ctx.createLinearGradient(-size*.18,0, size*.18,0);
+    g.addColorStop(0,'#eef2f7'); g.addColorStop(.5,'#c7d2de'); g.addColorStop(1,'#8fa0b3');
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.quadraticCurveTo(size*.22, size*.28, size*.14, size*.52);
+    ctx.lineTo(-size*.14, size*.52);
+    ctx.quadraticCurveTo(-size*.22, size*.28, 0,0);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(-size*.02, size*.05); ctx.lineTo(-size*.11, size*.48); ctx.stroke();
+    /* guard + gagang */
+    ctx.fillStyle='#3f3f46';
+    ctx.fillRect(-size*.17, size*.52, size*.34, size*.09);
+    ctx.fillStyle='#52525b';
+    ctx.fillRect(-size*.09, size*.61, size*.18, size*.33);
+    ctx.fillStyle=color;
+    ctx.fillRect(-size*.09, size*.66, size*.18, size*.06);
+    ctx.fillStyle='#3f3f46';
+    ctx.beginPath(); ctx.arc(0, size*.98, size*.09, 0, TAU); ctx.fill();
+  }
+}
+function tryFire(){
+  const w=WEAPONS[weaponIdx];
+  if(tre.charging) return;
+  if(T-tre.lastShot < w.cd){
+    const card=document.querySelectorAll('.wcard')[weaponIdx];
+    card.classList.remove('deny'); void card.offsetWidth; card.classList.add('deny');
+    return;
+  }
+  if(w.charge>0){ tre.charging={w, t:0}; }
+  else throwNow(w);
+}
+function throwNow(w){
+  tre.lastShot=T; tre.shots++; $('stShots').textContent=tre.shots;
+  const chest=chestRect();
+  const aim=tre.aim || {x:chest.x+chest.w/2, y:chest.y+chest.h/2};
+  const sx=cv3._w/2+rand(-46,46), sy=cv3._h+50;
+  if(w.kind==='twin'){
+    tre.pendingThrow.push({t:0, w, n:2, ox:aim.x-16, oy:aim.y+8, sx, sy});
+    tre.pendingThrow.push({t:.08, w, n:1, ox:aim.x+16, oy:aim.y-6, sx:sx+rand(-14,14), sy});
+  } else {
+    tre.pendingThrow.push({t:0, w, n:coinsFor(w), ox:aim.x, oy:aim.y, sx, sy});
+  }
+}
+function resolveImpact(k){
+  const chest=chestRect();
+  const ccx=chest.x+chest.w/2, ccy=chest.y+chest.h/2;
+  /* KECET! nabrak pisau yang sudah nancap */
+  let hit=null, hd=1e9;
+  for(const s of tre.stuck){
+    const d=Math.hypot(k.x-s.x, k.y-s.y);
+    if(d<15 && d<hd){ hd=d; hit=s; }
+  }
+  if(hit){
+    const d=hd||1;
+    tre.falling.push({x:k.x, y:k.y, vx:(k.x-hit.x)/d*rand(180,320), vy:rand(-330,-220), rot:k.rot, rotSpd:rand(-9,9), size:k.size, kind:k.kind, color:k.color, life:1.3});
+    floatTxt('YAH!', k.x, k.y-6, '#fda4af');
+    tre.shake=3;
+    for(let i=0;i<5;i++) tre.sparks3.push({x:k.x,y:k.y,vx:rand(-4,4),vy:rand(-6,-1),life:.7});
+    return;
+  }
+  /* NANCAP! */
+  tre.stuck.push({x:k.x, y:k.y, ang:Math.atan2(k.y-ccy, k.x-ccx), size:k.size, kind:k.kind, color:k.color, t:0, wob:rand(0,TAU)});
+  if(tre.stuck.length>12){
+    const o=tre.stuck.shift();
+    tre.falling.push({x:o.x,y:o.y,vx:rand(-140,140),vy:-170,rot:o.ang,rotSpd:rand(-8,8),size:o.size,kind:o.kind,color:o.color,life:1.2});
+  }
+  const big=k.kind==='axe';
+  for(let i=0;i<k.n;i++) tre.pending.push({t:i*.055, ox:k.x, oy:k.y, big});
+  if(big || k.kind==='twin'){
+    chestSvg.classList.remove('punch'); void chestSvg.offsetWidth; chestSvg.classList.add('punch');
+  }
+  impactStar.style.left=k.x+'px'; impactStar.style.top=k.y+'px';
+  impactStar.classList.remove('boom'); void impactStar.offsetWidth; impactStar.classList.add('boom');
+  tre.shake=big?9:3;
+  for(let i=0;i<(big?14:8);i++){
+    const a=rand(0,TAU), sp=rand(2,7);
+    tre.sparks3.push({x:k.x,y:k.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,life:1});
+  }
+  floatTxt('+'+k.n, k.x, k.y-14);
+}
+cv3.addEventListener('pointerdown', e=>{
+  const r=stg3.getBoundingClientRect();
+  const chest=chestRect();
+  tre.aim={ x:clamp(e.clientX-r.left, chest.x+10, chest.x+chest.w-10), y:clamp(e.clientY-r.top, chest.y+10, chest.y+chest.h-10) };
+  tryFire();
+});
+document.addEventListener('keydown', e=>{
+  if(activeStage!==3) return;
+  if(['1','2','3','4'].includes(e.key)) selectWeapon(+e.key-1);
+});
+
+function endRound(){
+  tre.round=false;
+  tre.best=Math.max(tre.best, tre.score);
+  $('timerChip').classList.add('hidden');
+  $('resCoins').textContent=tre.score;
+  $('resBest').textContent=tre.best;
+  $('resultBox').classList.remove('hidden');
+  lucide.createIcons();
+  syncTreHud();
+}
+
+function treUpdate(dt){
+  if(tre.round){
+    tre.timeLeft-=dt;
+    $('timerVal').textContent=Math.max(0,tre.timeLeft).toFixed(1);
+    if(tre.timeLeft<=0){ endRound(); return; }
+  }
+  /* charging — windup lemparan */
+  if(tre.charging){
+    tre.charging.t+=dt;
+    if(tre.charging.t>=tre.charging.w.charge){
+      const w=tre.charging.w; tre.charging=null;
+      throwNow(w);
+    }
+  }
+  tre.shake=Math.max(0,tre.shake-dt*26);
+
+  const W=cv3._w, H=cv3._h;
+  const floorY=H-16;
+
+  /* antrian lemparan */
+  tre.pendingThrow=tre.pendingThrow.filter(p=>{
+    p.t-=dt;
+    if(p.t<=0){
+      tre.knives.push({x:p.sx, y:p.sy, sx:p.sx, sy:p.sy, tx:p.ox, ty:p.oy, t:0, flight:p.w.flight, rot:rand(0,TAU), rotSpd:p.w.spin*(Math.random()<.5?-1:1), size:p.w.size, color:p.w.color, kind:p.w.kind, n:p.n, trail:[]});
+      return false;
+    }
+    return true;
+  });
+
+  /* pisau beterbangan (spin cepet ala Knife Hit) */
+  tre.knives=tre.knives.filter(k=>{
+    k.t+=dt; k.rot+=k.rotSpd*dt;
+    const p=Math.min(1,k.t/k.flight);
+    k.x=k.sx+(k.tx-k.sx)*p;
+    k.y=k.sy+(k.ty-k.sy)*p-Math.sin(Math.PI*p)*16;
+    k.trail.push({x:k.x,y:k.y}); if(k.trail.length>6) k.trail.shift();
+    if(p>=1){ resolveImpact(k); return false; }
+    return true;
+  });
+
+  /* pisau terlempar / jatuh */
+  tre.falling=tre.falling.filter(f=>{
+    f.life-=dt; f.vy+=1400*dt; f.x+=f.vx*dt; f.y+=f.vy*dt; f.rot+=f.rotSpd*dt;
+    return f.life>0 && f.y<H+90;
+  });
+
+  /* wobble pisau yang nancap */
+  for(const s of tre.stuck) s.t+=dt;
+
+  /* pending coins dari titik tusukan */
+  tre.pending=tre.pending.filter(p=>{
+    p.t-=dt;
+    if(p.t<=0){
+      tre.coinsA.push({
+        x:p.ox+rand(-14,14), y:p.oy-4,
+        vx:rand(-170,170), vy:-(rand(250,430)+(p.big?130:30)),
+        r:rand(10,14), a:rand(0,TAU), av:rand(-7,7),
+        settle:0, state:'fly', c:0
+      });
+      tre.score++; syncTreHud();
+      const chip=$('treScore').parentElement; chip.classList.remove('chip-pop'); void chip.offsetWidth; chip.classList.add('chip-pop');
+      return false;
+    }
+    return true;
+  });
+
+  /* COIN PHYSICS — natural pile */
+  const G=1500;
+  for(const c of tre.coinsA){
+    if(c.state==='collect'){
+      c.c+=dt/0.35;
+      const tx=60, ty=36, k=c.c;
+      c.x+=(tx-c.x)*Math.min(1,dt*10);
+      c.y+=(ty-c.y)*Math.min(1,dt*10);
+      c.r=Math.max(0,(1-k)*12);
+      continue;
+    }
+    c.vy+=G*dt; c.x+=c.vx*dt; c.y+=c.vy*dt; c.a+=c.av*dt;
+    if(c.y+c.r>floorY){ c.y=floorY-c.r; c.vy*=-0.34; c.vx*=.86; c.av*=.9; if(Math.abs(c.vy)<70)c.vy=0; }
+    if(c.x-c.r<4){ c.x=4+c.r; c.vx*=-.5; }
+    if(c.x+c.r>W-4){ c.x=W-4-c.r; c.vx*=-.5; }
+    const rest = c.y+c.r>=floorY-2 && Math.abs(c.vx)<26 && Math.abs(c.vy)<26;
+    if(rest) c.settle+=dt; else c.settle=0;
+    if(c.settle>2.4) c.state='collect';
+  }
+  /* soft separation biar tumpukannya natural */
+  const cs=tre.coinsA;
+  for(let i=0;i<cs.length;i++) for(let j=i+1;j<cs.length;j++){
+    const A=cs[i],B=cs[j];
+    const dx=B.x-A.x, dy=B.y-A.y;
+    const min=A.r+B.r, d2=dx*dx+dy*dy;
+    if(d2>0.01 && d2<min*min){
+      const d=Math.sqrt(d2), push=(min-d)/2;
+      const nx=dx/d, ny=dy/d;
+      A.x-=nx*push; B.x+=nx*push;
+      if(A.y>floorY-30) A.y-=push*.3;
+      if(B.y>floorY-30) B.y-=push*.3;
+    }
+  }
+  tre.coinsA=tre.coinsA.filter(c=>!(c.state==='collect'&&c.c>=1));
+  if(tre.coinsA.length>130){ const old=tre.coinsA.find(c=>c.state!=='collect'); if(old) old.state='collect'; }
+
+  tre.sparks3=tre.sparks3.filter(s=>s.life>0);
+  for(const s of tre.sparks3){ s.x+=s.vx; s.y+=s.vy; s.vy+=.18; s.life-=dt*1.6; }
+
+  /* cooldown bars */
+  const w=WEAPONS[weaponIdx];
+  document.querySelectorAll('.wcard').forEach((c,i)=>{
+    const cd=c.querySelector('.wcd-fill'), ch=c.querySelector('.wchg');
+    if(i===weaponIdx){
+      const remain=clamp((w.cd-(T-tre.lastShot))/w.cd,0,1);
+      cd.style.width=(remain*100)+'%';
+      ch.style.width = tre.charging? (tre.charging.t/tre.charging.w.charge*100)+'%' : '0';
+    } else { cd.style.width='0'; ch.style.width='0'; }
+  });
+}
+
+function treDraw(){
+  const W=cv3._w, H=cv3._h;
+  ctx3.clearRect(0,0,W,H);
+  ctx3.save();
+  if(tre.shake>0) ctx3.translate(rand(-tre.shake,tre.shake)*.6, rand(-tre.shake,tre.shake)*.6);
+
+  const Wc=cv3._w;
+  const w=WEAPONS[weaponIdx];
+
+  /* windup charge — siluet senjata nggede di bawah */
+  if(tre.charging){
+    const p=tre.charging.t/tre.charging.w.charge;
+    const cw=tre.charging.w;
+    ctx3.save();
+    ctx3.translate(Wc/2, H-12);
+    ctx3.rotate(Math.sin(p*Math.PI*3)*.3-.6*(1-p));
+    const sc=.4+.6*p;
+    ctx3.scale(sc,sc);
+    ctx3.globalAlpha=.35+.5*p;
+    drawKnifeLocal(ctx3, cw.kind, cw.size, cw.color);
+    ctx3.restore();
+    ctx3.strokeStyle='#fde047'; ctx3.lineWidth=3; ctx3.lineCap='round';
+    ctx3.beginPath(); ctx3.arc(Wc/2, H-12-cw.size*.35, 24, -Math.PI/2, -Math.PI/2+TAU*p); ctx3.stroke();
+  }
+
+  /* pisau yang NANCAP di peti (khas Knife Hit) */
+  for(const s of tre.stuck){
+    const wob=Math.sin(s.t*18)*.09*Math.max(0,1-s.t*3);
+    ctx3.save();
+    ctx3.translate(s.x,s.y);
+    ctx3.rotate(s.ang-Math.PI/2+wob);
+    ctx3.fillStyle='rgba(0,0,0,.4)';
+    ctx3.beginPath(); ctx3.ellipse(0,0,s.size*.09,s.size*.05,0,0,TAU); ctx3.fill();
+    drawKnifeLocal(ctx3, s.kind, s.size, s.color);
+    ctx3.restore();
+  }
+
+  /* pisau beterbangan (tumbling + trail) */
+  for(const k of tre.knives){
+    for(let i=1;i<k.trail.length;i++){
+      ctx3.strokeStyle=`rgba(255,255,255,${(i/k.trail.length*.22).toFixed(2)})`;
+      ctx3.lineWidth=2;
+      ctx3.beginPath(); ctx3.moveTo(k.trail[i-1].x,k.trail[i-1].y); ctx3.lineTo(k.trail[i].x,k.trail[i].y); ctx3.stroke();
+    }
+    ctx3.save();
+    ctx3.translate(k.x,k.y); ctx3.rotate(k.rot);
+    ctx3.translate(0,-k.size/2);
+    drawKnifeLocal(ctx3,k.kind,k.size,k.color);
+    ctx3.restore();
+  }
+
+  /* pisau terlempar / jatuh */
+  for(const f of tre.falling){
+    ctx3.save();
+    ctx3.globalAlpha=clamp(f.life,0,1);
+    ctx3.translate(f.x,f.y); ctx3.rotate(f.rot);
+    ctx3.translate(0,-f.size/2);
+    drawKnifeLocal(ctx3,f.kind,f.size,f.color);
+    ctx3.restore();
+  }
+
+  /* COINS — dengan glimmer blink mengkilat */
+  for(const c of tre.coinsA){
+    const glint=Math.pow(Math.max(0,Math.sin(T*2+c.a)),5)*.95;
+    ctx3.globalAlpha = c.state==='collect'? Math.max(0,1-c.c) : 1;
+    drawCoin(ctx3, c.x, c.y, c.r, Math.cos(c.a), glint, T, c.a, ctx3.globalAlpha);
+    ctx3.globalAlpha=1;
+  }
+
+  /* sparks */
+  for(const s of tre.sparks3){
+    ctx3.fillStyle=`rgba(255,240,180,${Math.max(0,s.life).toFixed(2)})`;
+    spark4(ctx3,s.x,s.y,8*s.life+1); ctx3.fill();
+  }
+  ctx3.restore();
+}
+
+/* ================================================================
+   GLOBAL LOOP
+================================================================ */
+let T=0, last=performance.now();
+function frame(now){
+  const dt=Math.min((now-last)/1000,.05); last=now; T+=dt;
+  if(activeStage===1) update1(dt);
+  else if(activeStage===2){ wheelUpdate(dt); wheelDraw(); }
+  else if(activeStage===3){ treUpdate(dt); treDraw(); }
+  requestAnimationFrame(frame);
+}
+
+/* reveal on scroll */
+const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); }),{threshold:.12});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+/* INIT */
+sizeCv(cv1); spawnAmbient(); apply1(); markFadePreset(); buildWeaponCards(); syncTreHud();
+requestAnimationFrame(frame);
+setTimeout(triggerBurst, 900);
+</script>
+</body>
+</html>

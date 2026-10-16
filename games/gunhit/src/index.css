@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: #05060a;
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.font-game {
+  font-family: 'Russo One', system-ui, sans-serif;
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.pop-in { animation: pop-in 0.45s cubic-bezier(.2,.9,.3,1.3) both; }
+
+@keyframes pulse-btn {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 196, 0, 0.55); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 14px rgba(255, 196, 0, 0); }
+}
+.pulse-btn { animation: pulse-btn 1.6s ease-in-out infinite; }
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.float-y { animation: float-y 2.4s ease-in-out infinite; }

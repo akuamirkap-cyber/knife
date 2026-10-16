@@ -1,0 +1,211 @@
+================================================================
+DESAIN HALAMAN PETA LEVEL — Perfect Shot (Knife Hit-like)
+File: docs/desain-peta-level.txt
+Komponen: ChallengesScreen di src/components/MenuScreens.tsx
+Sumber data: src/stages.ts + src/components/Bosses.tsx
+================================================================
+
+----------------------------------------------------------------
+1. TUJUAN HALAMAN
+----------------------------------------------------------------
+- Menampilkan progres 100 level dalam 1 layar scroll.
+- Pemain langsung paham: level mana NORMAL / BONUS / HARTA / BOSS,
+  mana yang sudah tamat, mana yang terkunci, mana posisi sekarang.
+- Tap chip = langsung main level itu (tidak ada langkah ekstra).
+- 1 halaman menggantikan 3 konsep lama: list banner, tower vertikal,
+  dan galeri boss — digabung jadi peta chapter + kartu boss + chip.
+
+----------------------------------------------------------------
+2. STRUKTUR LAYOUT (atas ke bawah)
+----------------------------------------------------------------
+[1] BACKGROUND
+- Gradient vertikal teal gelap: #1d4a54 -> #102a30 -> #081619
+- Pola titik radial putih 7% ukuran 22px (tekstur halus).
+- Vignette inset 42px hitam 38% (tidak terlalu tebal).
+- 8 partikel Dust melayang.
+
+[2] HEADER (tinggi ~60px)
+- Kiri: tombol back ‹ (44px, oranye gradient, border-b 4px).
+- Tengah: judul "PETA 100 LEVEL" 22px black + sub
+  "20 boss, tap chip stage untuk main" 12px putih 55%.
+- Kanan: pil "Lv 1-100" 13px.
+
+[3] LEGENDA SIMBOL (grid 4 kolom)
+- 4 kotak: NORMAL / BONUS / HARTA / BOSS.
+- Tiap kotak: simbol emoji 20px di atas + label 12px warna khas.
+- Warna background kotak = warna simbol dengan alpha 15%.
+- Fungsi: pemain tidak perlu menebak arti chip di bawahnya.
+- Definisi tunggal di src/stages.ts -> STAGE_META:
+  normal  : simbol Kayu,  warna #d6a35c
+  bonus   : simbol Roda,  warna #fbbf24
+  treasure: simbol Harta, warna #fde047
+  boss    : simbol Mahkota, warna #fb7185
+
+[4] LIST CHAPTER (area scroll utama, flex-1)
+- 4 chapter: LEMBANG TUNAS (1-25 hijau) / TELUK KARAT (26-50 biru) /
+  NGARAI GLOOM (51-75 ungu) / PUNCAK EMAS (76-100 emas).
+- Header chapter: garis 3px warna chapter + nama 13px tracking lebar
+  + pil "Lv X-Y" 12px. Jelas batas tiap 25 level.
+
+[5] KARTU BOSS (1 kartu = 1 blok 5 level)
+- Container: rounded-2xl, border 2px, bg #0d2329 95%.
+  Aktif (terpilih): border putih 70% + shadow. Nonaktif: border putih 10%.
+- Baris atas (button full-width):
+  * Kiri: lingkaran boss 58px, border putih 3px + glow warna boss
+    (blur 5px). Boss final (index 19) ada mahkota kecil di pojok.
+    Kalau boss sudah tamat: badge hijau ✓ di kanan bawah lingkaran.
+  * Tengah: nama boss 17px black truncate + pil "LEVEL X" 12px +
+    bintang difficulty 1-5 + pola serangan + jumlah pisau 12px.
+  * Kanan: kotak gradient warna boss berisi ikon Mahkota 18px.
+- Baris bawah: GRID 5 CHIP (1 chip = 1 level):
+  * Tiap chip: simbol 17px + nomor level 12px tabular.
+  * Chip boss: background = gradient warna boss tersebut.
+  * Chip normal/bonus/harta: bg putih 5%.
+  * STATE chip (prioritas visual):
+    1. Terkunci (level > highestUnlocked): simbol jadi Gembok,
+       bg hitam 40%, opacity 60%, angka putih 40%.
+    2. Posisi sekarang (level == currentLevel): border kuning +
+       bg kuning 15% + glow kuning.
+    3. Sudah tamat: badge hijau ✓ + bintang kuning ★ (1-3).
+    4. Biasa: seperti default di atas.
+  * Tap chip terkunci = bunyi error + tidak terjadi apa-apa.
+    Tap chip terbuka = langsung main level itu.
+
+[6] PANEL DETAIL BOSS TERPILIH (sticky di bawah list)
+- Bukan modal — selalu terlihat, isi berganti saat tap kartu boss.
+- Baris 1: lingkaran 60px + nomor urut boss (1-20) + nama 17px +
+  Lv + bintang + label pola (misal "Putar balik" kuning).
+- Baris 2: 2 tombol rintangan (accordion): ikon 16px + nama 12px +
+  "info/tutup". Tap untuk buka deskripsi cara menghadapi.
+- Baris 3: tombol hijau besar "LAWAN NAMA - LEVEL X".
+  Kalau level boss belum terbuka: teks jadi "LEVEL X TERKUNCI"
+  dan tap hanya bunyi error.
+
+[7] BOTTOM NAV (3 tombol)
+- MAP (kembali ke menu) / SKINS (buka Armory) / LEAGUE (buka Trophy).
+- Bulat 52px ungu gradient, border-b 5px, label 12px tracking lebar.
+
+----------------------------------------------------------------
+3. SISTEM WARNA & TEKS
+----------------------------------------------------------------
+- Background: teal gelap (bukan biru cerah) agar konsisten dengan
+  tema game.
+- Teks minimal 12px, font-black untuk angka/nama (aturan proyek).
+- Judul 22px, nama boss 17px, chip 12-17px, label kecil 12px.
+- Tidak ada teks 8-11px di halaman ini.
+- Warna chapter = warna progres: hijau -> biru -> ungu -> emas.
+- Warna chip boss = warna boss itu sendiri (gradasi ungu Sprouty
+  beda dengan oranye Mimic, dst) sehingga tiap blok mudah dibedakan.
+
+----------------------------------------------------------------
+4. INTERAKSI & STATE (props masuk)
+----------------------------------------------------------------
+Props ChallengesScreen:
+- completed: Record<level, {done, stars, best}> — untuk ✓ & ★.
+- highestUnlocked: number — batas gembok.
+- currentLevel: number — highlight kuning.
+- onPlayStage(phase, bossId, level) — dipanggil tap chip / tombol lawan.
+- onBack / onSkins / onLeague — navigasi.
+
+Alur tap:
+- Tap header kartu boss -> setSel(boss) + reset accordion (preview saja).
+- Tap chip terbuka -> sfx.click + onPlayStage(phase, boss, level).
+- Tap chip terkunci -> sfx.tick(error), tanpa navigasi.
+- Tap tombol LAWAN -> cek kunci -> onPlayStage("stage", sel, levelBoss).
+
+----------------------------------------------------------------
+5. DATA FLOW LEVEL
+----------------------------------------------------------------
+- getStage(level) di src/stages.ts menentukan jenis:
+  level % 5 == 0 -> boss (bossIndex = level/5 - 1)
+  level % 5 == 3 -> bonus
+  level % 5 == 4 -> treasure
+  sisanya        -> normal
+- blockLevels(i) = [i*5+1 ... i*5+5] untuk 5 chip tiap kartu boss.
+- STAGE_META[kind].phase memetakan ke fase game:
+  normal->"normal", bonus->"bonus", treasure->"treasure", boss->"stage".
+
+----------------------------------------------------------------
+6. KENAPA DESAIN INI DIPILIH
+----------------------------------------------------------------
+- 1 layar menjawab 3 pertanyaan: "sudah sampai mana, apa isinya,
+  pencet yang mana" — tanpa tab tambahan.
+- Chip bernomor menghilangkan ambiguitas banner teks ("Challenge 1"
+  tidak jelas nomor levelnya).
+- Legenda selalu di atas sehingga pemain baru langsung paham simbol.
+- Kartu boss memberi identitas tiap 5 level (wajah + nama + pola),
+  chip memberi presisi (nomor + jenis + status).
+- Panel detail tetap terlihat agar pemain bisa baca rintangan
+  SEBELUM menekan lawan (mengurangi gagal buta).
+
+----------------------------------------------------------------
+7. MASTER PROMPT (siap copy-paste untuk recreate / AI)
+----------------------------------------------------------------
+Buatkan halaman "Peta 100 Level" untuk game mobile portrait 380px,
+gaya kartun tebal (font black, border-b 3D, rounded-2xl), tema teal
+gelap (#1d4a54 ke #081619) + tekstur titik halus + vignette tipis.
+
+Struktur vertikal:
+1. Header: tombol back oranye kiri, judul "PETA 100 LEVEL" 22px +
+   sub "20 boss, tap chip stage untuk main" 12px, pil "Lv 1-100".
+2. Legenda 4 kotak: NORMAL Kayu coklat, BONUS Roda kuning,
+   HARTA Harta emas, BOSS Mahkota pink. Simbol 20px + label 12px.
+3. List scroll 4 chapter berwarna (hijau, biru, ungu, emas),
+   tiap chapter berisi 5 kartu boss.
+4. Tiap kartu boss: lingkaran wajah boss 58px + glow + nama 17px +
+   pil LEVEL + bintang 1-5 + label pola + tombol mahkota kanan.
+   Di bawahnya grid 5 chip bernomor: simbol + angka level.
+   Chip boss pakai gradient warna boss itu.
+5. State chip: terkunci = ikon gembok + redup 60%; posisi sekarang =
+   border + glow kuning; tamat = badge hijau + bintang 1-3.
+6. Panel detail sticky: lingkaran boss + nomor urut + nama + bintang +
+   2 tombol rintangan accordion (tap untuk buka deskripsi) +
+   tombol hijau besar "LAWAN NAMA - LEVEL X" (terkunci = teks gembok).
+7. Bottom nav 3 tombol bulat ungu: MAP / SKINS / LEAGUE + label 12px.
+8. Semua teks minimal 12px. Semua tombol ada sfx klik dan animasi
+   active:scale. Tap chip terkunci = bunyi error tanpa navigasi.
+
+Data: 100 level pola berulang tiap 5 level (normal, normal, bonus,
+treasure, boss), 20 boss dengan pola steady/pulse/wobble/pause/
+reverse/accel/chaos, tiap boss 2 rintangan (ikon + nama + deskripsi).
+
+----------------------------------------------------------------
+8. FILE TERKAIT
+----------------------------------------------------------------
+- src/components/MenuScreens.tsx -> ChallengesScreen (UI halaman ini)
+- src/stages.ts -> STAGE_META, CHAPTERS, getStage, blockLevels
+- src/components/Bosses.tsx -> BOSSES, BossTarget (20 wajah)
+- src/progress.ts -> completed, highestUnlocked (status bintang/gembok)
+- src/App.tsx -> playLevel, playStageFromMap (navigasi tap chip)
+================================================================
+
+================================================================
+REVISI (snake path + skor hanya setelah boss)
+================================================================
+- Pola level diubah: 1 normal, 2 normal, 3 bonus, 4 normal, 5 boss
+  (60 Normal + 20 Bonus + 20 Boss). HARTA jadi mode sampingan.
+- Menang stage biasa (normal/bonus/harta): TIDAK ada layar skor,
+  koin ditambah tanpa skor, lalu OTOMATIS lanjut ke level berikut.
+- Skor (+skor) hanya dihitung setelah ngalahin BOSS
+  (bonus koin boss di layar reward + gacha senjata).
+- Peta dirombak jadi snake path vertikal 100 node (lihat kode
+  ChallengesScreen terbaru): header + bintang total, legenda
+  NORMAL/BONUS/BOSS/FINAL, jalur S zig-zag (50-31-19-32-50-69-81-68%,
+  tiap 106px), node 46/46/58/66px, garis BAB tiap 5 level, bendera
+  MULAI, mahkota LEVEL 100, auto-scroll ke node KAMU, modal detail
+  (showcase + chip LEVEL/JENIS/BAB + rintangan FASE 1/2/3 + quick
+  facts + bintang + NANTI/MULAI).
+- Tema warna tetap teal yang sudah ada (bukan emerald spek awal).
+================================================================
+
+================================================================
+REVISI 2 (destroy + tanpa jeda skor)
+================================================================
+- Legenda jadi 5: NORMAL / BONUS / DESTROY (batu, #cbbfae) /
+  BOSS / FINAL.
+- Node destroy 46px batu dengan glow stone; modal showcase mini
+  batu + berlian; chip LEVEL n · DESTROY STAGE · BAB n;
+  judul "HANCURKAN BATU!" + fakta damage & tanpa-timer.
+- Menang stage biasa langsung auto-lanjut (tanpa layar skor/tombol);
+  skor hanya dihitung setelah boss.
+================================================================

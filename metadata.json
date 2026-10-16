@@ -1,0 +1,6 @@
+{
+  "name": "Game Arcade Hub",
+  "description": "Pilih dan mainkan 4 game seru: Diamond Breaker, Sunburst FX, Gun Hit, dan Perfect Shot Knife Boss.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

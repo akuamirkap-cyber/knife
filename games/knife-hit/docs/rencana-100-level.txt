@@ -1,0 +1,176 @@
+================================================================
+IDE SISTEM LEVEL 1-100 : NORMAL STAGE / BONUS STAGE / BOSS STAGE
+Game: Perfect Shot (Knife Hit-like)
+Status: SUDAH DIIMPLEMENTASIKAN secara best & matang (lihat §8)
+================================================================
+
+----------------------------------------------------------------
+1. RINGKASAN KONSEP
+----------------------------------------------------------------
+- Total 100 level, dibagi pola berulang tiap 5 level.
+- Ada 20 BOSS (satu boss tiap kelipatan 5).
+- Ada 3 JENIS stage + 1 varian bonus, masing-masing punya
+  SIMBOL, WARNA, dan NAMA yang konsisten di SEMUA layar
+  (menu, peta, HUD stage, reward) supaya rapi & jelas.
+
+----------------------------------------------------------------
+2. POLA 5 LEVEL (diulang 20x dari level 1 sampai 100)
+----------------------------------------------------------------
+| Posisi | Jenis        | Simbol | Warna     | Isi                        |
+|--------+--------------+--------+-----------+----------------------------|
+| +1     | NORMAL       | 🪵     | Abu/hijau | Kayu polos, 5 pisau        |
+| +2     | NORMAL+      | 🪵     | Abu/hijau | Kayu polos, 6 pisau, cepat |
+| +3     | BONUS        | 🎡     | Kuning    | Roda koin, 6 pisau         |
+| +4     | HARTA KARUN  | 💰     | Emas      | Tembak peti 10 detik       |
+| +5     | BOSS         | 👑     | Merah     | Lawan 1 boss (JS unik!)    |
+
+Contoh:
+  Level 1 🪵, 2 🪵, 3 🎡, 4 💰, 5 👑 (BOSS 1: SPROUTY)
+  Level 6 🪵, 7 🪵, 8 🎡, 9 💰, 10 👑 (BOSS 2: TIKI GRRR)
+  ...
+  Level 96 🪵, 97 🪵, 98 🎡, 99 💰, 100 👑 (BOSS 20: SOLARION)
+
+Total: 40 Normal + 20 Bonus + 20 Harta + 20 Boss = 100. PAS!
+
+Aturan main:
+- Normal & Bonus & Harta BOLEH diulang kapan saja (farming koin).
+- Boss HARUS menang berurutan untuk buka chapter berikutnya
+  (atau: boss boleh dicoba, tapi bintang/progress tercatat).
+- Kalah di Boss = tetap dapat hadiah hiburan kecil, bisa retry.
+
+----------------------------------------------------------------
+3. SIMBOL & WARNA (dipakai konsisten di semua UI)
+----------------------------------------------------------------
+- 🪵 NORMAL  : lingkaran KAYU polos, tanpa wajah. Warna coklat.
+- 🎡 BONUS   : RODA KOIN emas, putar 1 arah, 10 koin merata.
+- 💰 HARTA   : PETI TERBUKA penuh koin + timer 10 detik.
+- 👑 BOSS    : lingkaran WAJAH BOSS + mahkota kecil di peta.
+- 🔒 TERKUNCI: boss/chapter belum terbuka, hitam-putih + gembok.
+- ✓ SELESAI  : badge hijau di node yang sudah menang.
+- 📍 KAMU    : penanda posisi progres pemain di peta.
+
+Legenda simbol SELALU tampil di atas layar peta supaya jelas.
+
+----------------------------------------------------------------
+4. 4 CHAPTER (tiap 25 level, masing-masing 5 boss)
+----------------------------------------------------------------
+- CH 1 "LEMBANG TUNAS"  (Lv  1-25)  : hijau muda, tutorial.
+- CH 2 "TELUK KARAT"    (Lv 26-50)  : biru laut, menengah.
+- CH 3 "NGARAI GLOOM"   (Lv 51-75)  : ungu gelap, sulit.
+- CH 4 "PUNCAK EMAS"    (Lv 76-100) : emas/merah, ekspert + final.
+
+----------------------------------------------------------------
+5. DAFTAR 20 BOSS + URUTAN JENIS SERANGAN (termudah -> tersulit)
+----------------------------------------------------------------
+Prinsip urutan: kenalkan SATU mekanik baru tiap 1-2 boss.
+steady -> pulse -> wobble -> pause -> reverse -> accel -> chaos.
+
+#  Lv  Nama         Pola     Pisau Speed Diff Rintangan
+-- --- ------------ -------- ----- ----- ---- --------------------------
+1   5  SPROUTY      steady     5    90   ★   Tunas goyang (visual saja)
+2  10  TIKI GRRR    steady     6   105   ★   Daun menutup tepi
+3  15  MIMIC KING   pulse      6   115  ★★   Rahang buka-tutup
+4  20  BUBBLEPUFF   wobble     6   112  ★★   Gelembung mengecoh
+5  25  CAPT.RUSTJAW pulse      7   120  ★★   Kabut + ombak goyang
+6  30  CRABBY       reverse    7   122 ★★★   Capit: putar balik tiba2
+7  35  CHEESE       pulse      7   125 ★★★   Lubang keju + tikus
+8  40  SHROOMY      pause      7   125 ★★★   Spora: berhenti palsu
+9  45  FROSTBITE    accel      8   130 ★★★   Es: makin lama makin cepat
+10 50  GOBBLOR      reverse    8   135 ★★★★  Lendir + tatapan (MID-BOSS)
+11 55  SPIDERO      reverse    8   140 ★★★★  Jaring: balik makin sering
+12 60  MUMMY        pause      8   145 ★★★★  Kutukan: jeda makin lama
+13 65  LAVABLOB     accel      9   150 ★★★★  Lava: akselerasi kuat
+14 70  GHOSTLY      pause      9   152 ★★★★★ Tembus: jeda + balik arah
+15 75  STORMY       chaos      9   158 ★★★★★ Petir: pola acak ringan
+16 80  SHADOWBITE   chaos      9   162 ★★★★★ Bayangan: acak sedang
+17 85  GOLEM        accel      10  168 ★★★★★ Batu: cepat + balik arah
+18 90  HYDRA        chaos      10  172 ★★★★★ 3 kepala: flip arah acak
+19 95  VOIDLORD     chaos      10  180 ★★★★★ Void: acak kuat + cepat
+20 100 SOLARION     chaos      12  188 ★★★★★ FINAL: semua pola + 12 pisau
+
+Keterangan pola (diimplementasi di putaran target):
+- steady  : kecepatan TETAP nyaman (tutorial).
+- pulse   : kecepatan naik-turun halus (sinus).
+- wobble  : goyang kiri-kanan + speed berayun.
+- pause   : kadang BERHENTI ~1 detik (fake-out, jangan terkecoh!).
+- reverse : SESekali PUTAR BALIK arah (diawali perlambatan).
+- accel   : makin LAMA makin CEPAT (lomba dengan waktu).
+- chaos   : campuran reverse + pause + pulse secara acak.
+
+Alasan urutan ini bagus:
+a) 5 boss pertama HANYA steady/pulse/wobble -> pemain belajar timing.
+b) reverse & pause baru muncul Lv 30+ setelah pemain pede.
+c) accel melatih kecepatan reaksi sebelum chaos.
+d) chaos hanya untuk 6 boss terakhir (rasa "neraka akhir").
+e) GOBBLOR di tengah (Lv 50) sebagai ujian tengah game.
+f) Jumlah pisau naik perlahan 5 -> 12 mengikuti skill pemain.
+
+----------------------------------------------------------------
+6. EKONOMI REWARD (biar farming tetap seru)
+----------------------------------------------------------------
+- Normal menang       : +50 koin.
+- Bonus (per koin)    : +1 koin x koin kena (maks 10).
+- Harta karun         : sesuai koin terkumpul (damage senjata ngaruh!).
+- Boss menang         : kotak hadiah + roll senjata (no-duplikat).
+- Tiap 5 boss (chapter selesai): bonus peti + 500 koin.
+- Kalahkan boss 20 (Lv 100): gelar "MASTER SLAYER" + skin emas.
+
+----------------------------------------------------------------
+7. CATATAN IMPLEMENTASI TEKNIS
+----------------------------------------------------------------
+- BossDef tambah field: pattern, difficulty (1-5).
+- StageScreen: mode "boss" | "normal", loop putaran baca pattern.
+- stages.ts: getStage(level) -> { kind, bossIndex }.
+- Peta Challenges: 4 chapter, tiap boss 1 kartu berisi 5 chip
+  stage (🪵🪵🎡💰👑) yang bisa di-tap langsung -> jelas & rapi.
+- Warna & simbol stage didefinisikan SEKALI di stages.ts lalu
+  dipakai menu, peta, HUD, dan reward (tidak hardcode berulang).
+
+----------------------------------------------------------------
+8. IMPLEMENTASI BEST & MATANG (sudah dikerjakan)
+----------------------------------------------------------------
+a) SAVE PERMANEN (src/progress.ts)
+   - localStorage "perfect-shot-save-v1": koin, apel, skor,
+     highestUnlocked, completed per level {stars,best},
+     senjata, achievement, stats. Tombol Reset di bar bawah.
+b) TABRAKAN PISAU BENERAN
+   - StageScreen & BonusStageScreen: cek jarak sudut <15-17°
+     ke semua pisau nancap. Kena = animasi crash + overlay gagal.
+   - Tanpa ini game bukan knife-hit; sekarang sudah ada.
+c) ALUR PER LEVEL (bukan demo linear)
+   - Normal/Bonus/Treasure menang -> LevelComplete (bintang
+     1-3, koin, rekor, tombol NEXT/ULANGI/PETA).
+   - Boss menang -> Box (gacha no-duplikat) -> Reward (equip)
+     -> bonus koin boss -> peta. Kalah boss tetap bisa retry.
+   - Gagal -> FailScreen countdown 10 dtk: REVIVE (nonton iklan,
+     lanjut dari posisi terakhir via snapshot) / ULANGI / PETA.
+d) PETA MATANG
+   - Chip terkunci 🔒 di atas highestUnlocked (tap = toast).
+   - Chip selesai ✓ + bintang ★, level aktif highlight kuning.
+   - Kepala boss selesai ✓, tombol boss terkunci jelas.
+   - Menu PLAY = lanjut highestUnlocked; tombol BONUS/HARTA
+     otomatis cari level sejenis terdekat yang sudah terbuka.
+e) HUD JUJUR: semua layar tampilkan LEVEL + koin/skor asli
+   (tidak ada lagi STAGE 6 / skor 46 hardcode).
+f) EKONOMI: normalReward/bossReward naik per chapter,
+   bonus 5 koin/koin kena, bintang dari performa, best tersimpan.
+g) ACHIEVEMENT skala 100 level / 20 boss / 10rb koin.
+================================================================
+
+----------------------------------------------------------------
+REVISI 2 (destroy + tanpa jeda skor)
+----------------------------------------------------------------
+- Selesai stage biasa (normal/bonus/destroy/harta): TIDAK ada layar
+  skor & TIDAK ada toast — koin masuk diam-diam lalu OTOMATIS lanjut
+  ke level berikut (tanpa tombol LANJUT, tanpa jeda 900ms).
+- Skor (+skor) HANYA dihitung setelah ngalahin BOSS.
+- Pola level: 1 normal, 2 normal, 3 bonus, 4 DESTROY, 5 boss
+  (40 Normal + 20 Bonus + 20 Destroy + 20 Boss = 100).
+- STAGE DESTROY: tembak 1 bongkahan batu besar sampai pecah
+  berkeping-keping (9 keping, threshold = damage kumulatif) hingga
+  berlian besar di tengah bersih terlihat. Damage & jeda tembak ikut
+  kekuatan senjata (pistol cepat 1 dmg ... BFG lambat 6 dmg).
+  Tanpa timer, tanpa gagal, bintang dari efisiensi tembakan.
+- Simbol destroy: batu, warna stone #cbbfae. Node peta 46px,
+  modal showcase batu + berlian, fakta damage/tanpa-timer.
+================================================================

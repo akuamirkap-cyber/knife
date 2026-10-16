@@ -1,0 +1,912 @@
+import type { Weapon, WeaponId } from './weapons';
+
+const TAU = Math.PI * 2;
+const rand = (a: number, b: number) => a + Math.random() * (b - a);
+const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+
+// ---------------------------------------------------------------- particles
+export type PKind =
+  | 'spark' | 'chip' | 'smoke' | 'shell' | 'text' | 'ring' | 'glow' | 'bolt'
+  | 'star' | 'shard' | 'shock' | 'drop' | 'streak' | 'petal'
+  | 'slap' | 'pencilShaving' | 'paintSplat' | 'prism' | 'feather';
+
+export interface Particle {
+  tx?: number; ty?: number;
+  x: number; y: number; vx: number; vy: number;
+  life: number; max: number; size: number; color: string;
+  kind: PKind; rot: number; vr: number; g: number; text?: string;
+  drag?: number; extra?: number;
+}
+
+export interface FxSink {
+  push(p: Particle): void;
+  light(x: number, y: number, r: number, rgb: string, life: number): void;
+}
+
+// ---------------------------------------------------------------- profiles
+export type Impact =
+  | 'bullet' | 'heavy' | 'energy' | 'electric' | 'ice' | 'water' | 'snow' | 'fire' | 'explosive'
+  | 'pixel' | 'void' | 'magic' | 'blade' | 'nature' | 'confetti' | 'gold' | 'stone' | 'glass' | 'sonic'
+  | 'sandal' | 'slingshot' | 'pencil' | 'paintball' | 'holy' | 'gem' | 'buster' | 'obliterator' | 'unicorn' | 'wand';
+
+export type Decal =
+  | 'hole' | 'bigHole' | 'scorch' | 'burn' | 'frost' | 'splash' | 'paint' | 'glow' | 'slit' | 'pixel' | 'dent' | 'snow' | 'none';
+export type MuzzleKind = 'fire' | 'energy' | 'soft' | 'quiet' | 'none';
+
+export interface FxProfile {
+  impact: Impact;
+  decal: Decal;
+  muzzle: MuzzleKind;
+  light: string; // rgb
+  lightR: number;
+  hitstop: number;
+  kick: number;
+  ghost: number;
+  streak: number;
+  speedLines: boolean;
+  tint: number;
+  decalColors?: string[];
+}
+
+const P = (impact: Impact, decal: Decal, muzzle: MuzzleKind, light: string, lightR: number, extra: Partial<FxProfile> = {}): FxProfile => ({
+  impact, decal, muzzle, light, lightR, hitstop: 0.02, kick: 3, ghost: 0, streak: 1, speedLines: false, tint: 0, ...extra,
+});
+
+const WARM = '255,200,120';
+
+export const FX: Record<WeaponId, FxProfile> = {
+  // Originals
+  pistol: P('bullet', 'hole', 'fire', WARM, 90, { kick: 3 }),
+  ak47: P('bullet', 'hole', 'fire', '255,190,110', 80, { hitstop: 0.012, kick: 2.5 }),
+  nail: P('blade', 'slit', 'quiet', '255,235,180', 50, { hitstop: 0.008, kick: 1, streak: 0.8 }),
+  crossbow: P('blade', 'slit', 'quiet', '255,255,255', 60, { kick: 2, streak: 1.3, speedLines: true }),
+  plasma: P('energy', 'glow', 'energy', '57,255,156', 150, { hitstop: 0.035, kick: 4, ghost: 4, tint: 0.12, decalColors: ['#0b3d24', '#39ff9c'] }),
+  laser: P('energy', 'glow', 'energy', '255,42,85', 130, { kick: 3, decalColors: ['#3d0010', '#ff2a55'] }),
+  fish: P('water', 'splash', 'soft', '120,210,255', 80, { kick: 2, decalColors: ['rgba(80,170,255,0.35)'] }),
+  rpg: P('explosive', 'scorch', 'fire', '255,150,60', 250, { hitstop: 0.08, kick: 10, tint: 0.25, streak: 1.3 }),
+  cricket: P('heavy', 'bigHole', 'energy', '120,190,255', 300, { hitstop: 0.13, kick: 16, tint: 0.35, speedLines: true, ghost: 3 }),
+  electro: P('electric', 'glow', 'energy', '90,209,255', 150, { hitstop: 0.03, kick: 3, decalColors: ['#05202e', '#5ad1ff'] }),
+  bazooka: P('explosive', 'scorch', 'fire', '255,140,50', 280, { hitstop: 0.11, kick: 13, tint: 0.3, streak: 1.4 }),
+  freeze: P('ice', 'frost', 'energy', '155,231,255', 150, { hitstop: 0.04, kick: 3, tint: 0.15 }),
+  golden: P('gold', 'hole', 'fire', '255,215,90', 160, { hitstop: 0.03, kick: 4, ghost: 2, tint: 0.12 }),
+  blackhole: P('void', 'glow', 'energy', '168,85,247', 180, { hitstop: 0.05, kick: 5, ghost: 5, tint: 0.2, decalColors: ['#000000', '#a855f7'] }),
+
+  // Nusantara & fun
+  slingshot: P('slingshot', 'dent', 'quiet', '230,220,200', 70, { hitstop: 0.045, kick: 5, speedLines: true, ghost: 2, streak: 1.2 }),
+  blowgun: P('blade', 'slit', 'quiet', '230,255,210', 40, { hitstop: 0, kick: 1, streak: 0.9 }),
+  shotgun: P('heavy', 'hole', 'fire', '255,190,100', 160, { hitstop: 0.03, kick: 5 }),
+  soaker: P('water', 'splash', 'soft', '96,165,250', 70, { hitstop: 0, kick: 1, decalColors: ['rgba(59,130,246,0.3)'] }),
+  snowball: P('snow', 'snow', 'soft', '230,245,255', 80, { kick: 2 }),
+  sniper: P('heavy', 'bigHole', 'fire', '255,220,160', 200, { hitstop: 0.09, kick: 10, speedLines: true, streak: 1.6, tint: 0.12 }),
+  flamethrower: P('fire', 'burn', 'fire', '255,140,40', 120, { hitstop: 0, kick: 1.5 }),
+  disc: P('energy', 'glow', 'energy', '34,211,238', 120, { hitstop: 0.03, kick: 4, ghost: 4 }),
+  bamboo: P('explosive', 'scorch', 'fire', '255,240,200', 260, { hitstop: 0.09, kick: 11, tint: 0.3 }),
+  banana: P('water', 'paint', 'soft', '255,230,80', 70, { kick: 2, decalColors: ['rgba(250,204,21,0.5)', 'rgba(254,240,138,0.5)'] }),
+  bubble: P('water', 'none', 'soft', '220,200,255', 80, { kick: 1, ghost: 2 }),
+  harpoon: P('blade', 'slit', 'quiet', '200,240,255', 60, { hitstop: 0.03, kick: 3, speedLines: true }),
+  chicken: P('water', 'none', 'soft', '255,240,150', 80, { kick: 2 }),
+  confetti: P('confetti', 'paint', 'soft', '255,180,220', 100, { kick: 2, decalColors: ['rgba(244,63,94,0.5)', 'rgba(250,204,21,0.5)', 'rgba(34,211,238,0.5)', 'rgba(168,85,247,0.5)'] }),
+  seed: P('nature', 'none', 'soft', '180,230,120', 60, { kick: 1 }),
+  pizza: P('water', 'paint', 'soft', '255,200,120', 70, { kick: 2, decalColors: ['rgba(185,28,28,0.5)', 'rgba(251,191,36,0.4)'] }),
+  minigun: P('bullet', 'hole', 'fire', '255,200,120', 80, { hitstop: 0, kick: 1.5 }),
+  railgun: P('electric', 'glow', 'energy', '120,200,255', 200, { hitstop: 0.07, kick: 8, speedLines: true, ghost: 3, tint: 0.18, decalColors: ['#04182a', '#38bdf8'] }),
+  magnet: P('electric', 'dent', 'energy', '255,100,100', 120, { kick: 3 }),
+  shrink: P('energy', 'glow', 'energy', '74,222,128', 120, { kick: 2, ghost: 4, decalColors: ['#052e16', '#4ade80'] }),
+  grow: P('energy', 'glow', 'energy', '251,146,60', 140, { kick: 4, ghost: 3, decalColors: ['#431407', '#fb923c'] }),
+  pirate: P('heavy', 'bigHole', 'fire', '255,180,90', 220, { hitstop: 0.08, kick: 11, tint: 0.15 }),
+  card: P('blade', 'slit', 'quiet', '255,255,255', 50, { hitstop: 0.01, kick: 1, ghost: 2 }),
+  sonic: P('sonic', 'dent', 'energy', '190,255,120', 150, { hitstop: 0.03, kick: 5 }),
+  mirror: P('glass', 'slit', 'energy', '230,240,255', 130, { kick: 2, ghost: 3 }),
+  portal: P('magic', 'glow', 'energy', '80,170,255', 140, { kick: 3, ghost: 3, decalColors: ['#0b1020', '#fb923c'] }),
+  chrono: P('magic', 'glow', 'energy', '250,220,120', 140, { kick: 3, ghost: 4, decalColors: ['#422006', '#facc15'] }),
+  glitch: P('pixel', 'pixel', 'energy', '34,255,136', 130, { hitstop: 0.04, kick: 3, ghost: 3 }),
+  dragon: P('fire', 'burn', 'fire', '255,110,40', 180, { hitstop: 0.04, kick: 5, tint: 0.15, ghost: 2 }),
+  gravity: P('void', 'glow', 'energy', '129,140,248', 160, { hitstop: 0.04, kick: 4, ghost: 3, decalColors: ['#0f0a2e', '#818cf8'] }),
+
+  // Wave 3
+  honey: P('water', 'paint', 'soft', '251,191,36', 70, { kick: 1.5, decalColors: ['rgba(245,158,11,0.55)', 'rgba(251,191,36,0.6)'] }),
+  coconut: P('water', 'dent', 'soft', '217,249,157', 90, { hitstop: 0.04, kick: 6 }),
+  angklung: P('magic', 'glow', 'soft', '253,230,138', 90, { kick: 2, decalColors: ['#451a03', '#fbbf24'] }),
+  bee: P('blade', 'slit', 'quiet', '250,204,21', 50, { hitstop: 0, kick: 1 }),
+  ink: P('water', 'paint', 'soft', '124,58,237', 80, { kick: 2, decalColors: ['rgba(15,10,40,0.75)', 'rgba(49,46,129,0.65)'] }),
+  yoyo: P('slingshot', 'dent', 'quiet', '255,140,140', 70, { kick: 2, ghost: 3 }),
+  sakura: P('nature', 'paint', 'quiet', '249,168,212', 80, { kick: 1.5, ghost: 2, decalColors: ['rgba(249,168,212,0.55)', 'rgba(251,207,232,0.6)'] }),
+  acid: P('water', 'burn', 'soft', '163,230,53', 90, { kick: 2, tint: 0.08 }),
+  keris: P('gold', 'slit', 'energy', '255,215,120', 160, { hitstop: 0.05, kick: 5, ghost: 4, speedLines: true, tint: 0.12 }),
+  tornado: P('sonic', 'dent', 'soft', '203,213,225', 120, { hitstop: 0.03, kick: 4, ghost: 3 }),
+  firework: P('confetti', 'scorch', 'fire', '255,180,200', 200, { hitstop: 0.06, kick: 6, tint: 0.15 }),
+  anchor: P('heavy', 'bigHole', 'quiet', '180,190,210', 160, { hitstop: 0.09, kick: 11 }),
+  shark: P('water', 'bigHole', 'soft', '125,211,252', 110, { hitstop: 0.05, kick: 6, decalColors: ['rgba(14,165,233,0.35)'] }),
+  ghost: P('magic', 'glow', 'energy', '199,210,254', 120, { kick: 2, ghost: 6, decalColors: ['#1e1b4b', '#c7d2fe'] }),
+  ufo: P('energy', 'glow', 'energy', '134,239,172', 130, { kick: 3, ghost: 3, decalColors: ['#052e16', '#4ade80'] }),
+  rainbow: P('unicorn', 'paint', 'energy', '255,200,230', 150, { hitstop: 0.03, kick: 3, ghost: 5, tint: 0.1,
+    decalColors: ['rgba(248,113,113,0.5)', 'rgba(250,204,21,0.5)', 'rgba(74,222,128,0.5)', 'rgba(96,165,250,0.5)', 'rgba(167,139,250,0.5)'] }),
+  meteor: P('explosive', 'scorch', 'fire', '255,140,50', 300, { hitstop: 0.12, kick: 14, tint: 0.3, streak: 1.6 }),
+  diamond: P('gem', 'slit', 'quiet', '165,243,252', 140, { hitstop: 0.03, kick: 3, ghost: 3, tint: 0.08 }),
+  moonbeam: P('magic', 'glow', 'energy', '196,181,253', 160, { hitstop: 0.03, kick: 3, tint: 0.12, decalColors: ['#1e1b4b', '#c4b5fd'] }),
+  storm: P('electric', 'scorch', 'energy', '147,197,253', 220, { hitstop: 0.06, kick: 7, tint: 0.2, speedLines: true }),
+
+  // Wave 4
+  pencil: P('pencil', 'slit', 'quiet', '255,240,180', 50, { kick: 1.5, ghost: 2 }),
+  sandal: P('sandal', 'dent', 'soft', '147,197,253', 70, { hitstop: 0.05, kick: 5 }),
+  paintball: P('paintball', 'none', 'soft', '255,255,255', 60, { hitstop: 0.01, kick: 1.5 }),
+  wand: P('wand', 'glow', 'energy', '216,180,254', 130, { kick: 2, ghost: 4, decalColors: ['#3b0764', '#e879f9'] }),
+  ruby: P('gem', 'hole', 'fire', '255,100,130', 140, { hitstop: 0.03, kick: 5, ghost: 2 }),
+  emerald: P('gem', 'glow', 'energy', '52,211,153', 150, { hitstop: 0.03, kick: 3, tint: 0.12, decalColors: ['#022c22', '#34d399'] }),
+  sapphire: P('gem', 'frost', 'fire', '96,165,250', 170, { hitstop: 0.04, kick: 6, tint: 0.12 }),
+  crystal: P('gem', 'glow', 'energy', '240,171,252', 180, { hitstop: 0.07, kick: 8, ghost: 3, tint: 0.18, decalColors: ['#4a044e', '#f0abfc'] }),
+  beerifle: P('blade', 'slit', 'fire', '250,204,21', 140, { hitstop: 0.06, kick: 8, speedLines: true, streak: 1.5 }),
+  buster: P('buster', 'glow', 'energy', '125,211,252', 130, { hitstop: 0.02, kick: 2, decalColors: ['#082f49', '#38bdf8'] }),
+  holy: P('holy', 'glow', 'energy', '255,240,180', 200, { hitstop: 0.05, kick: 4, tint: 0.2, decalColors: ['#fef9c3', '#fde047'] }),
+  unicorn: P('unicorn', 'paint', 'energy', '250,190,240', 180, { hitstop: 0.04, kick: 3, ghost: 5, tint: 0.15,
+    decalColors: ['rgba(248,113,113,0.5)', 'rgba(250,204,21,0.5)', 'rgba(74,222,128,0.5)', 'rgba(96,165,250,0.5)', 'rgba(192,132,252,0.5)'] }),
+  obliterator: P('obliterator', 'scorch', 'energy', '74,222,128', 340, { hitstop: 0.16, kick: 18, ghost: 5, tint: 0.45, streak: 1.6 }),
+  bit8: P('pixel', 'pixel', 'energy', '34,197,94', 120, { hitstop: 0.03, kick: 3, ghost: 3 }),
+  coingun: P('gold', 'dent', 'soft', '250,204,21', 140, { hitstop: 0.03, kick: 3, ghost: 2, tint: 0.1 }),
+  kunai: P('blade', 'slit', 'quiet', '226,232,240', 60, { hitstop: 0.02, kick: 2, speedLines: true, streak: 1.3 }),
+  blaster: P('energy', 'scorch', 'energy', '239,68,68', 220, { hitstop: 0.05, kick: 5, speedLines: true, tint: 0.18, decalColors: ['#450a0a', '#ef4444'] }),
+
+  // ---------------------------------------------------------------- 11 SCI-FI / WESTERN
+  lone_star: P('gold', 'hole', 'fire', '255,200,120', 200, { hitstop: 0.04, kick: 8, tint: 0.12 }),
+  photon_saber: P('energy', 'glow', 'energy', '34,211,238', 220, { hitstop: 0.05, kick: 5, ghost: 3, tint: 0.18, decalColors: ['#083344', '#22d3ee'] }),
+  plasma_repeater: P('energy', 'glow', 'energy', '244,63,94', 160, { hitstop: 0.025, kick: 3, ghost: 3, tint: 0.12, decalColors: ['#4c0519', '#f43f5e'] }),
+  warp_disruptor: P('obliterator', 'scorch', 'energy', '74,222,128', 420, { hitstop: 0.18, kick: 18, ghost: 6, tint: 0.5, speedLines: true, streak: 1.6 }),
+  deflector_shield: P('electric', 'glow', 'energy', '129,140,248', 180, { hitstop: 0.03, kick: 3, ghost: 3, tint: 0.12, decalColors: ['#0f0a2e', '#818cf8'] }),
+  gauntlet_cannon: P('energy', 'glow', 'energy', '239,68,68', 260, { hitstop: 0.07, kick: 8, ghost: 4, tint: 0.25, decalColors: ['#450a0a', '#ef4444'] }),
+  alien_ray: P('energy', 'glow', 'energy', '74,222,128', 160, { hitstop: 0.03, kick: 3, ghost: 3, tint: 0.12, decalColors: ['#052e16', '#4ade80'] }),
+  pulse_rifle: P('electric', 'glow', 'energy', '56,189,248', 160, { hitstop: 0.02, kick: 3, ghost: 2, tint: 0.12, decalColors: ['#082f49', '#38bdf8'] }),
+  cryo_blaster: P('ice', 'frost', 'energy', '103,232,249', 190, { hitstop: 0.04, kick: 3, ghost: 3, tint: 0.15 }),
+  hyperdrive: P('energy', 'glow', 'energy', '96,165,250', 220, { hitstop: 0.04, kick: 4, ghost: 4, speedLines: true, tint: 0.18, decalColors: ['#1e3a8a', '#60a5fa'] }),
+  quantum_destabilizer: P('void', 'glow', 'energy', '168,85,247', 200, { hitstop: 0.05, kick: 4, ghost: 5, tint: 0.2, decalColors: ['#0f0a2e', '#a855f7'] }),
+};
+
+// ---------------------------------------------------------------- helpers
+function mk(x: number, y: number, vx: number, vy: number, life: number, size: number, color: string, kind: PKind, extra: Partial<Particle> = {}): Particle {
+  return { x, y, vx, vy, life, max: life, size, color, kind, rot: rand(0, TAU), vr: rand(-12, 12), g: 0, ...extra };
+}
+
+function cone(nx: number, ny: number, spread: number, vmin: number, vmax: number): [number, number] {
+  const a = Math.atan2(ny, nx) + rand(-spread, spread);
+  const v = rand(vmin, vmax);
+  return [Math.cos(a) * v, Math.sin(a) * v];
+}
+
+function rgbOf(hex: string) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h.slice(0, 6), 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
+
+// ---------------------------------------------------------------- muzzle
+export function spawnMuzzle(s: FxSink, prof: FxProfile, w: Weapon, x: number, y: number) {
+  if (prof.muzzle === 'none') return;
+  s.light(x, y, prof.lightR * (prof.muzzle === 'quiet' ? 0.3 : 0.6), prof.light, prof.muzzle === 'fire' ? 0.08 : 0.12);
+  switch (prof.muzzle) {
+    case 'fire': {
+      const n = 5 + Math.round(prof.kick * 0.8);
+      for (let i = 0; i < n; i++) {
+        const [vx, vy] = cone(0, -1, 0.55, 140, 420);
+        s.push(mk(x, y - 4, vx, vy, rand(0.12, 0.28), rand(1.2, 2.0), pick(['#fff7d6', '#ffd23f', '#ff9f1c']), 'spark', { g: 500, drag: 2 }));
+      }
+      break;
+    }
+    case 'energy': {
+      for (let i = 0; i < 4; i++) {
+        const [vx, vy] = cone(0, -1, 0.8, 60, 200);
+        s.push(mk(x, y - 4, vx, vy, rand(0.2, 0.4), rand(3, 5), `rgb(${prof.light})`, 'star', { drag: 3 }));
+      }
+      break;
+    }
+    case 'soft': {
+      for (let i = 0; i < 4; i++) {
+        const [vx, vy] = cone(0, -1, 0.7, 30, 120);
+        s.push(mk(x, y - 4, vx, vy, rand(0.25, 0.45), rand(4, 8), 'rgba(255,255,255,', 'smoke', { g: -20, drag: 2 }));
+      }
+      break;
+    }
+    case 'quiet': {
+      for (let i = 0; i < 2; i++) {
+        s.push(mk(x + rand(-3, 3), y - 4, 0, rand(-800, -500), 0.08, 1.0, 'rgba(255,255,255,0.7)', 'streak'));
+      }
+      break;
+    }
+  }
+  void w;
+}
+
+export function spawnSpeedLines(s: FxSink, x: number, yTop: number, yBot: number, rgb: string) {
+  for (let i = 0; i < 6; i++) {
+    s.push(mk(x + rand(-24, 24), rand(yTop, yBot), 0, rand(-2200, -1400), rand(0.06, 0.12), rand(0.8, 1.6), `rgba(${rgb},0.85)`, 'streak'));
+  }
+}
+
+// ---------------------------------------------------------------- impact
+export function spawnImpact(s: FxSink, prof: FxProfile, w: Weapon, x: number, y: number, nx: number, ny: number, chips: string[]) {
+  const L = prof.light;
+  const lightCss = `rgb(${L})`;
+
+  s.light(x, y, Math.min(180, prof.lightR * 0.75), L, 0.16 + prof.hitstop);
+
+  const sparks = (n: number, cols: string[], vmin = 250, vmax = 650, spread = 1.1, g = 900) => {
+    for (let i = 0; i < n; i++) {
+      const [vx, vy] = cone(nx, ny, spread, vmin, vmax);
+      s.push(mk(x, y, vx, vy, rand(0.12, 0.32), rand(1.1, 2.2), pick(cols), 'spark', { g, drag: 1.8 }));
+    }
+  };
+  const chipBurst = (n: number, cols: string[], kind: PKind = 'chip', vmax = 320, g = 1300, size = [2.0, 4.5]) => {
+    for (let i = 0; i < n; i++) {
+      const [vx, vy] = cone(nx, ny, 1.2, 60, vmax);
+      s.push(mk(x, y, vx, vy, rand(0.35, 0.75), rand(size[0], size[1]), pick(cols), kind, { g }));
+    }
+  };
+  const dust = (n: number, col = 'rgba(190,180,165,', size = [5, 11]) => {
+    for (let i = 0; i < n; i++) {
+      const [vx, vy] = cone(nx, ny, 1.0, 20, 90);
+      s.push(mk(x + rand(-3, 3), y + rand(-3, 3), vx, vy, rand(0.4, 0.8), rand(size[0], size[1]), col, 'smoke', { g: -15, drag: 2.2 }));
+    }
+  };
+  const stars = (n: number, cols: string[], vmax = 220, size = [3.5, 6.5]) => {
+    for (let i = 0; i < n; i++) {
+      const [vx, vy] = cone(nx, ny, Math.PI * 0.85, 30, vmax);
+      s.push(mk(x, y, vx, vy, rand(0.3, 0.65), rand(size[0], size[1]), pick(cols), 'star', { drag: 3.2 }));
+    }
+  };
+  const glows = (n: number, rgbs: string[], vmax = 220, g = 0, size = [2.5, 5.5]) => {
+    for (let i = 0; i < n; i++) {
+      const [vx, vy] = cone(nx, ny, Math.PI * 0.8, 30, vmax);
+      s.push(mk(x, y, vx, vy, rand(0.25, 0.5), rand(size[0], size[1]), pick(rgbs), 'glow', { g, drag: 2.2 }));
+    }
+  };
+
+  switch (prof.impact) {
+    case 'sandal': {
+      s.push(mk(x, y, 0, 0, 0.28, 28, '#38bdf8', 'slap', { extra: Math.atan2(ny, nx) }));
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI - Math.PI * 0.5;
+        const [vx, vy] = cone(Math.cos(a), Math.sin(a), 0.3, 180, 360);
+        s.push(mk(x, y, vx, vy, 0.12, 1.5, 'rgba(255,255,255,0.85)', 'streak'));
+      }
+      stars(5, ['#fde047', '#ffffff', '#93c5fd'], 140, [3, 5]);
+      dust(4, 'rgba(219,234,254,', [5, 9]);
+      break;
+    }
+    case 'slingshot': {
+      chipBurst(9, ['#a8a29e', '#78716c', '#d6d3d1', '#57534e'], 'shard', 260, 1100, [2.5, 5]);
+      sparks(8, ['#ffffff', '#f5d0a0', '#ffd23f'], 180, 480, 0.9, 1100);
+      dust(6, 'rgba(180,150,120,', [6, 12]);
+      chipBurst(5, chips, 'chip', 200);
+      break;
+    }
+    case 'pencil': {
+      for (let i = 0; i < 7; i++) {
+        const [vx, vy] = cone(nx, ny, 1.2, 50, 200);
+        s.push(mk(x, y, vx, vy, rand(0.5, 0.9), rand(4, 7), pick(['#fde047', '#d4a373', '#c08a5a']), 'pencilShaving', { g: 300, drag: 2.5 }));
+      }
+      chipBurst(8, ['#f472b6', '#fbcfe8', '#374151', '#1f2937'], 'chip', 180, 800, [1.5, 3]);
+      dust(4, 'rgba(60,60,60,', [4, 8]);
+      break;
+    }
+    case 'paintball': {
+      for (let i = 0; i < 14; i++) {
+        const [vx, vy] = cone(nx, ny, 1.3, 80, 340);
+        s.push(mk(x, y, vx, vy, rand(0.35, 0.7), rand(2.5, 5.5), lightCss, 'drop', { g: 900, drag: 1.5 }));
+      }
+      s.push(mk(x, y, 0, 0, 0.35, 22, lightCss, 'paintSplat'));
+      break;
+    }
+    case 'wand': {
+      stars(14, ['#ffffff', '#fde047', '#f5d0fe', '#c084fc', '#e879f9'], 220, [3, 6]);
+      glows(8, ['216,180,254', '253,224,71'], 140, -40, [2.5, 4.5]);
+      for (let i = 0; i < 4; i++) {
+        const [vx, vy] = cone(nx, ny, 1.0, 100, 240);
+        s.push(mk(x, y, vx, vy, 0.16, 1.2, 'rgba(255,255,255,0.9)', 'streak'));
+      }
+      break;
+    }
+    case 'holy': {
+      for (let i = 0; i < 6; i++) {
+        s.push(mk(x + rand(-16, 16), y + rand(-40, 20), 0, rand(-600, -300), rand(0.18, 0.35), rand(1.5, 3.0), 'rgba(255,248,220,0.85)', 'streak'));
+      }
+      for (let i = 0; i < 5; i++) {
+        const [vx, vy] = cone(nx, ny, 1.4, 20, 100);
+        s.push(mk(x, y, vx, vy - 30, rand(0.7, 1.3), rand(4, 7), '#ffffff', 'feather', { g: 50, drag: 2.8 }));
+      }
+      stars(8, ['#ffffff', '#fde68a'], 160, [3, 5]);
+      break;
+    }
+    case 'gem': {
+      for (let i = 0; i < 11; i++) {
+        const [vx, vy] = cone(nx, ny, 1.3, 90, 360);
+        s.push(mk(x, y, vx, vy, rand(0.4, 0.8), rand(3, 6), lightCss, 'prism', { g: 1100, drag: 1.2 }));
+      }
+      stars(7, ['#ffffff', lightCss], 200, [3, 5]);
+      sparks(6, ['#ffffff', lightCss], 200, 500, 0.9);
+      break;
+    }
+    case 'buster': {
+      s.push(mk(x, y, 0, 0, 0.22, 26, '125,211,252', 'shock'));
+      glows(10, ['125,211,252', '254,240,138'], 180, 0, [2.5, 4.5]);
+      sparks(8, ['#ffffff', '#7dd3fc', '#fef08a'], 220, 550, 1.0);
+      break;
+    }
+    case 'obliterator': {
+      for (let i = 0; i < 6; i++) {
+        const a = Math.atan2(ny, nx) + rand(-1.2, 1.2);
+        const d = rand(30, 70);
+        s.push(mk(x, y, 0, 0, rand(0.15, 0.28), 2.2, '#86efac', 'bolt', { tx: x + Math.cos(a) * d, ty: y + Math.sin(a) * d }));
+      }
+      glows(16, ['74,222,128', '34,197,94', '220,252,231'], 240, 0, [4, 8]);
+      chipBurst(8, ['#15803d', '#22c55e', '#bbf7d0'], 'chip', 280);
+      s.push(mk(x, y, 0, 0, 0.35, 46, '74,222,128', 'shock'));
+      break;
+    }
+    case 'unicorn': {
+      const RB = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#60a5fa', '#c084fc'];
+      stars(12, RB, 240, [3.5, 6]);
+      glows(8, ['250,190,240', '254,240,138'], 160, -20, [3, 5]);
+      for (let i = 0; i < 6; i++) {
+        const [vx, vy] = cone(nx, ny, 1.2, 80, 260);
+        s.push(mk(x, y, vx, vy, rand(0.4, 0.7), rand(2.5, 4.5), pick(RB), 'drop', { g: 700 }));
+      }
+      break;
+    }
+    case 'bullet':
+      sparks(10, ['#ffffff', '#fff3b0', '#ffd23f', '#ff9f1c']);
+      chipBurst(7, chips);
+      dust(3);
+      break;
+    case 'heavy':
+      sparks(16, ['#ffffff', '#fff3b0', '#ffd23f', '#ff9f1c'], 300, 800, 1.2);
+      chipBurst(12, chips, 'chip', 380);
+      dust(6, 'rgba(180,170,150,', [7, 14]);
+      if (w.energy) glows(10, [w.trail, '255,255,255'], 220);
+      break;
+    case 'energy':
+      glows(14, [w.trail, '255,255,255'], 220);
+      stars(6, ['#ffffff', lightCss]);
+      sparks(6, [lightCss, '#ffffff'], 200, 500, 1.1, 200);
+      s.push(mk(x, y, 0, 0, 0.25, 30, L, 'shock'));
+      chipBurst(4, chips);
+      break;
+    case 'electric':
+      for (let i = 0; i < 5; i++) {
+        const a = Math.atan2(ny, nx) + rand(-1.4, 1.4);
+        const d = rand(24, 60);
+        s.push(mk(x, y, 0, 0, rand(0.1, 0.2), 1.8, lightCss, 'bolt', { tx: x + Math.cos(a) * d, ty: y + Math.sin(a) * d }));
+      }
+      sparks(12, ['#ffffff', lightCss], 240, 650, 1.3, 300);
+      glows(7, [L, '255,255,255'], 180);
+      chipBurst(4, chips);
+      break;
+    case 'ice':
+      chipBurst(12, ['#ffffff', '#e0f7ff', '#9be7ff', '#7fd3ff'], 'shard', 320, 800, [3, 7]);
+      dust(4, 'rgba(210,240,255,', [6, 12]);
+      stars(6, ['#ffffff', '#bff1ff']);
+      break;
+    case 'water':
+      for (let i = 0; i < 14; i++) {
+        const [vx, vy] = cone(nx, ny, 1.1, 90, 360);
+        s.push(mk(x, y, vx, vy, rand(0.35, 0.65), rand(2, 4), pick(['#bfdbfe', '#60a5fa', '#ffffff', '#3b82f6']), 'drop', { g: 1100 }));
+      }
+      dust(2, 'rgba(190,220,255,', [6, 10]);
+      break;
+    case 'snow':
+      chipBurst(14, ['#ffffff', '#f0f9ff', '#e0f2fe'], 'chip', 260, 500, [2, 4]);
+      dust(5, 'rgba(255,255,255,', [6, 13]);
+      break;
+    case 'fire':
+      for (let i = 0; i < 14; i++) {
+        const [vx, vy] = cone(nx, ny, 1.2, 50, 240);
+        s.push(mk(x, y, vx, vy - 40, rand(0.28, 0.6), rand(1.1, 1.8), pick(['#fff3b0', '#ffd23f', '#ff9f1c', '#ff4500']), 'spark', { g: -200, drag: 1.8 }));
+      }
+      glows(10, ['255,220,120', '255,140,40', '255,60,20'], 180, -120, [3, 7]);
+      dust(4, 'rgba(60,50,45,', [6, 12]);
+      break;
+    case 'explosive':
+      chipBurst(12, ['#3f3f46', '#57534e', ...chips], 'shard', 480, 1200, [4, 8]);
+      sparks(18, ['#ffffff', '#fff3b0', '#ffd23f', '#ff6a00'], 300, 850, 1.5, 600);
+      s.push(mk(x, y, 0, 0, 0.35, 60, '255,200,120', 'shock'));
+      dust(8, 'rgba(100,90,80,', [9, 18]);
+      break;
+    case 'pixel':
+      for (let i = 0; i < 18; i++) {
+        const [vx, vy] = cone(nx, ny, Math.PI, 40, 300);
+        s.push(mk(x, y, vx, vy, rand(0.25, 0.55), rand(2.5, 4.5), pick(['#22ff88', '#ff0055', '#00ffee', '#ffffff']), 'chip', { g: 200, rot: 0, vr: 0 }));
+      }
+      break;
+    case 'void':
+      for (let i = 0; i < 16; i++) {
+        const a = rand(0, TAU);
+        const d = rand(35, 80);
+        s.push(mk(x + Math.cos(a) * d, y + Math.sin(a) * d, -Math.cos(a) * d * 2.2, -Math.sin(a) * d * 2.2, 0.32, rand(2, 4), L, 'glow'));
+      }
+      s.push(mk(x, y, 0, 0, 0.32, 40, '20,0,40', 'shock'));
+      break;
+    case 'magic':
+      stars(10, ['#ffffff', lightCss, '#fde047'], 220, [3, 6]);
+      glows(7, [L, '255,255,255'], 150);
+      s.push(mk(x, y, 0, 0, 0.3, 40, L, 'shock'));
+      break;
+    case 'blade': {
+      const px = -ny;
+      const py = nx;
+      s.push(mk(x - px * 18, y - py * 18, px * 700, py * 700, 0.08, 1.8, 'rgba(255,255,255,0.9)', 'streak'));
+      sparks(6, ['#ffffff', '#e5e7eb', '#fde68a'], 200, 500, 0.8);
+      chipBurst(4, chips, 'chip', 180);
+      break;
+    }
+    case 'nature':
+      for (let i = 0; i < 10; i++) {
+        const [vx, vy] = cone(nx, ny, 1.4, 40, 180);
+        s.push(mk(x, y, vx, vy, rand(0.6, 1.1), rand(2.5, 4.5), pick(['#86efac', '#4ade80', '#f9a8d4', '#fb7185', '#fde047']), 'petal', { g: 100, drag: 2.2 }));
+      }
+      stars(4, ['#ffffff', '#bef264'], 140);
+      break;
+    case 'confetti':
+      stars(8, ['#f43f5e', '#facc15', '#22d3ee', '#a855f7', '#4ade80'], 240);
+      break;
+    case 'gold':
+      sparks(14, ['#ffffff', '#fff1a8', '#ffd23f', '#f59e0b'], 240, 700, 1.2, 600);
+      stars(8, ['#ffffff', '#fff1a8', '#ffd23f'], 200, [3.5, 7]);
+      chipBurst(5, chips);
+      break;
+    case 'stone':
+      chipBurst(9, ['#a8a29e', '#78716c', '#d6d3d1'], 'shard', 260, 1100, [2.5, 5]);
+      dust(5, 'rgba(160,150,140,', [6, 12]);
+      break;
+    case 'glass':
+      chipBurst(12, ['#ffffff', '#e2e8f0', '#bae6fd', '#f1f5f9'], 'shard', 340, 900, [2.5, 6]);
+      stars(6, ['#ffffff', '#e0f2fe'], 170);
+      break;
+    case 'sonic':
+      for (let i = 0; i < 3; i++) s.push(mk(x, y, 0, 0, 0.22 + i * 0.08, 30 + i * 22, L, 'shock'));
+      glows(6, [L], 160);
+      break;
+  }
+}
+
+// ---------------------------------------------------------------- decals (on rotating target face)
+// RETAKAN PETIR KARTUN PROFESIONAL (AUTHENTIC ARCADE LIGHTNING FRACTURES)
+// Dibuat dari simpul garis petir bersudut tajam (miter join), bercabang jernih,
+// dengan bayangan gelap tipis di bawah dan pendaran specular highlight putih tajam di atas.
+// Tidak ada gumpalan hitam/kutu sama sekali!
+export function drawLightningBolt(
+  c: CanvasRenderingContext2D,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  displace = 8,
+  minSeg = 3,
+  forkChance = 0.45,
+  depth = 0
+) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist < minSeg || depth > 2) {
+    c.lineTo(x2, y2);
+    return;
+  }
+
+  // Midpoint with perpendicular displacement
+  const midX = (x1 + x2) / 2 + (-dy / dist) * (Math.random() - 0.5) * displace;
+  const midY = (y1 + y2) / 2 + (dx / dist) * (Math.random() - 0.5) * displace;
+
+  drawLightningBolt(c, x1, y1, midX, midY, displace * 0.55, minSeg, forkChance, depth + 1);
+  drawLightningBolt(c, midX, midY, x2, y2, displace * 0.55, minSeg, forkChance, depth + 1);
+
+  // Sub-branch forked lightning
+  if (depth < 2 && Math.random() < forkChance) {
+    const forkAngle = Math.atan2(dy, dx) + (Math.random() < 0.5 ? 0.55 : -0.55);
+    const forkLen = dist * 0.45;
+    const fx2 = midX + Math.cos(forkAngle) * forkLen;
+    const fy2 = midY + Math.sin(forkAngle) * forkLen;
+    drawLightningBolt(c, midX, midY, fx2, fy2, displace * 0.4, minSeg, 0, depth + 1);
+  }
+}
+
+export function lightningImpactDecal(
+  c: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  inwardAngle: number,
+  _radius = 3.5,
+  isBig = false,
+  glowColor?: string
+) {
+  c.save();
+  c.lineJoin = 'miter';
+  c.lineCap = 'butt';
+
+  // Jumlah cabang petir utama (3-4 cabang yang menyebar tajam ke arah dalam target)
+  const numCracks = isBig ? 4 : 3;
+  const baseReach = (isBig ? 24 : 16) + Math.random() * 4;
+
+  interface CrackPath {
+    destX: number;
+    destY: number;
+    midDisplace: number;
+  }
+
+  const branches: CrackPath[] = [];
+
+  // Hitung target cabang petir merambat ke arah dalam target (inwardAngle)
+  for (let i = 0; i < numCracks; i++) {
+    // Sudut menyebar ke dalam (+/- 75 derajat dari arah tancap)
+    const spread = (i - (numCracks - 1) / 2) * 0.48 + (Math.random() - 0.5) * 0.25;
+    const crackAngle = inwardAngle + spread;
+    const reach = baseReach * (0.8 + Math.random() * 0.4);
+    branches.push({
+      destX: x + Math.cos(crackAngle) * reach,
+      destY: y + Math.sin(crackAngle) * reach,
+      midDisplace: 7 + Math.random() * 4,
+    });
+  }
+
+  // 1. LAYER 1: Shadow Crevice (celah retakan gelap di dasar)
+  c.strokeStyle = 'rgba(10, 8, 12, 0.75)';
+  c.lineWidth = isBig ? 2.0 : 1.4;
+  for (const b of branches) {
+    c.beginPath();
+    c.moveTo(x, y);
+    drawLightningBolt(c, x, y, b.destX, b.destY, b.midDisplace, 4, 0.4, 0);
+    c.stroke();
+  }
+
+  // 2. LAYER 2: Crisp Razor Core (garis retakan petir putih/terang di tengah celah)
+  c.strokeStyle = glowColor ? `rgba(${glowColor}, 0.9)` : 'rgba(255, 255, 255, 0.85)';
+  c.lineWidth = isBig ? 1.0 : 0.7;
+  for (const b of branches) {
+    c.beginPath();
+    c.moveTo(x, y);
+    drawLightningBolt(c, x, y, b.destX, b.destY, b.midDisplace * 0.85, 4, 0.3, 0);
+    c.stroke();
+  }
+
+  // 3. LAYER 3: Entry Pin Notch (tanda titik tancap kecil 1.5px, BUKAN kutu bulat besar!)
+  c.fillStyle = '#0a080c';
+  c.beginPath();
+  c.arc(x, y, isBig ? 2.2 : 1.5, 0, TAU);
+  c.fill();
+  c.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  c.beginPath();
+  c.arc(x - 0.4, y - 0.4, isBig ? 1.0 : 0.7, 0, TAU);
+  c.fill();
+
+  c.restore();
+}
+
+function cleanSlitDecal(c: CanvasRenderingContext2D, x: number, y: number, a: number, len = 10, w = 2.2) {
+  c.save();
+  c.translate(x, y);
+  c.rotate(a + Math.PI / 2);
+  // Soft shadow
+  c.fillStyle = 'rgba(0,0,0,0.3)';
+  c.beginPath();
+  c.roundRect(-w - 1, -len / 2 - 1, (w + 1) * 2, len + 2, w + 1);
+  c.fill();
+  // Clean slit
+  c.fillStyle = '#0a0705';
+  c.beginPath();
+  c.roundRect(-w, -len / 2, w * 2, len, w);
+  c.fill();
+  // Specular edge
+  c.fillStyle = 'rgba(255,255,255,0.4)';
+  c.fillRect(-w + 0.5, -len / 2 + 1, 0.8, len - 2);
+  c.restore();
+}
+
+function blob(c: CanvasRenderingContext2D, x: number, y: number, r: number, col: string) {
+  c.fillStyle = col;
+  c.beginPath();
+  for (let i = 0; i <= 8; i++) {
+    const a = (i / 8) * TAU;
+    const rr = r * rand(0.8, 1.15);
+    c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  c.closePath();
+  c.fill();
+}
+
+export function drawDecal(c: CanvasRenderingContext2D, R: number, a: number, prof: FxProfile) {
+  const x = Math.cos(a) * (R - 4);
+  const y = Math.sin(a) * (R - 4);
+  c.save();
+  c.beginPath();
+  c.arc(0, 0, R, 0, TAU);
+  c.clip();
+  const cols = prof.decalColors ?? [];
+
+  switch (prof.decal) {
+    case 'hole':
+    case 'bigHole': {
+      const big = prof.decal === 'bigHole';
+      const r = big ? 5.5 : 3.8;
+      // Retakan petir tajam & indah, bukan kutu/bunderan jelek!
+      lightningImpactDecal(c, x, y, a + Math.PI, r, big);
+      break;
+    }
+    case 'scorch': {
+      // Retakan petir ledakan yang membakar & bercabang
+      lightningImpactDecal(c, x, y, a + Math.PI, 6, true);
+      break;
+    }
+    case 'burn': {
+      // Warm ember scorched lightning fractures
+      lightningImpactDecal(c, x, y, a + Math.PI, 3.2, false, '251,146,60');
+      break;
+    }
+    case 'frost': {
+      // Clean geometric frost star (crystal diamond)
+      const g = c.createRadialGradient(x, y, 1, x, y, 15);
+      g.addColorStop(0, 'rgba(224, 242, 254, 0.85)');
+      g.addColorStop(0.6, 'rgba(186, 230, 253, 0.4)');
+      g.addColorStop(1, 'rgba(125, 211, 252, 0)');
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(x, y, 15, 0, TAU);
+      c.fill();
+      // Crisp 4-point ice crystal
+      c.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+      c.lineWidth = 1.2;
+      c.beginPath();
+      c.moveTo(x - 9, y); c.lineTo(x + 9, y);
+      c.moveTo(x, y - 9); c.lineTo(x, y + 9);
+      c.moveTo(x - 5, y - 5); c.lineTo(x + 5, y + 5);
+      c.moveTo(x + 5, y - 5); c.lineTo(x - 5, y + 5);
+      c.stroke();
+      break;
+    }
+    case 'splash':
+    case 'paint': {
+      const list = cols.length ? cols : ['rgba(0,0,0,0.2)'];
+      blob(c, x, y, rand(6, 9), pick(list));
+      for (let i = 0; i < 3; i++) {
+        const aa = a + Math.PI + rand(-1.0, 1.0);
+        const d = rand(8, 15);
+        blob(c, x + Math.cos(aa) * d, y + Math.sin(aa) * d, rand(1.8, 3.2), pick(list));
+      }
+      break;
+    }
+    case 'glow': {
+      const [, col] = cols.length >= 2 ? cols : ['#000000', '#ffffff'];
+      lightningImpactDecal(c, x, y, a + Math.PI, 3.5, false, rgbOf(col));
+      break;
+    }
+    case 'slit': {
+      // Clean precision needle / blade slit
+      cleanSlitDecal(c, x, y, a, 9, 1.6);
+      break;
+    }
+    case 'pixel': {
+      c.fillStyle = pick(['#22ff88', '#ff0055', '#00ffee', '#ffffff']);
+      for (let k = -1; k <= 1; k++) {
+        c.fillRect(Math.round(x / 4) * 4 + k * 4, Math.round(y / 4) * 4, 3.5, 3.5);
+      }
+      break;
+    }
+    case 'dent': {
+      // Clean spherical surface dent
+      const g = c.createRadialGradient(x - 1, y - 1, 0.5, x, y, 7);
+      g.addColorStop(0, 'rgba(0,0,0,0.45)');
+      g.addColorStop(0.65, 'rgba(0,0,0,0.1)');
+      g.addColorStop(1, 'rgba(255,255,255,0.2)');
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(x, y, 7, 0, TAU);
+      c.fill();
+      break;
+    }
+    case 'snow': {
+      for (let i = 0; i < 3; i++) blob(c, x + rand(-5, 5), y + rand(-5, 5), rand(2.5, 4.5), 'rgba(255,255,255,0.85)');
+      break;
+    }
+    case 'none':
+      break;
+  }
+  c.restore();
+}
+
+// ---------------------------------------------------------------- render custom particle kinds
+export function drawFxParticle(c: CanvasRenderingContext2D, p: Particle, time: number): void {
+  const a = Math.max(0, p.life / p.max);
+  const t = 1 - a;
+  switch (p.kind) {
+    case 'slap': {
+      const ang = p.extra ?? 0;
+      c.save();
+      c.translate(p.x, p.y);
+      c.rotate(ang);
+      c.globalAlpha = Math.min(1, a * 2.2);
+      c.strokeStyle = p.color;
+      c.lineWidth = 2.4 * a;
+      c.lineCap = 'round';
+      for (let i = -1; i <= 1; i++) {
+        c.beginPath();
+        const r2 = p.size * (0.6 + t * 0.8) + i * 6;
+        c.arc(0, 0, r2, -Math.PI * 0.35, Math.PI * 0.35);
+        c.stroke();
+      }
+      c.restore();
+      break;
+    }
+    case 'pencilShaving': {
+      c.save();
+      c.globalAlpha = Math.min(1, a * 2);
+      c.translate(p.x, p.y);
+      c.rotate(p.rot);
+      c.fillStyle = p.color;
+      c.beginPath();
+      c.arc(0, 0, p.size, 0, Math.PI * 1.3);
+      c.arc(0, 0, p.size * 0.65, Math.PI * 1.3, 0, true);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = '#1f2937';
+      c.lineWidth = 0.8;
+      c.beginPath();
+      c.arc(0, 0, p.size, 0, Math.PI * 1.3);
+      c.stroke();
+      c.restore();
+      break;
+    }
+    case 'paintSplat': {
+      c.save();
+      c.translate(p.x, p.y);
+      c.globalAlpha = Math.min(1, a * 1.8);
+      c.fillStyle = p.color;
+      const r = p.size * (0.4 + t * 0.6);
+      c.beginPath();
+      c.arc(0, 0, r, 0, TAU);
+      c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.7)';
+      c.beginPath();
+      c.arc(-r * 0.35, -r * 0.35, r * 0.28, 0, TAU);
+      c.fill();
+      c.restore();
+      break;
+    }
+    case 'prism': {
+      c.save();
+      c.globalAlpha = Math.min(1, a * 2);
+      c.translate(p.x, p.y);
+      c.rotate(p.rot);
+      c.fillStyle = p.color;
+      c.beginPath();
+      c.moveTo(0, -p.size);
+      c.lineTo(p.size * 0.8, -p.size * 0.2);
+      c.lineTo(p.size * 0.4, p.size);
+      c.lineTo(-p.size * 0.6, p.size * 0.6);
+      c.lineTo(-p.size * 0.8, -p.size * 0.2);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = 'rgba(255,255,255,0.85)';
+      c.lineWidth = 0.8;
+      c.stroke();
+      c.beginPath();
+      c.moveTo(0, -p.size);
+      c.lineTo(0, p.size * 0.4);
+      c.lineTo(p.size * 0.8, -p.size * 0.2);
+      c.stroke();
+      c.restore();
+      break;
+    }
+    case 'feather': {
+      c.save();
+      c.globalAlpha = Math.min(1, a * 1.8);
+      c.translate(p.x, p.y);
+      c.rotate(p.rot + Math.sin(time * 6 + p.x) * 0.3);
+      c.fillStyle = '#ffffff';
+      c.beginPath();
+      c.ellipse(0, 0, p.size * 0.4, p.size, 0, 0, TAU);
+      c.fill();
+      c.strokeStyle = '#fde68a';
+      c.lineWidth = 0.7;
+      c.beginPath();
+      c.moveTo(0, -p.size);
+      c.lineTo(0, p.size);
+      c.stroke();
+      c.restore();
+      break;
+    }
+    case 'star': {
+      const tw = 0.6 + 0.4 * Math.sin(time * 25 + p.rot * 4);
+      const r = p.size * (0.4 + a * 0.7) * tw;
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      c.globalAlpha = Math.min(1, a * 1.5);
+      c.translate(p.x, p.y);
+      c.rotate(p.rot * 0.15);
+      c.fillStyle = p.color;
+      c.beginPath();
+      c.moveTo(0, -r);
+      c.quadraticCurveTo(0, 0, r, 0);
+      c.quadraticCurveTo(0, 0, 0, r);
+      c.quadraticCurveTo(0, 0, -r, 0);
+      c.quadraticCurveTo(0, 0, 0, -r);
+      c.fill();
+      c.fillStyle = '#ffffff';
+      c.beginPath();
+      c.arc(0, 0, r * 0.25, 0, TAU);
+      c.fill();
+      c.restore();
+      break;
+    }
+    case 'shard': {
+      c.save();
+      c.globalAlpha = Math.min(1, a * 2);
+      c.translate(p.x, p.y);
+      c.rotate(p.rot);
+      c.fillStyle = p.color;
+      c.beginPath();
+      c.moveTo(0, -p.size);
+      c.lineTo(p.size * 0.5, p.size * 0.6);
+      c.lineTo(-p.size * 0.5, p.size * 0.4);
+      c.closePath();
+      c.fill();
+      c.restore();
+      break;
+    }
+    case 'shock': {
+      const e = 1 - Math.pow(1 - t, 2.5);
+      const r = p.size * (0.2 + 0.8 * e);
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      c.strokeStyle = `rgba(${p.color},${0.65 * a})`;
+      c.lineWidth = Math.max(1, 2.4 * a);
+      c.beginPath();
+      c.arc(p.x, p.y, r, 0, TAU);
+      c.stroke();
+      c.restore();
+      break;
+    }
+    case 'petal': {
+      c.save();
+      c.globalAlpha = Math.min(1, a * 2);
+      c.translate(p.x, p.y);
+      c.rotate(p.rot);
+      c.scale(1, 0.4 + 0.6 * Math.abs(Math.sin(time * 6 + p.rot)));
+      c.fillStyle = p.color;
+      c.beginPath();
+      c.ellipse(0, 0, p.size, p.size * 0.5, 0, 0, TAU);
+      c.fill();
+      c.restore();
+      break;
+    }
+    case 'drop': {
+      const ang = Math.atan2(p.vy, p.vx);
+      const sp = Math.min(2.5, Math.hypot(p.vx, p.vy) / 250 + 1);
+      c.save();
+      c.globalAlpha = Math.min(1, a * 2);
+      c.translate(p.x, p.y);
+      c.rotate(ang);
+      c.fillStyle = p.color;
+      c.beginPath();
+      c.ellipse(0, 0, p.size * sp, p.size * 0.7, 0, 0, TAU);
+      c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.7)';
+      c.beginPath();
+      c.arc(p.size * 0.3, -p.size * 0.2, p.size * 0.22, 0, TAU);
+      c.fill();
+      c.restore();
+      break;
+    }
+    case 'streak': {
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      c.globalAlpha = a * 0.85;
+      c.strokeStyle = p.color;
+      c.lineWidth = p.size;
+      c.lineCap = 'round';
+      c.beginPath();
+      c.moveTo(p.x, p.y);
+      c.lineTo(p.x - p.vx * 0.04, p.y - p.vy * 0.04);
+      c.stroke();
+      c.restore();
+      break;
+    }
+    default:
+      break;
+  }
+}

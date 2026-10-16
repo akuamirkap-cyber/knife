@@ -1,0 +1,118 @@
+import type { WeaponId } from '../weapons';
+
+export interface GunMetrics {
+  totalLen: number;
+  centerOffsetY: number;
+  centerOffsetX: number;
+  span: number;
+}
+
+// Measured actual bounding box of every gun from muzzle (cx, y0)
+// centerOffsetY = vertical distance from muzzle (y0) to the visual center
+// centerOffsetX = horizontal distance from barrel line (cx) to center of mass
+// span = maximum overall dimension (diagonal/length) used for auto-scale
+export const GUN_METRICS: Partial<Record<WeaponId, Partial<GunMetrics>>> = {
+  pistol: { totalLen: 155, centerOffsetY: 75, centerOffsetX: 22, span: 165 },
+  ak47: { totalLen: 265, centerOffsetY: 130, centerOffsetX: 24, span: 270 },
+  nail: { totalLen: 195, centerOffsetY: 95, centerOffsetX: -10, span: 200 },
+  crossbow: { totalLen: 225, centerOffsetY: 110, centerOffsetX: 0, span: 230 },
+  plasma: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 18, span: 175 },
+  laser: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 15, span: 175 },
+  fish: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 18, span: 180 },
+  rpg: { totalLen: 275, centerOffsetY: 135, centerOffsetX: 15, span: 280 },
+  cricket: { totalLen: 95, centerOffsetY: 45, centerOffsetX: 12, span: 110 },
+  electro: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 18, span: 180 },
+  bazooka: { totalLen: 270, centerOffsetY: 132, centerOffsetX: 12, span: 275 },
+  freeze: { totalLen: 175, centerOffsetY: 85, centerOffsetX: 16, span: 185 },
+  golden: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 22, span: 175 },
+  blackhole: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 16, span: 180 },
+  slingshot: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 0, span: 170 },
+  blowgun: { totalLen: 290, centerOffsetY: 145, centerOffsetX: 5, span: 295 },
+  shotgun: { totalLen: 260, centerOffsetY: 130, centerOffsetX: 16, span: 265 },
+  soaker: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 18, span: 180 },
+  snowball: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 16, span: 180 },
+  sniper: { totalLen: 305, centerOffsetY: 150, centerOffsetX: 16, span: 310 },
+  flamethrower: { totalLen: 175, centerOffsetY: 85, centerOffsetX: 18, span: 185 },
+  disc: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 16, span: 175 },
+  bamboo: { totalLen: 205, centerOffsetY: 100, centerOffsetX: 6, span: 210 },
+  banana: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 15, span: 175 },
+  bubble: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 16, span: 175 },
+  harpoon: { totalLen: 265, centerOffsetY: 130, centerOffsetX: 14, span: 270 },
+  chicken: { totalLen: 185, centerOffsetY: 90, centerOffsetX: 16, span: 190 },
+  confetti: { totalLen: 175, centerOffsetY: 85, centerOffsetX: 15, span: 180 },
+  seed: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 16, span: 175 },
+  pizza: { totalLen: 175, centerOffsetY: 85, centerOffsetX: 16, span: 180 },
+  minigun: { totalLen: 235, centerOffsetY: 115, centerOffsetX: 0, span: 240 },
+  railgun: { totalLen: 200, centerOffsetY: 98, centerOffsetX: 16, span: 205 },
+  magnet: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 16, span: 175 },
+  shrink: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 14, span: 170 },
+  grow: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 14, span: 170 },
+  pirate: { totalLen: 210, centerOffsetY: 102, centerOffsetX: 12, span: 215 },
+  card: { totalLen: 160, centerOffsetY: 78, centerOffsetX: 14, span: 165 },
+  sonic: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 16, span: 175 },
+  mirror: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 14, span: 170 },
+  portal: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 14, span: 170 },
+  chrono: { totalLen: 175, centerOffsetY: 85, centerOffsetX: 14, span: 180 },
+  glitch: { totalLen: 160, centerOffsetY: 78, centerOffsetX: 10, span: 165 },
+  dragon: { totalLen: 175, centerOffsetY: 85, centerOffsetX: 16, span: 180 },
+  gravity: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 16, span: 175 },
+  honey: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 16, span: 175 },
+  coconut: { totalLen: 225, centerOffsetY: 110, centerOffsetX: 14, span: 230 },
+  angklung: { totalLen: 185, centerOffsetY: 92, centerOffsetX: 12, span: 190 },
+  bee: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 16, span: 175 },
+  ink: { totalLen: 185, centerOffsetY: 90, centerOffsetX: 16, span: 190 },
+  yoyo: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 14, span: 170 },
+  sakura: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 14, span: 175 },
+  acid: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 16, span: 175 },
+  keris: { totalLen: 215, centerOffsetY: 105, centerOffsetX: 6, span: 220 },
+  tornado: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 16, span: 175 },
+  firework: { totalLen: 185, centerOffsetY: 90, centerOffsetX: 14, span: 190 },
+  anchor: { totalLen: 220, centerOffsetY: 108, centerOffsetX: 14, span: 225 },
+  shark: { totalLen: 180, centerOffsetY: 88, centerOffsetX: 16, span: 185 },
+  ghost: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 14, span: 175 },
+  ufo: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 14, span: 170 },
+  rainbow: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 14, span: 170 },
+  meteor: { totalLen: 185, centerOffsetY: 90, centerOffsetX: 16, span: 190 },
+  diamond: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 14, span: 170 },
+  moonbeam: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 14, span: 175 },
+  storm: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 16, span: 175 },
+  pencil: { totalLen: 180, centerOffsetY: 88, centerOffsetX: 8, span: 185 },
+  sandal: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 12, span: 170 },
+  paintball: { totalLen: 175, centerOffsetY: 85, centerOffsetX: 18, span: 185 },
+  wand: { totalLen: 185, centerOffsetY: 90, centerOffsetX: 8, span: 190 },
+  ruby: { totalLen: 175, centerOffsetY: 85, centerOffsetX: 22, span: 180 },
+  emerald: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 14, span: 170 },
+  sapphire: { totalLen: 245, centerOffsetY: 120, centerOffsetX: 16, span: 250 },
+  crystal: { totalLen: 180, centerOffsetY: 88, centerOffsetX: 14, span: 185 },
+  beerifle: { totalLen: 300, centerOffsetY: 148, centerOffsetX: 16, span: 305 },
+  buster: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 10, span: 175 },
+  holy: { totalLen: 175, centerOffsetY: 85, centerOffsetX: 16, span: 180 },
+  unicorn: { totalLen: 175, centerOffsetY: 85, centerOffsetX: 16, span: 180 },
+  obliterator: { totalLen: 225, centerOffsetY: 110, centerOffsetX: 16, span: 230 },
+  bit8: { totalLen: 165, centerOffsetY: 80, centerOffsetX: 12, span: 170 },
+  coingun: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 16, span: 175 },
+  kunai: { totalLen: 195, centerOffsetY: 96, centerOffsetX: 6, span: 200 },
+  blaster: { totalLen: 185, centerOffsetY: 90, centerOffsetX: 16, span: 190 },
+  // ---------------------------------------------------------- 11 SCI-FI / WESTERN
+  lone_star: { totalLen: 185, centerOffsetY: 88, centerOffsetX: 16, span: 190 },
+  photon_saber: { totalLen: 240, centerOffsetY: 120, centerOffsetX: 8, span: 245 },
+  plasma_repeater: { totalLen: 185, centerOffsetY: 88, centerOffsetX: 16, span: 190 },
+  warp_disruptor: { totalLen: 195, centerOffsetY: 96, centerOffsetX: 14, span: 200 },
+  deflector_shield: { totalLen: 175, centerOffsetY: 82, centerOffsetX: 14, span: 180 },
+  gauntlet_cannon: { totalLen: 205, centerOffsetY: 100, centerOffsetX: 10, span: 210 },
+  alien_ray: { totalLen: 190, centerOffsetY: 92, centerOffsetX: 12, span: 195 },
+  pulse_rifle: { totalLen: 240, centerOffsetY: 118, centerOffsetX: 14, span: 245 },
+  cryo_blaster: { totalLen: 190, centerOffsetY: 92, centerOffsetX: 12, span: 195 },
+  hyperdrive: { totalLen: 240, centerOffsetY: 118, centerOffsetX: 14, span: 245 },
+  quantum_destabilizer: { totalLen: 195, centerOffsetY: 94, centerOffsetX: 12, span: 200 },
+};
+
+export function getGunMetrics(id: WeaponId): GunMetrics {
+  const m = GUN_METRICS[id];
+  return {
+    totalLen: m?.totalLen ?? 175,
+    centerOffsetY: m?.centerOffsetY ?? 85,
+    centerOffsetX: m?.centerOffsetX ?? 16,
+    span: m?.span ?? 180,
+  };
+}
