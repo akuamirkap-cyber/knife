@@ -1,5 +1,6 @@
 import type { WeaponId } from '../weapons';
 import { TAU, rand, lin, steel, chrome, brass, wood, rr, grip, guard, glow, jag, star, radial, gunState } from './kit';
+import { shotPulse } from './commonGunMotion';
 import { bit8Gun, coinGun, kunaiGun, starWarsBlaster } from './guns6';
 import { drawGunExtra4, FLASH4 } from './guns7';
 
@@ -33,7 +34,8 @@ function gem(c: C, x: number, y: number, s: number, light: string, mid: string, 
 }
 
 // ------------------------------------------------------------- PENCIL (LEBIH RAMPING & ELEGANT!)
-function pencilGun(c: C, cx: number, y0: number, _t: number, ready: boolean) {
+function pencilGun(c: C, cx: number, y0: number, t: number, ready: boolean) {
+  const click = shotPulse(gunState.sinceShot, 0.28);
   grip(c, cx, y0 + 120, '#f472b6', '#f9a8d4', 0.65);
   guard(c, cx, y0 + 114, '#9d174d');
   // Sleek slender hexagonal pencil body (lebar ramping 16px bukan 30px)
@@ -43,6 +45,8 @@ function pencilGun(c: C, cx: number, y0: number, _t: number, ready: boolean) {
   c.beginPath();
   c.moveTo(cx, y0 + 36); c.lineTo(cx, y0 + 154);
   c.stroke();
+  c.fillStyle = `rgba(255,255,255,${0.22 + 0.28 * Math.sin(t * 3) ** 2})`;
+  c.fillRect(cx - 6, y0 + 43 + (t * 19) % 85, 1.8, 15);
   c.fillStyle = '#111';
   c.font = "bold 7px 'Russo One', sans-serif";
   c.textAlign = 'center';
@@ -53,7 +57,8 @@ function pencilGun(c: C, cx: number, y0: number, _t: number, ready: boolean) {
   c.restore();
   // Sleek silver ferrule + pink eraser
   rr(c, cx - 8.5, y0 + 152, 17, 10, 1.5, chrome(c, cx - 8.5, cx + 8.5), '#475569', 1);
-  rr(c, cx - 8, y0 + 162, 16, 14, [1, 1, 6, 6], lin(c, cx - 8, cx + 8, ['#db2777', '#f9a8d4', '#ec4899']), '#831843', 1);
+  rr(c, cx - 8, y0 + 162 + click * 4, 16, 14 - click * 4, [1, 1, 6, 6],
+    lin(c, cx - 8, cx + 8, ['#db2777', '#f9a8d4', '#ec4899']), '#831843', 1);
   // Sharpened slender cone
   c.beginPath();
   c.moveTo(cx - 8, y0 + 36);
@@ -70,11 +75,19 @@ function pencilGun(c: C, cx: number, y0: number, _t: number, ready: boolean) {
   c.beginPath();
   c.moveTo(cx - 2.5, y0 + 8);
   c.lineTo(cx + 2.5, y0 + 8);
-  c.lineTo(cx, y0 - 4);
+  c.lineTo(cx, y0 - 4 - click * 10);
   c.closePath();
   c.fillStyle = '#1f2937';
   c.fill();
   if (ready) glow(c, cx, y0 - 3, 2, '#9ca3af', 5);
+  if (click > 0.02) {
+    c.fillStyle = `rgba(226,232,240,${click * 0.8})`;
+    for (const side of [-1, 1]) {
+      c.beginPath();
+      c.arc(cx + side * (6 + click * 7), y0 - 5 - click * 7, 1.8, 0, TAU);
+      c.fill();
+    }
+  }
 }
 
 // ------------------------------------------------------------- SANDAL JEPIT
@@ -119,6 +132,7 @@ export function drawSandal(c: C, x: number, y: number, s: number, rot = 0) {
 }
 
 function sandalGun(c: C, cx: number, y0: number, t: number, ready: boolean) {
+  const snap = shotPulse(gunState.sinceShot, 0.34);
   grip(c, cx, y0 + 112, '#1e3a8a', '#2563eb', 0.8);
   guard(c, cx, y0 + 104, '#172554');
   // launcher body: blue-white striped like the iconic sandal
@@ -131,19 +145,32 @@ function sandalGun(c: C, cx: number, y0: number, t: number, ready: boolean) {
   c.textAlign = 'center';
   c.fillText('EMAK', cx, y0 + 88);
   c.fillText('POWER', cx, y0 + 100);
-  // rubber flaps (launch mouth)
-  rr(c, cx - 22, y0 + 38, 44, 14, 6, '#1d4ed8', '#172554', 1.5);
-  if (ready) drawSandal(c, cx, y0 + 12, 0.9, Math.sin(t * 3) * 0.08);
+  // Rubber launch lips snap outward, then settle back into their blue rim.
+  rr(c, cx - 22, y0 + 38 + snap * 5, 44, 14, 6, '#1d4ed8', '#172554', 1.5);
+  if (ready) drawSandal(c, cx, y0 + 12 + Math.sin(t * 3) * 2 - snap * 8,
+    0.9, Math.sin(t * 3) * 0.08);
   else {
     c.fillStyle = '#0b1530';
     c.beginPath();
     c.ellipse(cx, y0 + 40, 16, 4, 0, 0, TAU);
     c.fill();
   }
+  if (snap > 0.02) {
+    c.strokeStyle = `rgba(191,219,254,${snap * 0.8})`;
+    c.lineWidth = 2.5;
+    for (const side of [-1, 1]) {
+      c.beginPath();
+      c.moveTo(cx + side * 17, y0 + 41);
+      c.quadraticCurveTo(cx + side * (26 + snap * 9), y0 + 30,
+        cx + side * (29 + snap * 12), y0 + 18);
+      c.stroke();
+    }
+  }
 }
 
 // ------------------------------------------------------------- PAINTBALL
 function paintballGun(c: C, cx: number, y0: number, t: number) {
+  const churn = shotPulse(gunState.sinceShot, 0.32);
   grip(c, cx, y0 + 130, '#111827', '#374151', 0.8);
   guard(c, cx, y0 + 122, '#000');
   // CO2 tank
@@ -163,7 +190,8 @@ function paintballGun(c: C, cx: number, y0: number, t: number) {
   const cols = ['#f43f5e', '#facc15', '#22d3ee', '#a855f7', '#4ade80', '#fb923c'];
   for (let i = 0; i < 9; i++) {
     const bx = cx - 28 + (i % 3) * 9 + (Math.floor(i / 3) % 2) * 4;
-    const by = y0 + 98 - Math.floor(i / 3) * 9 + Math.sin(t * 6 + i) * 0.8;
+    const by = y0 + 98 - Math.floor(i / 3) * 9
+      + Math.sin(t * 6 + i) * (0.8 + churn * 4.5);
     c.beginPath();
     c.arc(bx, by, 4.2, 0, TAU);
     c.fillStyle = radial(c, bx, by, 4.2, ['#ffffff', cols[i % 6], cols[i % 6]]);
@@ -194,6 +222,17 @@ function paintballGun(c: C, cx: number, y0: number, t: number) {
   c.beginPath();
   c.arc(cx - 7, y0 + 146, 3, 0, TAU);
   c.fill();
+  // Color sloshes up the feed line; tiny paint beads shake free on a shot.
+  c.fillStyle = `rgba(34,211,238,${0.25 + 0.45 * Math.sin(t * 3) ** 2})`;
+  c.fillRect(cx + 7, y0 + 98 + (t * 22) % 35, 2, 9);
+  if (churn > 0.02) {
+    for (const side of [-1, 1]) {
+      c.fillStyle = side < 0 ? `rgba(250,204,21,${churn})` : `rgba(244,114,182,${churn})`;
+      c.beginPath();
+      c.arc(cx + side * (6 + churn * 8), y0 - 5 - churn * 8, 2.4, 0, TAU);
+      c.fill();
+    }
+  }
 }
 
 // ------------------------------------------------------------- MAGIC WAND

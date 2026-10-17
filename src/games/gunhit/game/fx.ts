@@ -1,4 +1,6 @@
 import type { Weapon, WeaponId } from './weapons';
+import { getGunEffect, supportsGunVariants } from './art/gunVariants';
+import { spawnClassicMuzzle, spawnClassicImpact } from './classicShotFx';
 
 const TAU = Math.PI * 2;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -8,7 +10,8 @@ const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 export type PKind =
   | 'spark' | 'chip' | 'smoke' | 'shell' | 'text' | 'ring' | 'glow' | 'bolt'
   | 'star' | 'shard' | 'shock' | 'drop' | 'streak' | 'petal'
-  | 'slap' | 'pencilShaving' | 'paintSplat' | 'prism' | 'feather';
+  | 'snowflake' | 'snowChunk' | 'snowDust' | 'waterDrop' | 'waterSplash' | 'honeyDrop' | 'honeySplash'
+  | 'bananaDrop' | 'bananaSplash' | 'slap' | 'pencilShaving' | 'paintSplat' | 'prism' | 'feather';
 
 export interface Particle {
   tx?: number; ty?: number;
@@ -26,7 +29,7 @@ export interface FxSink {
 // ---------------------------------------------------------------- profiles
 export type Impact =
   | 'bullet' | 'heavy' | 'energy' | 'electric' | 'ice' | 'water' | 'snow' | 'fire' | 'explosive'
-  | 'pixel' | 'void' | 'magic' | 'blade' | 'nature' | 'confetti' | 'gold' | 'stone' | 'glass' | 'sonic'
+  | 'pixel' | 'void' | 'magic' | 'honey' | 'blade' | 'nature' | 'confetti' | 'gold' | 'stone' | 'glass' | 'sonic'
   | 'sandal' | 'slingshot' | 'pencil' | 'paintball' | 'holy' | 'gem' | 'buster' | 'obliterator' | 'unicorn' | 'wand';
 
 export type Decal =
@@ -97,14 +100,14 @@ export const FX: Record<WeaponId, FxProfile> = {
   card: P('blade', 'slit', 'quiet', '255,255,255', 50, { hitstop: 0.01, kick: 1, ghost: 2 }),
   sonic: P('sonic', 'dent', 'energy', '190,255,120', 150, { hitstop: 0.03, kick: 5 }),
   mirror: P('glass', 'slit', 'energy', '230,240,255', 130, { kick: 2, ghost: 3 }),
-  portal: P('magic', 'glow', 'energy', '80,170,255', 140, { kick: 3, ghost: 3, decalColors: ['#0b1020', '#fb923c'] }),
+  portal: P('magic', 'glow', 'energy', '80,170,255', 140, { kick: 3, decalColors: ['#0b1020', '#fb923c'] }),
   chrono: P('magic', 'glow', 'energy', '250,220,120', 140, { kick: 3, ghost: 4, decalColors: ['#422006', '#facc15'] }),
   glitch: P('pixel', 'pixel', 'energy', '34,255,136', 130, { hitstop: 0.04, kick: 3, ghost: 3 }),
   dragon: P('fire', 'burn', 'fire', '255,110,40', 180, { hitstop: 0.04, kick: 5, tint: 0.15, ghost: 2 }),
   gravity: P('void', 'glow', 'energy', '129,140,248', 160, { hitstop: 0.04, kick: 4, ghost: 3, decalColors: ['#0f0a2e', '#818cf8'] }),
 
   // Wave 3
-  honey: P('water', 'paint', 'soft', '251,191,36', 70, { kick: 1.5, decalColors: ['rgba(245,158,11,0.55)', 'rgba(251,191,36,0.6)'] }),
+  honey: P('honey', 'paint', 'soft', '251,191,36', 95, { kick: 1.5, decalColors: ['rgba(245,158,11,0.65)', 'rgba(251,191,36,0.75)'] }),
   coconut: P('water', 'dent', 'soft', '217,249,157', 90, { hitstop: 0.04, kick: 6 }),
   angklung: P('magic', 'glow', 'soft', '253,230,138', 90, { kick: 2, decalColors: ['#451a03', '#fbbf24'] }),
   bee: P('blade', 'slit', 'quiet', '250,204,21', 50, { hitstop: 0, kick: 1 }),
@@ -123,7 +126,7 @@ export const FX: Record<WeaponId, FxProfile> = {
     decalColors: ['rgba(248,113,113,0.5)', 'rgba(250,204,21,0.5)', 'rgba(74,222,128,0.5)', 'rgba(96,165,250,0.5)', 'rgba(167,139,250,0.5)'] }),
   meteor: P('explosive', 'scorch', 'fire', '255,140,50', 300, { hitstop: 0.12, kick: 14, tint: 0.3, streak: 1.6 }),
   diamond: P('gem', 'slit', 'quiet', '165,243,252', 140, { hitstop: 0.03, kick: 3, ghost: 3, tint: 0.08 }),
-  moonbeam: P('magic', 'glow', 'energy', '196,181,253', 160, { hitstop: 0.03, kick: 3, tint: 0.12, decalColors: ['#1e1b4b', '#c4b5fd'] }),
+  moonbeam: P('magic', 'glow', 'energy', '205,186,255', 210, { hitstop: 0.03, kick: 3, tint: 0.12, decalColors: ['#1e1b4b', '#c4b5fd'] }),
   storm: P('electric', 'scorch', 'energy', '147,197,253', 220, { hitstop: 0.06, kick: 7, tint: 0.2, speedLines: true }),
 
   // Wave 4
@@ -179,6 +182,10 @@ function rgbOf(hex: string) {
 
 // ---------------------------------------------------------------- muzzle
 export function spawnMuzzle(s: FxSink, prof: FxProfile, w: Weapon, x: number, y: number) {
+  if (supportsGunVariants(w.id) && getGunEffect(w.id) === 'original') {
+    spawnClassicMuzzle(s, prof, w, x, y);
+    return;
+  }
   if (prof.muzzle === 'none') return;
   s.light(x, y, prof.lightR * (prof.muzzle === 'quiet' ? 0.3 : 0.6), prof.light, prof.muzzle === 'fire' ? 0.08 : 0.12);
   switch (prof.muzzle) {
@@ -191,14 +198,40 @@ export function spawnMuzzle(s: FxSink, prof: FxProfile, w: Weapon, x: number, y:
       break;
     }
     case 'energy': {
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < (w.id === 'moonbeam' ? 8 : 4); i++) {
         const [vx, vy] = cone(0, -1, 0.8, 60, 200);
         s.push(mk(x, y - 4, vx, vy, rand(0.2, 0.4), rand(3, 5), `rgb(${prof.light})`, 'star', { drag: 3 }));
       }
       break;
     }
     case 'soft': {
-      for (let i = 0; i < 4; i++) {
+      if (w.id === 'honey') {
+        for (let i = 0; i < 6; i++) {
+          const [vx, vy] = cone(0, -1, 0.75, 45, 160);
+          s.push(mk(x, y - 3, vx, vy, rand(0.27, 0.52), rand(1.7, 3.7),
+            '#fbbf24', 'honeyDrop', { g: 760, drag: 1.2 }));
+        }
+      } else if (w.id === 'banana') {
+        for (let i = 0; i < 7; i++) {
+          const [vx, vy] = cone(0, -1, 0.92, 60, 205);
+          s.push(mk(x, y - 4, vx, vy, rand(0.28, 0.55), rand(2, 4.2),
+            pick(['#fff8dd', '#ffe4a0', '#f8d478']), 'bananaDrop', { g: 850, drag: 1.3 }));
+        }
+      } else if (w.id === 'soaker') {
+        for (let i = 0; i < 7; i++) {
+          const [vx, vy] = cone(0, -1, 0.8, 100, 260);
+          s.push(mk(x, y - 4, vx, vy, rand(0.22, 0.45), rand(2, 4), '#7dd3fc', 'waterDrop', { g: 750, drag: 1 }));
+        }
+      } else if (w.id === 'snowball') {
+        for (let i = 0; i < 6; i++) {
+          const [vx, vy] = cone(0, -1, 0.9, 50, 160);
+          s.push(mk(x, y - 4, vx, vy, rand(0.3, 0.52), rand(2.2, 4.5), '#ffffff', 'snowflake', { g: 65, drag: 1.8 }));
+        }
+        for (let i = 0; i < 9; i++) {
+          const [vx, vy] = cone(0, -1, 1.25, 60, 180);
+          s.push(mk(x, y - 5, vx, vy, rand(0.24, 0.42), rand(1.5, 3.8), '#ffffff', 'snowDust', { g: 150, drag: 1.3 }));
+        }
+      } else for (let i = 0; i < 4; i++) {
         const [vx, vy] = cone(0, -1, 0.7, 30, 120);
         s.push(mk(x, y - 4, vx, vy, rand(0.25, 0.45), rand(4, 8), 'rgba(255,255,255,', 'smoke', { g: -20, drag: 2 }));
       }
@@ -211,7 +244,6 @@ export function spawnMuzzle(s: FxSink, prof: FxProfile, w: Weapon, x: number, y:
       break;
     }
   }
-  void w;
 }
 
 export function spawnSpeedLines(s: FxSink, x: number, yTop: number, yBot: number, rgb: string) {
@@ -222,6 +254,10 @@ export function spawnSpeedLines(s: FxSink, x: number, yTop: number, yBot: number
 
 // ---------------------------------------------------------------- impact
 export function spawnImpact(s: FxSink, prof: FxProfile, w: Weapon, x: number, y: number, nx: number, ny: number, chips: string[]) {
+  if (supportsGunVariants(w.id) && getGunEffect(w.id) === 'original') {
+    spawnClassicImpact(s, prof, w, x, y, nx, ny, chips);
+    return;
+  }
   const L = prof.light;
   const lightCss = `rgb(${L})`;
 
@@ -367,6 +403,17 @@ export function spawnImpact(s: FxSink, prof: FxProfile, w: Weapon, x: number, y:
       sparks(6, [lightCss, '#ffffff'], 200, 500, 1.1, 200);
       s.push(mk(x, y, 0, 0, 0.25, 30, L, 'shock'));
       chipBurst(4, chips);
+      if (w.id === 'plasma' || w.id === 'laser') {
+        const plasma = w.id === 'plasma';
+        s.push(mk(x, y, 0, 0, 0.31, plasma ? 50 : 45,
+          plasma ? '57,255,156' : '255,75,130', 'shock'));
+        for (let i = 0; i < 5; i++) {
+          const ang = rand(0, TAU), dist = rand(13, 34);
+          s.push(mk(x, y, 0, 0, rand(0.11, 0.24), 1.6,
+            plasma ? '#c1ffe5' : '#ffd2df', 'bolt',
+            { tx: x + Math.cos(ang) * dist, ty: y + Math.sin(ang) * dist }));
+        }
+      }
       break;
     case 'electric':
       for (let i = 0; i < 5; i++) {
@@ -383,17 +430,67 @@ export function spawnImpact(s: FxSink, prof: FxProfile, w: Weapon, x: number, y:
       dust(4, 'rgba(210,240,255,', [6, 12]);
       stars(6, ['#ffffff', '#bff1ff']);
       break;
+    case 'honey': {
+      // Heavy syrup beads, an elastic splash crown and a warm translucent
+      // pool. No blue water drops or brittle glass-chip slow particles.
+      s.push(mk(x, y, 0, 0, 0.4, 27, '#e9a51d', 'honeySplash',
+        { extra: Math.atan2(ny, nx) }));
+      for (let i = 0; i < 17; i++) {
+        const [vx, vy] = cone(nx, ny, 1.45, 55, 270);
+        s.push(mk(x, y, vx, vy, rand(0.38, 0.8), rand(2, 5.5),
+          pick(['#fff1a8', '#ffcf4c', '#d99116']), 'honeyDrop', { g: 900, drag: 1.1 }));
+      }
+      break;
+    }
     case 'water':
-      for (let i = 0; i < 14; i++) {
+      if (w.id === 'banana') {
+        // Banana pulp bursts into a generous creamy juice crown, NEVER into
+        // the Soaker's blue water or brittle ice/wood chips. The flesh itself
+        // remains attached to the target after this short-lived splash.
+        s.push(mk(x, y, 0, 0, 0.49, 39, '#fff0b5', 'bananaSplash',
+          { extra: Math.atan2(ny, nx) }));
+        s.push(mk(x, y, 0, 0, 0.26, 53, '255,226,142', 'shock'));
+        for (let i = 0; i < 26; i++) {
+          const [vx, vy] = cone(nx, ny, 1.56, 65, 390);
+          s.push(mk(x, y, vx, vy, rand(0.33, 0.75), rand(2.2, 6.6),
+            pick(['#fffdf0', '#fff0bb', '#f9d879']), 'bananaDrop', { g: 990, drag: 0.85 }));
+        }
+      } else if (w.id === 'soaker') {
+        // A translucent splash crown, flying liquid beads and fine spray —
+        // not the opaque blue rectangular chips of the generic slow perk.
+        s.push(mk(x, y, 0, 0, 0.42, 36, '#7dd3fc', 'waterSplash', { extra: Math.atan2(ny, nx) }));
+        for (let i = 0; i < 22; i++) {
+          const [vx, vy] = cone(nx, ny, 1.48, 70, 420);
+          s.push(mk(x, y, vx, vy, rand(0.32, 0.67), rand(1.9, 6.4), pick(['#e1faff', '#7dd3fc', '#38bdf8']),
+            'waterDrop', { g: 1050, drag: 0.9 }));
+        }
+      } else for (let i = 0; i < 14; i++) {
         const [vx, vy] = cone(nx, ny, 1.1, 90, 360);
         s.push(mk(x, y, vx, vy, rand(0.35, 0.65), rand(2, 4), pick(['#bfdbfe', '#60a5fa', '#ffffff', '#3b82f6']), 'drop', { g: 1100 }));
       }
-      dust(2, 'rgba(190,220,255,', [6, 10]);
+      if (w.id !== 'soaker' && w.id !== 'banana') dust(2, 'rgba(190,220,255,', [6, 10]);
       break;
-    case 'snow':
-      chipBurst(14, ['#ffffff', '#f0f9ff', '#e0f2fe'], 'chip', 260, 500, [2, 4]);
-      dust(5, 'rgba(255,255,255,', [6, 13]);
+    case 'snow': {
+      // Packed snow separates into soft white clumps and fine powder, NOT
+      // blue crystalline ice. A brief cloud cushions the half-buried ball.
+      dust(6, 'rgba(246,252,255,', [7, 13]);
+      s.push(mk(x, y, 0, 0, 0.26, 27, '239,250,255', 'shock'));
+      for (let i = 0; i < 24; i++) {
+        const [vx, vy] = cone(nx, ny, 1.75, 80, 340);
+        s.push(mk(x, y, vx, vy, rand(0.35, 0.7), rand(1.4, 3.5),
+          pick(['#ffffff', '#fafcff', '#eaf6fb']), 'snowDust', { g: 180, drag: 1.2 }));
+      }
+      for (let i = 0; i < 12; i++) {
+        const [vx, vy] = cone(nx, ny, 1.6, 120, 340);
+        s.push(mk(x, y, vx, vy, rand(0.42, 0.76), rand(3.8, 7.2),
+          pick(['#ffffff', '#f6fcff', '#e5f3fa']), 'snowChunk', { g: 600, drag: 0.55 }));
+      }
+      for (let i = 0; i < 5; i++) {
+        const [vx, vy] = cone(nx, ny, 1.65, 60, 200);
+        s.push(mk(x, y, vx, vy, rand(0.35, 0.62), rand(2.4, 4.5), '#ffffff', 'snowflake', { g: 90, drag: 2 }));
+      }
       break;
+    }
     case 'fire':
       for (let i = 0; i < 14; i++) {
         const [vx, vy] = cone(nx, ny, 1.2, 50, 240);
@@ -403,10 +500,19 @@ export function spawnImpact(s: FxSink, prof: FxProfile, w: Weapon, x: number, y:
       dust(4, 'rgba(60,50,45,', [6, 12]);
       break;
     case 'explosive':
+      if (w.id === 'bamboo') {
+        // Lebaran-style white powder plume and hot wick sparks. The gameplay
+        // explosion still comes from explodeAt; no extra damage or hitbox.
+        sparks(18, ['#fffdf1', '#fef3c7', '#f8cb59', '#f16a43'], 220, 680, 1.5, 450);
+        s.push(mk(x, y, 0, 0, 0.35, 65, '255,249,228', 'shock'));
+        dust(7, 'rgba(255,250,237,', [9, 17]);
+        break;
+      }
       chipBurst(12, ['#3f3f46', '#57534e', ...chips], 'shard', 480, 1200, [4, 8]);
       sparks(18, ['#ffffff', '#fff3b0', '#ffd23f', '#ff6a00'], 300, 850, 1.5, 600);
       s.push(mk(x, y, 0, 0, 0.35, 60, '255,200,120', 'shock'));
       dust(8, 'rgba(100,90,80,', [9, 18]);
+      if (w.id === 'meteor') glows(8, ['255,191,74', '255,113,31'], 200, -100, [3, 7]);
       break;
     case 'pixel':
       for (let i = 0; i < 18; i++) {
@@ -420,12 +526,29 @@ export function spawnImpact(s: FxSink, prof: FxProfile, w: Weapon, x: number, y:
         const d = rand(35, 80);
         s.push(mk(x + Math.cos(a) * d, y + Math.sin(a) * d, -Math.cos(a) * d * 2.2, -Math.sin(a) * d * 2.2, 0.32, rand(2, 4), L, 'glow'));
       }
-      s.push(mk(x, y, 0, 0, 0.32, 40, '20,0,40', 'shock'));
+      s.push(mk(x, y, 0, 0, 0.32, w.id === 'blackhole' ? 37 : 40,
+        w.id === 'blackhole' ? '168,85,247' : '20,0,40', 'shock'));
+      if (w.id === 'blackhole') {
+        // A small inward spiral, not a giant opaque black mark on the stone.
+        for (let i = 0; i < 5; i++) {
+          const ang = (i / 5) * TAU;
+          s.push(mk(x + Math.cos(ang) * 23, y + Math.sin(ang) * 23,
+            -Math.cos(ang) * 50, -Math.sin(ang) * 50, 0.34, 1.8,
+            '226,199,255', 'glow'));
+        }
+      }
       break;
     case 'magic':
-      stars(10, ['#ffffff', lightCss, '#fde047'], 220, [3, 6]);
-      glows(7, [L, '255,255,255'], 150);
-      s.push(mk(x, y, 0, 0, 0.3, 40, L, 'shock'));
+      if (w.id === 'moonbeam') {
+        stars(18, ['#ffffff', '#ede9fe', '#c4b5fd', '#fff1be'], 270, [3.5, 7.5]);
+        glows(10, ['205,186,255', '255,239,190'], 170);
+        s.push(mk(x, y, 0, 0, 0.45, 62, L, 'shock'));
+        s.push(mk(x, y, 0, 0, 0.32, 34, '255,239,190', 'shock'));
+      } else {
+        stars(10, ['#ffffff', lightCss, '#fde047'], 220, [3, 6]);
+        glows(7, [L, '255,255,255'], 150);
+        s.push(mk(x, y, 0, 0, 0.3, 40, L, 'shock'));
+      }
       break;
     case 'blade': {
       const px = -ny;
@@ -448,6 +571,12 @@ export function spawnImpact(s: FxSink, prof: FxProfile, w: Weapon, x: number, y:
     case 'gold':
       sparks(14, ['#ffffff', '#fff1a8', '#ffd23f', '#f59e0b'], 240, 700, 1.2, 600);
       stars(8, ['#ffffff', '#fff1a8', '#ffd23f'], 200, [3.5, 7]);
+      // New Golden Gun effect adds a luminous glint; the opted-in classic
+      // effect still calls the original, simpler impact in classicShotFx.
+      if (w.id === 'golden') {
+        stars(9, ['#fffdf1', '#ffe69c'], 185, [2.6, 5.3]);
+        glows(6, ['255,228,138', '255,246,203'], 150, -70, [2.8, 5]);
+      }
       chipBurst(5, chips);
       break;
     case 'stone':
@@ -833,6 +962,62 @@ export function drawFxParticle(c: CanvasRenderingContext2D, p: Particle, time: n
       c.restore();
       break;
     }
+    case 'snowflake': {
+      c.save();
+      c.globalAlpha = Math.min(1, a * 1.7);
+      c.translate(p.x, p.y);
+      c.rotate(p.rot);
+      c.shadowColor = '#93c5fd'; c.shadowBlur = 3;
+      c.strokeStyle = p.color;
+      c.lineCap = 'round'; c.lineWidth = Math.max(0.7, p.size * 0.16);
+      for (let i = 0; i < 3; i++) {
+        c.rotate(TAU / 6);
+        c.beginPath(); c.moveTo(-p.size, 0); c.lineTo(p.size, 0);
+        c.moveTo(p.size * 0.48, 0); c.lineTo(p.size * 0.7, -p.size * 0.24);
+        c.moveTo(p.size * 0.48, 0); c.lineTo(p.size * 0.7, p.size * 0.24);
+        c.stroke();
+      }
+      c.restore();
+      break;
+    }
+    case 'snowDust': {
+      c.save();
+      c.translate(p.x, p.y);
+      c.globalAlpha = Math.min(1, a * 1.7);
+      const r = p.size * (0.7 + t * 0.35);
+      const powder = c.createRadialGradient(-r * 0.2, -r * 0.25, 0, 0, 0, r * 1.55);
+      powder.addColorStop(0, p.color);
+      powder.addColorStop(0.48, 'rgba(246,252,255,0.86)');
+      powder.addColorStop(1, 'rgba(244,251,255,0)');
+      c.fillStyle = powder;
+      c.beginPath(); c.arc(0, 0, r * 1.55, 0, TAU); c.fill();
+      c.restore();
+      break;
+    }
+    case 'snowChunk': {
+      c.save();
+      c.globalAlpha = Math.min(1, a * 1.8);
+      c.translate(p.x, p.y);
+      c.rotate(p.rot);
+      const s = p.size;
+      const packed = c.createRadialGradient(-s * 0.35, -s * 0.45, s * 0.08, 0, 0, s * 1.25);
+      packed.addColorStop(0, '#ffffff'); packed.addColorStop(0.52, p.color); packed.addColorStop(1, '#c5dee9');
+      c.fillStyle = packed;
+      c.beginPath();
+      c.moveTo(-s * 0.92, -s * 0.14);
+      c.quadraticCurveTo(-s * 1.04, -s * 0.79, -s * 0.38, -s * 0.85);
+      c.quadraticCurveTo(s * 0.09, -s * 1.18, s * 0.44, -s * 0.67);
+      c.quadraticCurveTo(s * 0.95, -s * 0.47, s * 0.91, s * 0.2);
+      c.quadraticCurveTo(s * 0.8, s * 0.89, s * 0.13, s * 0.84);
+      c.quadraticCurveTo(-s * 0.35, s * 1.01, -s * 0.88, s * 0.37);
+      c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(155,194,212,0.56)'; c.lineWidth = 0.75; c.stroke();
+      c.fillStyle = 'rgba(255,255,255,0.95)';
+      c.beginPath(); c.arc(-s * 0.28, -s * 0.26, s * 0.2, 0, TAU);
+      c.arc(s * 0.37, -s * 0.09, s * 0.12, 0, TAU); c.fill();
+      c.restore();
+      break;
+    }
     case 'shard': {
       c.save();
       c.globalAlpha = Math.min(1, a * 2);
@@ -871,6 +1056,158 @@ export function drawFxParticle(c: CanvasRenderingContext2D, p: Particle, time: n
       c.beginPath();
       c.ellipse(0, 0, p.size, p.size * 0.5, 0, 0, TAU);
       c.fill();
+      c.restore();
+      break;
+    }
+    case 'bananaSplash': {
+      c.save(); c.translate(p.x, p.y);
+      c.rotate((p.extra ?? Math.PI / 2) - Math.PI / 2);
+      c.globalAlpha = Math.min(1, a * 2.1);
+      const r = p.size * (0.55 + t * 0.58);
+      const juice = c.createRadialGradient(0, 0, 1, 0, 0, r * 1.2);
+      juice.addColorStop(0, 'rgba(255,255,230,0.95)');
+      juice.addColorStop(0.52, 'rgba(251,223,148,0.67)');
+      juice.addColorStop(1, 'rgba(232,177,78,0)');
+      c.fillStyle = juice;
+      c.beginPath(); c.ellipse(0, 0, r * 1.4, r * 0.42, 0, 0, TAU); c.fill();
+      // Fluid sheets and round beads crest above the point of impact.
+      for (const side of [-1, 1]) {
+        c.fillStyle = side < 0 ? 'rgba(255,250,217,0.89)' : 'rgba(249,217,136,0.84)';
+        c.beginPath(); c.moveTo(side * r * 0.1, 1);
+        c.bezierCurveTo(side * r * 0.38, -r * 0.14, side * r * 0.58, -r * 0.66, side * r * 0.74, -r * 0.55);
+        c.quadraticCurveTo(side * r * 0.65, -r * 0.2, side * r * 0.39, 1);
+        c.closePath(); c.fill();
+        c.fillStyle = '#fff5cd'; c.beginPath();
+        c.arc(side * r * 0.78, -r * 0.57, 3.1, 0, TAU); c.fill();
+      }
+      c.strokeStyle = 'rgba(255,255,247,0.95)'; c.lineWidth = 1.7;
+      c.beginPath(); c.ellipse(0, 0, r * 0.8, r * 0.21, 0, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+      c.restore(); break;
+    }
+    case 'bananaDrop': {
+      c.save(); c.translate(p.x, p.y); c.rotate(Math.atan2(p.vy, p.vx));
+      c.globalAlpha = Math.min(1, a * 1.9);
+      const r = p.size;
+      c.fillStyle = p.color;
+      c.beginPath(); c.moveTo(-r * 1.5, 0);
+      c.bezierCurveTo(-r * 0.7, -r * 0.25, -r * 0.25, -r * 0.9, r * 0.3, -r * 0.8);
+      c.quadraticCurveTo(r * 1.27, -r * 0.45, r * 0.86, r * 0.65);
+      c.quadraticCurveTo(-r * 0.4, r, -r * 1.5, 0);
+      c.fill(); c.strokeStyle = 'rgba(219,179,98,0.64)'; c.lineWidth = 0.7; c.stroke();
+      c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(0, -r * 0.45, r * 0.24, r * 0.11, 0, 0, TAU); c.fill();
+      c.restore(); break;
+    }
+    case 'honeySplash': {
+      c.save(); c.translate(p.x, p.y);
+      c.rotate((p.extra ?? Math.PI / 2) - Math.PI / 2);
+      c.globalAlpha = Math.min(1, a * 2);
+      const r = p.size * (0.65 + t * 0.38);
+      const pool = c.createRadialGradient(0, 1, 0, 0, 1, r);
+      pool.addColorStop(0, 'rgba(255,228,126,0.81)');
+      pool.addColorStop(0.55, 'rgba(218,137,22,0.49)');
+      pool.addColorStop(1, 'rgba(151,78,10,0)');
+      c.fillStyle = pool; c.beginPath(); c.ellipse(0, 1, r, r * 0.34, 0, 0, TAU); c.fill();
+      c.fillStyle = '#fbbf38';
+      for (const side of [-1, 1]) {
+        c.beginPath(); c.moveTo(side * r * 0.13, 0);
+        c.bezierCurveTo(side * r * 0.4, -r * 0.16, side * r * 0.53, -r * 0.68, side * r * 0.7, -r * 0.62);
+        c.quadraticCurveTo(side * r * 0.71, -r * 0.32, side * r * 0.46, -r * 0.09);
+        c.quadraticCurveTo(side * r * 0.35, 2, side * r * 0.13, 0); c.fill();
+        c.fillStyle = '#ffe1a0'; c.beginPath();
+        c.arc(side * r * 0.7, -r * 0.66, 2.6, 0, TAU); c.fill();
+        c.fillStyle = '#fbbf38';
+      }
+      c.strokeStyle = 'rgba(255,250,194,0.88)'; c.lineWidth = 1.7;
+      c.beginPath(); c.ellipse(0, 1, r * 0.66, r * 0.17, 0, Math.PI * 1.07, Math.PI * 1.91); c.stroke();
+      c.restore(); break;
+    }
+    case 'honeyDrop': {
+      const angle = Math.atan2(p.vy, p.vx);
+      c.save(); c.translate(p.x, p.y); c.rotate(angle);
+      c.globalAlpha = Math.min(1, a * 1.8);
+      const r = p.size;
+      const syrup = c.createRadialGradient(-r * 0.4, -r * 0.2, 0, 0, 0, r * 1.5);
+      syrup.addColorStop(0, '#fff6c3'); syrup.addColorStop(0.43, '#ffc83d');
+      syrup.addColorStop(1, '#a9560c'); c.fillStyle = syrup;
+      c.beginPath(); c.moveTo(-r * 1.6, 0);
+      c.bezierCurveTo(-r * 0.6, -r * 0.46, r * 0.45, -r, r, 0);
+      c.bezierCurveTo(r * 0.45, r, -r * 0.6, r * 0.46, -r * 1.6, 0);
+      c.fill(); c.restore(); break;
+    }
+    case 'waterSplash': {
+      c.save();
+      c.translate(p.x, p.y);
+      c.rotate((p.extra ?? Math.PI / 2) - Math.PI / 2);
+      c.globalAlpha = Math.min(1, a * 1.8);
+      const r = p.size * (0.7 + t * 0.42);
+      const pool = c.createRadialGradient(0, 0, 1, 0, 0, r);
+      pool.addColorStop(0, 'rgba(27,159,224,0.58)');
+      pool.addColorStop(0.55, 'rgba(44,184,227,0.4)');
+      pool.addColorStop(1, 'rgba(22,144,207,0)');
+      c.fillStyle = pool;
+      c.beginPath(); c.ellipse(0, 0, r * 1.25, r * 0.32, 0, 0, TAU); c.fill();
+      const crest = c.createLinearGradient(0, -r * 0.45, 0, r * 0.18);
+      crest.addColorStop(0, 'rgba(220,252,255,0.72)');
+      crest.addColorStop(1, 'rgba(23,164,217,0.12)');
+      c.fillStyle = crest;
+      c.beginPath();
+      c.moveTo(-r * 0.42, 1);
+      c.quadraticCurveTo(-r * 0.36, -r * 0.28, -r * 0.13, -r * 0.21);
+      c.quadraticCurveTo(-r * 0.03, -r * 0.57, r * 0.12, -r * 0.24);
+      c.quadraticCurveTo(r * 0.31, -r * 0.29, r * 0.41, 1);
+      c.quadraticCurveTo(0, r * 0.12, -r * 0.42, 1);
+      c.fill();
+      c.lineCap = 'round';
+      // Two broad curling sheets of water rise and fold outward. Unlike five
+      // straight rays they read as a splash crown, even at normal game scale.
+      for (const side of [-1, 1]) {
+        const peak = side < 0 ? 0.61 : 0.48;
+        c.fillStyle = 'rgba(28,159,220,0.56)';
+        c.beginPath();
+        c.moveTo(side * r * 0.12, 1);
+        c.bezierCurveTo(side * r * 0.42, r * 0.07, side * r * 0.72, r * 0.5, side * r, r * peak);
+        c.quadraticCurveTo(side * r * 0.81, r * 0.21, side * r * 0.58, r * 0.08);
+        c.quadraticCurveTo(side * r * 0.29, -r * 0.06, side * r * 0.12, 1);
+        c.closePath(); c.fill();
+        c.strokeStyle = 'rgba(206,248,255,0.85)'; c.lineWidth = 1.3 + a;
+        c.beginPath(); c.moveTo(side * r * 0.26, 1);
+        c.bezierCurveTo(side * r * 0.48, r * 0.08, side * r * 0.78, r * 0.51, side * r, r * peak);
+        c.stroke();
+        c.fillStyle = 'rgba(194,247,255,0.92)';
+        c.beginPath(); c.arc(side * r * 1.03, r * peak, 2.3, 0, TAU); c.fill();
+        c.beginPath(); c.arc(side * r * 1.18, r * 0.18, 1.3, 0, TAU); c.fill();
+      }
+      c.strokeStyle = 'rgba(240,255,255,0.83)'; c.lineWidth = 1.2;
+      c.beginPath(); c.moveTo(-r * 0.3, -r * 0.04);
+      c.quadraticCurveTo(-r * 0.12, -r * 0.4, r * 0.04, -r * 0.22); c.stroke();
+      c.strokeStyle = 'rgba(69,190,234,0.8)'; c.lineWidth = 2.2;
+      c.beginPath(); c.ellipse(0, 2.5, r * (0.88 + t * 0.14), r * 0.23, 0, 0, Math.PI); c.stroke();
+      c.strokeStyle = 'rgba(224,251,255,0.82)'; c.lineWidth = 1;
+      c.beginPath(); c.ellipse(0, 2.5, r * (1.15 + t * 0.2), r * 0.28, 0, 0.12, Math.PI * 0.83); c.stroke();
+      c.restore();
+      break;
+    }
+    case 'waterDrop': {
+      const ang = Math.atan2(p.vy, p.vx);
+      c.save();
+      c.translate(p.x, p.y); c.rotate(ang);
+      c.globalAlpha = Math.min(1, a * 1.8);
+      const s = p.size;
+      const water = c.createRadialGradient(s * 0.22, -s * 0.3, 0, 0, 0, s * 1.6);
+      water.addColorStop(0, 'rgba(255,255,255,0.9)');
+      water.addColorStop(0.31, 'rgba(213,250,255,0.82)');
+      water.addColorStop(0.72, 'rgba(37,184,228,0.63)');
+      water.addColorStop(1, 'rgba(17,129,188,0.32)');
+      c.fillStyle = water;
+      c.beginPath();
+      c.moveTo(-s * 1.45, 0);
+      c.bezierCurveTo(-s * 0.65, -s * 0.2, -s * 0.3, -s * 0.95, s * 0.28, -s * 0.86);
+      c.bezierCurveTo(s * 1.4, -s * 0.6, s * 1.4, s * 0.75, s * 0.27, s * 0.92);
+      c.bezierCurveTo(-s * 0.3, s * 0.93, -s * 0.65, s * 0.22, -s * 1.45, 0);
+      c.fill();
+      c.strokeStyle = 'rgba(221,251,255,0.75)'; c.lineWidth = Math.max(0.6, s * 0.17); c.stroke();
+      c.fillStyle = 'rgba(255,255,255,0.9)';
+      c.beginPath(); c.ellipse(s * 0.37, -s * 0.36, s * 0.23, s * 0.13, -0.4, 0, TAU); c.fill();
       c.restore();
       break;
     }

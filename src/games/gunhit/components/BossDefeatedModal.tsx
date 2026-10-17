@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { sfx } from '../game/audio';
 import { sfx4 } from '../game/sfx4';
+import { useSlideActive } from '../../shared/SlideActivity';
 
 interface BossDefeatedModalProps {
   bossName: string;
@@ -15,18 +16,20 @@ export const BossDefeatedModal = ({
   rewardCoins,
   onContinue,
 }: BossDefeatedModalProps) => {
+  const active = useSlideActive();
   const [xpProgress, setXpProgress] = useState(15);
 
   useEffect(() => {
+    if (!active || xpProgress >= 92) return;
     sfx.boss();
     sfx4.match();
-    // Animate XP bar gliding forward
+    // Animate XP bar gliding forward only when the slide is in focus.
     const t = setTimeout(() => {
       setXpProgress(92);
       sfx.coin();
     }, 450);
     return () => clearTimeout(t);
-  }, []);
+  }, [active, xpProgress]);
 
   return (
     <div className="pop-in absolute inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-[#133038]/95 to-[#091a1f]/98 px-6 text-white backdrop-blur-md">

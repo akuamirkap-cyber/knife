@@ -46,7 +46,7 @@ export interface Weapon {
   ejectY?: number;
   explode?: boolean;
   explodeFx?: 'fire' | 'white' | 'firework';
-  slowStyle?: 'ice' | 'water' | 'stun';
+  slowStyle?: 'ice' | 'water' | 'honey' | 'stun';
   charge?: boolean;
   paint?: boolean;
   meltEvery?: number;
@@ -178,7 +178,7 @@ export const WEAPONS: Weapon[] = [
     sparks: ['#ffffff', '#bfdbfe', '#60a5fa'], slow: true, slowFactor: 0.6, slowTime: 1.5, slowRgb: '80,160,255', slowText: '💦 BASAH!',
     burstFx: { colors: ['#93c5fd', '#dbeafe', '#ffffff'], n: 8, g: 700, spd: 180 }, previewLen: 190, previewY: 40, stats: { rate: 5, speed: 3, power: 2 } },
   { ...base, id: 'snowball', name: 'SNOWBALL CANNON', emoji: '⛄', rarity: 'UMUM', perk: 'MANUSIA SALJU', desc: 'Bola salju bertumpuk. Tiap 3 bola salju menempel, muncul manusia salju dan bonus +3 poin!',
-    speed: 2000, cooldown: 0.2, recoil: 0.9, shake: 2.5, half: 6.5, stick: 16, noSmoke: true, color: '#e0f2fe', trail: '230,245,255', trailFx: 'frost',
+    speed: 2000, cooldown: 0.2, recoil: 0.9, shake: 2.5, half: 13, stick: 16, noSmoke: true, color: '#e0f2fe', trail: '230,245,255', trailFx: 'frost',
     sparks: ['#ffffff', '#e0f2fe', '#bae6fd'], snowman: true, burstFx: { colors: ['#ffffff', '#e0f2fe'], n: 12, g: 500, spd: 160 }, previewLen: 200, previewY: 48, stats: { rate: 3, speed: 2, power: 3 } },
   { ...base, id: 'sniper', name: 'SNIPER AWP', emoji: '🎯', rarity: 'LANGKA', perk: 'SLOW-MO SCOPE', desc: 'TAHAN layar untuk membidik dalam slow-motion, LEPAS untuk menembak. 2 poin tiap kena!',
     speed: 7000, cooldown: 0.5, points: 2, recoil: 2.2, shake: 7, half: 3.6, scope: true, color: '#ff2020', trail: '255,240,200', sparks: FIRE, casing: '#e0ad40', ejectY: 150,
@@ -196,14 +196,14 @@ export const WEAPONS: Weapon[] = [
   { ...base, id: 'bamboo', name: 'MERIAM BAMBU', emoji: '🎍', rarity: 'LANGKA', perk: 'DUARR LEBARAN', desc: 'Meriam bambu khas Lebaran! Petasan meledak DUARR dengan asap putih tebal, 2 poin.',
     speed: 1600, cooldown: 0.5, points: 2, recoil: 1.7, shake: 10, half: 5, color: '#7cb342', trail: '240,240,240', trailFx: 'smoke',
     sparks: ['#ffffff', '#fde68a', '#f87171'], explode: true, explodeFx: 'white', previewLen: 230, previewScale: 0.86, previewY: 40, stats: { rate: 1, speed: 2, power: 5 } },
-  { ...base, id: 'banana', name: 'BANANA GUN', emoji: '🍌', rarity: 'LANGKA', perk: 'TERPELESET', desc: '45% kemungkinan target terpeleset kulit pisang dan berbalik arah putar!',
-    speed: 2000, cooldown: 0.2, recoil: 0.8, half: 5.5, noSmoke: true, reverseChance: 0.45, color: '#ffe135', trail: '255,230,80',
+  { ...base, id: 'banana', name: 'BANANA GUN', emoji: '🍌', rarity: 'LANGKA', perk: 'TERPELESET', desc: 'Daging pisang melesat, tertancap separuh dan memercikkan sari buah. Kulit menutup kembali saat isi ulang; 45% peluang membalik putaran!',
+    speed: 2000, cooldown: 0.2, recoil: 0.8, half: 5.5, noSmoke: true, reverseChance: 0.45, color: '#fff0b3', trail: '255,238,190',
     sparks: ['#fffbe0', '#ffe135', '#c8a000'], previewLen: 180, previewY: 30, stats: { rate: 3, speed: 2, power: 3 } },
   { ...base, id: 'harpoon', name: 'HARPOON GUN', emoji: '🔱', rarity: 'LANGKA', perk: 'TALI PENARIK', desc: 'Tombak bertali. Talinya ikut menarik koin di sekitar titik kena.',
     speed: 2600, cooldown: 0.3, recoil: 0.9, half: 3, noSmoke: true, rope: true, coinRadius: 44, color: '#22d3ee', trail: '200,240,255',
     sparks: ['#ffffff', '#a5f3fc', '#22d3ee'], previewLen: 270, previewScale: 0.8, previewY: 30, stats: { rate: 2, speed: 4, power: 3 } },
-  { ...base, id: 'chicken', name: 'RUBBER CHICKEN', emoji: '🐔', rarity: 'LANGKA', perk: 'KWEK!', desc: 'Menembak ayam karet yang berbunyi. Tiap kena dapat poin bonus acak 0 sampai 5!',
-    speed: 1800, cooldown: 0.22, recoil: 0.8, half: 6, stick: 32, noSmoke: true, randomBonus: 5, color: '#fde047', trail: '255,240,150',
+  { ...base, id: 'chicken', name: 'RUBBER CHICKEN', emoji: '🐔', rarity: 'LANGKA', perk: 'KWEK!', desc: 'Ayam karet 2× lebih besar melesat sambil berbunyi. Tiap kena dapat poin bonus acak 0 sampai 5!',
+    speed: 1800, cooldown: 0.22, recoil: 0.8, half: 12, stick: 70, noSmoke: true, randomBonus: 5, color: '#fde047', trail: '255,240,150',
     sparks: ['#ffffff', '#fde047', '#ef4444'], burstFx: { colors: ['#ffffff', '#fef9c3'], n: 8, g: 200, spd: 120 }, previewLen: 190, previewY: 44, stats: { rate: 3, speed: 2, power: 3 } },
   { ...base, id: 'confetti', name: 'CONFETTI CANNON', emoji: '🎉', rarity: 'LANGKA', perk: 'PESTA COMBO', desc: 'Setiap tembakan pesta konfeti! Waktu combo jauh lebih panjang.',
     speed: 2200, cooldown: 0.18, recoil: 0.8, half: 5, noSmoke: true, confetti: true, comboWindow: 1.3, color: '#f472b6', trail: '255,180,220', trailFx: 'confetti',
@@ -259,8 +259,8 @@ export const WEAPONS: Weapon[] = [
     sparks: ['#ffffff', '#c7d2fe', '#6366f1'], previewY: 34, stats: { rate: 3, speed: 3, power: 4 } },
 
   // ======================== 20 NEW (wave 3) ========================
-  { ...base, id: 'honey', name: 'HONEY BLASTER', emoji: '🍯', rarity: 'UMUM', perk: 'LENGKET', desc: 'Gumpalan madu kental. Target jadi lengket dan berputar jauh lebih lambat!',
-    speed: 1900, cooldown: 0.18, half: 5.5, stick: 22, recoil: 0.7, noSmoke: true, slow: true, slowFactor: 0.5, slowTime: 1.6, slowRgb: '245,158,11', slowText: '🍯 LENGKET!', slowStyle: 'water',
+  { ...base, id: 'honey', name: 'HONEY BLASTER', emoji: '🍯', rarity: 'UMUM', perk: 'LENGKET', desc: 'Madu kental memercik, menempel di papan, dan memperlambat putarannya!',
+    speed: 1900, cooldown: 0.18, half: 5.5, stick: 22, recoil: 0.7, noSmoke: true, slow: true, slowFactor: 0.5, slowTime: 1.6, slowRgb: '245,158,11', slowText: '🍯 LENGKET!', slowStyle: 'honey',
     color: '#f59e0b', trail: '255,190,60', trailFx: 'glow', sparks: ['#fff7d6', '#fbbf24', '#b45309'],
     burstFx: { colors: ['#fbbf24', '#f59e0b', '#fde68a'], n: 8, g: 900, spd: 150 }, previewY: 34, stats: { rate: 3, speed: 2, power: 2 } },
   { ...base, id: 'coconut', name: 'MERIAM KELAPA', emoji: '🥥', rarity: 'UMUM', perk: 'KELAPA MUDA', desc: 'Peluncur kelapa muda khas pantai tropis! Kelapa pecah dan menyiram air segar, 2 poin.',
@@ -269,7 +269,7 @@ export const WEAPONS: Weapon[] = [
   { ...base, id: 'angklung', name: 'ANGKLUNG', emoji: '🎶', rarity: 'LANGKA', perk: 'NADA COMBO', desc: 'Alat musik bambu Sunda yang menembakkan not balok. Tiap kena memainkan nada pentatonik dan waktu combo lebih panjang!',
     speed: 2300, cooldown: 0.16, half: 4, noSmoke: true, notes: true, comboWindow: 1.2, color: '#d97706', trail: '255,220,150', trailFx: 'note',
     sparks: ['#ffffff', '#fde68a', '#d97706'], previewY: 36, stats: { rate: 4, speed: 3, power: 2 } },
-  { ...base, id: 'bee', name: 'BEE HIVE GUN', emoji: '🐝', rarity: 'LANGKA', perk: 'SENGAT', desc: 'Sarang lebah yang menembakkan lebah marah. Tahan untuk tembak beruntun, target disengat dan memberi poin tiap detik!',
+  { ...base, id: 'bee', name: 'BEE HIVE GUN', emoji: '🐝', rarity: 'LANGKA', perk: 'SENGAT', desc: 'Hornet bersengat tajam menancap di papan. Tahan untuk tembak beruntun; sengatnya terus memberi poin!',
     speed: 2100, cooldown: 0.1, auto: true, half: 3.5, stick: 24, recoil: 0.4, shake: 1.2, noSmoke: true, burn: true, burnText: '🐝 DISENGAT!', burnIcon: '🐝',
     color: '#facc15', trail: '250,204,21', sparks: ['#ffffff', '#fde047', '#111111'], previewY: 36, stats: { rate: 5, speed: 3, power: 2 } },
   { ...base, id: 'ink', name: 'TINTA GURITA', emoji: '🐙', rarity: 'LANGKA', perk: 'SEMBUR TINTA', desc: 'Semburan tinta gurita menutupi duri jebakan selama 2 detik, jadi duri tidak berbahaya!',
@@ -314,7 +314,7 @@ export const WEAPONS: Weapon[] = [
   { ...base, id: 'diamond', name: 'DIAMOND GUN', emoji: '💎', rarity: 'LEGENDARIS', perk: 'BERLIAN', desc: 'Pistol kristal yang menembakkan berlian. Koin 2x dan 25% kemungkinan JACKPOT +8 koin!',
     speed: 3400, cooldown: 0.16, half: 3, coinValue: 2, jackpot: 0.25, jackpotText: '💎 BERLIAN! +8 💰', noSmoke: true, color: '#67e8f9', trail: '200,250,255', trailFx: 'gold',
     sparks: ['#ffffff', '#cffafe', '#67e8f9'], previewY: 30, stats: { rate: 3, speed: 4, power: 4 } },
-  { ...base, id: 'moonbeam', name: 'MOONBEAM', emoji: '🌙', rarity: 'LEGENDARIS', perk: 'CAHAYA BULAN', desc: 'Sinar bulan purnama yang instan. 2 poin dan 30% kemungkinan dapat koin bulan!',
+  { ...base, id: 'moonbeam', name: 'MOONBEAM', emoji: '🌙', rarity: 'LEGENDARIS', perk: 'CAHAYA BULAN', desc: 'Tongkat bulan menembakkan bintang-bintang beraura kuat secepat kilat. 2 poin dan 30% peluang koin bulan!',
     speed: 14000, cooldown: 0.18, points: 2, half: 4, energy: true, beam: true, luckyCoin: 0.3, luckyText: '🌙 +1 💰', color: '#c4b5fd', trail: '210,200,255',
     sparks: ['#ffffff', '#ede9fe', '#a78bfa'], previewY: 34, stats: { rate: 3, speed: 5, power: 4 } },
   { ...base, id: 'storm', name: 'STORM CALLER', emoji: '🌩️', rarity: 'LEGENDARIS', perk: 'BADAI PETIR', desc: 'Memanggil badai! Petir menyambar ke peluru lain, menghancurkan 1 duri, dan combo lebih mudah.',

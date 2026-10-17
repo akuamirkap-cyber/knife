@@ -1,3 +1,5 @@
+import { drawBreakerDiamond } from '../../shared/diamondArt';
+import { drawBreakerCoin } from '../../shared/coinArt';
 import { BY_ID, CATALOG, type WeaponDef } from './catalog';
 import { drawGun, gunLength, type GunDraw } from './guns';
 import { drawBullet, type BulletView } from './bullets';
@@ -263,46 +265,6 @@ function pointInPoly(p: V, poly: V[]) {
   return inside;
 }
 
-function drawDiamond(ctx: CanvasRenderingContext2D, t: number, scale: number) {
-  ctx.save();
-  ctx.translate(RCX, RCY); ctx.scale(scale, scale);
-  const G = [-54, -27, 0, 27, 54].map((x) => ({ x, y: -6 }));
-  const T = [-28, -9, 9, 28].map((x) => ({ x, y: -29 }));
-  const P = { x: 0, y: 52 };
-  const strip = [G[0], T[0], G[1], T[1], G[2], T[2], G[3], T[3], G[4]];
-  const crownL = [78, 92, 70, 88, 64, 84, 72, 90, 76];
-  for (let i = 0; i < strip.length - 2; i++) {
-    const a = strip[i], b = strip[i + 1], c = strip[i + 2];
-    ctx.fillStyle = `hsl(${188 + i * 3},92%,${crownL[i] + Math.sin(t * 2 + i) * 6}%)`;
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.closePath(); ctx.fill();
-  }
-  ctx.fillStyle = `hsl(195,100%,${90 + Math.sin(t * 3) * 5}%)`;
-  ctx.beginPath(); ctx.moveTo(T[0].x, T[0].y); ctx.lineTo(T[3].x, T[3].y); ctx.lineTo(T[2].x, -21); ctx.lineTo(T[1].x, -21); ctx.closePath(); ctx.fill();
-  const pavL = [55, 72, 48, 66];
-  for (let i = 0; i < 4; i++) {
-    const a = G[i], b = G[i + 1];
-    const mid = { x: ((a.x + b.x) / 2) * 0.5, y: 22 };
-    const l = pavL[i] + Math.sin(t * 2.4 + i * 1.7) * 7;
-    ctx.fillStyle = `hsl(${200 + i * 4},85%,${l}%)`;
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(mid.x, mid.y); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = `hsl(${205 + i * 4},85%,${l - 12}%)`;
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(mid.x, mid.y); ctx.lineTo(P.x, P.y); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = `hsl(${195 + i * 4},85%,${l + 8}%)`;
-    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(mid.x, mid.y); ctx.lineTo(P.x, P.y); ctx.closePath(); ctx.fill();
-  }
-  ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.moveTo(T[0].x, T[0].y); ctx.lineTo(T[3].x, T[3].y); ctx.lineTo(G[4].x, G[4].y); ctx.lineTo(P.x, P.y); ctx.lineTo(G[0].x, G[0].y);
-  ctx.closePath(); ctx.stroke();
-  const sp = (Math.sin(t * 2.2) + 1) / 2;
-  const sx = -20 + Math.sin(t * 0.7) * 10, sy = -18, s = 6 + sp * 8;
-  ctx.fillStyle = `rgba(255,255,255,${0.4 + sp * 0.6})`;
-  ctx.beginPath();
-  ctx.moveTo(sx, sy - s); ctx.lineTo(sx + s * 0.18, sy - s * 0.18); ctx.lineTo(sx + s, sy); ctx.lineTo(sx + s * 0.18, sy + s * 0.18);
-  ctx.lineTo(sx, sy + s); ctx.lineTo(sx - s * 0.18, sy + s * 0.18); ctx.lineTo(sx - s, sy); ctx.lineTo(sx - s * 0.18, sy - s * 0.18);
-  ctx.closePath(); ctx.fill();
-  ctx.restore();
-}
 
 export class Game {
   canvas: HTMLCanvasElement;
@@ -327,6 +289,7 @@ export class Game {
   spin = 0; spinUpT = 0; heat = 0; charge = 0;
   switchT = 0; winT = 0; t = 0; hudT = 0;
   stars = 0; totalCells = 0; raf = 0; last = 0;
+  private active = false;
   diamondPing = 0; flashScreen = 0;
   star: StarPickup | null = null;
   starTimer = 9;
@@ -360,10 +323,21 @@ export class Game {
     this.resize();
     this.generateRock();
     this.ammo = this.magSize();
-    this.last = performance.now();
-    this.raf = requestAnimationFrame(this.loop);
+    this.render(); // Static thumbnail until the slide is selected.
   }
-  destroy() { cancelAnimationFrame(this.raf); }
+  setActive(active: boolean) {
+    if (this.active === active) return;
+    this.active = active;
+    if (active) {
+      this.last = performance.now();
+      this.raf = requestAnimationFrame(this.loop);
+    } else {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      this.firing = false;
+    }
+  }
+  destroy() { this.setActive(false); }
   get w(): WeaponDef { return BY_ID[this.weaponId] ?? CATALOG[1]; }
   magSize() { return Math.round(this.w.mag * (this.buffs.ammo ? 2 : 1)); }
   rof() { return this.w.rof * (this.buffs.speed ? 0.5 : 1) * (this.tBuff === 'rapid' ? 0.5 : this.tBuff === 'mini' ? 0.6 : 1); }
@@ -1348,10 +1322,13 @@ export class Game {
   }
 
   loop = (now: number) => {
-    const dt = Math.min(0.033, (now - this.last) / 1000);
-    this.last = now;
-    this.update(dt);
-    this.render();
+    if (!this.active) return;
+    if (now - this.last >= 1000 / 60 - 1) {
+      const dt = Math.min(0.033, (now - this.last) / 1000);
+      this.last = now;
+      this.update(dt);
+      this.render();
+    }
     this.raf = requestAnimationFrame(this.loop);
   };
 
@@ -1764,55 +1741,8 @@ export class Game {
     ctx.restore();
   }
 
-  drawCoinSprite(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, phase: number, flat = 1) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(flat, 1);
-    const g = ctx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r);
-    g.addColorStop(0, '#fff8d0');
-    g.addColorStop(0.45, '#ffd54a');
-    g.addColorStop(0.8, '#e8a317');
-    g.addColorStop(1, '#a86a08');
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,245,190,0.85)'; ctx.lineWidth = Math.max(1, r * 0.12);
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.76, 0, TAU); ctx.stroke();
-    ctx.fillStyle = 'rgba(180,110,10,0.55)';
-    ctx.font = `900 ${r * 1.05}px system-ui, sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('$', 0, r * 0.06);
-    // moving specular sweep = blink blink
-    const sweep = (Math.sin(this.t * 3.4 + phase) + 1) / 2;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.35 + sweep * 0.6;
-    ctx.rotate(-0.6);
-    const lg = ctx.createLinearGradient(-r, 0, r, 0);
-    lg.addColorStop(0, 'rgba(255,255,255,0)');
-    lg.addColorStop(0.5, 'rgba(255,255,255,0.9)');
-    lg.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = lg;
-    ctx.beginPath(); ctx.ellipse((sweep - 0.5) * r * 1.9, 0, r * 0.32, r, 0, 0, TAU); ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.beginPath(); ctx.ellipse(-r * 0.34, -r * 0.4, r * 0.2, r * 0.13, -0.6, 0, TAU); ctx.fill();
-    ctx.restore();
-    // twinkle star
-    const tw = Math.sin(this.t * 5 + phase * 2);
-    if (tw > 0.72) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = (tw - 0.72) * 3.4;
-      ctx.fillStyle = '#fffbe0';
-      const s = r * 1.5;
-      ctx.beginPath();
-      ctx.moveTo(x + r * 0.5, y - r * 0.5 - s); ctx.lineTo(x + r * 0.5 + s * 0.18, y - r * 0.5 - s * 0.18);
-      ctx.lineTo(x + r * 0.5 + s, y - r * 0.5); ctx.lineTo(x + r * 0.5 + s * 0.18, y - r * 0.5 + s * 0.18);
-      ctx.lineTo(x + r * 0.5, y - r * 0.5 + s); ctx.lineTo(x + r * 0.5 - s * 0.18, y - r * 0.5 + s * 0.18);
-      ctx.lineTo(x + r * 0.5 - s, y - r * 0.5); ctx.lineTo(x + r * 0.5 - s * 0.18, y - r * 0.5 - s * 0.18);
-      ctx.closePath(); ctx.fill();
-      ctx.restore();
-    }
+  drawCoinSprite(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, phase: number, flat = 1, glowing = false) {
+    drawBreakerCoin(ctx, x, y, r, this.t, phase, flat, glowing);
   }
 
   drawCoinRing(ctx: CanvasRenderingContext2D) {
@@ -1821,13 +1751,7 @@ export class Game {
       const a = c.a + this.rot;
       const x = RCX + Math.cos(a) * c.r, y = RCY + Math.sin(a) * c.r;
       const flat = Math.abs(Math.cos(this.t * 2.2 + c.spin)) * 0.8 + 0.2;
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      const gl = ctx.createRadialGradient(x, y, 0, x, y, 22);
-      gl.addColorStop(0, 'rgba(255,215,90,0.4)'); gl.addColorStop(1, 'rgba(255,180,0,0)');
-      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, 22, 0, TAU); ctx.fill();
-      ctx.restore();
-      this.drawCoinSprite(ctx, x, y, 11, c.spin, flat);
+      this.drawCoinSprite(ctx, x, y, 11, c.spin, flat, true);
     }
   }
 
@@ -2202,7 +2126,7 @@ export class Game {
     const ds = this.state === 'won'
       ? 1 + Math.min(1, this.winT * 1.5) * 0.45 + Math.sin(this.t * 3) * 0.03
       : 1 + this.diamondPing * 0.05;
-    if (showDiamond) drawDiamond(ctx, this.t, ds);
+    if (showDiamond) drawBreakerDiamond(ctx, RCX, RCY, this.t, ds);
 
     if (this.stage === 'treasure') this.drawChest(ctx);
     else this.drawRock(ctx);

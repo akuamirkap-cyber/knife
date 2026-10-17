@@ -3,6 +3,9 @@ import { Game } from './game/Game';
 import { setMuted, sfx } from './game/audio';
 import { sfx4 } from './game/sfx4';
 import { getWeapon, type WeaponId } from './game/weapons';
+import { useSlideActive } from '../shared/SlideActivity';
+import { SunburstFX } from '../knife-hit/components/Effects';
+import { gunSunburstColor } from './game/sunburstPalette';
 import { drawGunCentered } from './game/art/drawCentered';
 import { getGunMetrics } from './game/art/metrics';
 import { type Quest, type QuestState } from './game/quests';
@@ -25,6 +28,10 @@ const LS = {
 };
 
 const num = (k: string) => Number(localStorage.getItem(k) || 0);
+const coinsInBank = () => {
+  const saved = localStorage.getItem(LS.coins);
+  return saved === null ? 120 : Number(saved) || 0;
+};
 
 const getInitialQuests = (): QuestState => {
   try {
@@ -41,6 +48,7 @@ const getInitialQuests = (): QuestState => {
 };
 
 export default function App({ onExit }: { onExit?: () => void }) {
+  const active = useSlideActive();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -49,15 +57,18 @@ export default function App({ onExit }: { onExit?: () => void }) {
   const [screen, setScreen] = useState<Screen>('menu');
   const [transitioning, setTransitioning] = useState(false);
   const [transText, setTransText] = useState('READY?');
+  const [transitionStep, setTransitionStep] = useState<0 | 1 | 2>(0);
 
   const [result, setResult] = useState({ score: 0, level: 1, coins: 0, newBest: false });
   const [displayScore, setDisplayScore] = useState(0);
 
   const [best, setBest] = useState(() => num(LS.best));
   const [bestLevel, setBestLevel] = useState(() => Math.max(1, num(LS.bestLevel)));
-  const [totalCoins, setTotalCoins] = useState(() => Math.max(120, num(LS.coins)));
+  const [totalCoins, setTotalCoins] = useState(coinsInBank);
 
   const [questState, setQuestState] = useState<QuestState>(getInitialQuests);
+  const questStateRef = useRef(questState);
+  questStateRef.current = questState;
 
   const [muted, setMutedState] = useState(false);
   const [arsenalOpen, setArsenalOpen] = useState(false);
@@ -71,14 +82,24 @@ export default function App({ onExit }: { onExit?: () => void }) {
     coins: number;
   } | null>(null);
   const [bonusStageOpen, setBonusStageOpen] = useState(false);
+  const [bonusAfterBoss, setBonusAfterBoss] = useState(5);
   const [starBuffOpen, setStarBuffOpen] = useState(false);
+  const [starBuffTreasure, setStarBuffTreasure] = useState(false);
 
   const [weapon, setWeaponState] = useState<WeaponId>(() => getWeapon(localStorage.getItem(LS.weapon) || 'pistol').id);
 
   // Sync quests to LS
   const saveQuests = (qs: QuestState) => {
+    questStateRef.current = qs;
     setQuestState(qs);
     localStorage.setItem(LS.quests, JSON.stringify(qs));
+  };
+
+  const depositCoins = (amount: number) => {
+    const total = coinsInBank() + amount;
+    localStorage.setItem(LS.coins, String(total));
+    setTotalCoins(total);
+    return total;
   };
 
   const chooseWeapon = (id: WeaponId) => {
@@ -89,71 +110,87 @@ export default function App({ onExit }: { onExit?: () => void }) {
   };
 
   const handleClaimQuest = (q: Quest) => {
-    const nextCoins = totalCoins + q.rewardCoins;
-    setTotalCoins(nextCoins);
-    localStorage.setItem(LS.coins, String(nextCoins));
-
-    if (q.rewardWeapon) {
-      chooseWeapon(q.rewardWeapon as WeaponId);
-    }
-
-    const nextQuests: QuestState = {
-      ...questState,
-      claimed: [...questState.claimed, q.id],
-      totalCoinsCollected: questState.totalCoinsCollected + q.rewardCoins,
-    };
-    saveQuests(nextQuests);
+    const current = questStateRef.current;
+    if (current.claimed.includes(q.id)) return;
+    depositCoins(q.rewardCoins);
+    if (q.rewardWeapon) chooseWeapon(q.rewardWeapon as WeaponId);
+    saveQuests({
+      ...current,
+      claimed: [...current.claimed, q.id],
+      totalCoinsCollected: current.totalCoinsCollected + q.rewardCoins,
+    });
   };
 
+  // Create one engine per mounted slide. Quest/coin updates must not destroy a live run.
   useEffect(() => {
     const g = new Game(canvasRef.current!, {
-      onGameOver: (score, level, coins) => {
+      onGameOver: (score, level, coins, runCoins) => {
         const prevBest = num(LS.best);
         const newBest = score > prevBest;
         if (newBest) localStorage.setItem(LS.best, String(score));
         if (level > num(LS.bestLevel)) localStorage.setItem(LS.bestLevel, String(level));
-
-        const updatedTotalCoins = num(LS.coins) + coins;
-        localStorage.setItem(LS.coins, String(updatedTotalCoins));
-
+        depositCoins(coins); // special-stage and boss rewards were banked already
         setBest(num(LS.best));
         setBestLevel(Math.max(1, num(LS.bestLevel)));
-        setTotalCoins(updatedTotalCoins);
-
-        // Update Quest state metrics
-        const updatedQuests: QuestState = {
-          ...questState,
-          highestScore: Math.max(questState.highestScore, score),
-          highestLevel: Math.max(questState.highestLevel, level),
-          totalCoinsCollected: questState.totalCoinsCollected + coins,
-        };
-        saveQuests(updatedQuests);
-
-        setResult({ score, level, coins, newBest });
+        const current = questStateRef.current;
+        saveQuests({
+          ...current,
+          highestScore: Math.max(current.highestScore, score),
+          highestLevel: Math.max(current.highestLevel, level),
+          totalCoinsCollected: current.totalCoinsCollected + coins,
+        });
+        setResult({ score, level, coins: runCoins, newBest });
         setDisplayScore(0);
         setScreen('over');
       },
-      onStarHit: () => setStarBuffOpen(true),
-      applyStarBuff: () => undefined,
+      onStarHit: (treasure) => {
+        setStarBuffTreasure(treasure);
+        setStarBuffOpen(true);
+      },
       onBossDefeated: (bossName, level, coinsEarned) => {
         setBossDefeatedData({ name: bossName, level, coins: coinsEarned });
-        const updatedTotalCoins = totalCoins + coinsEarned;
-        setTotalCoins(updatedTotalCoins);
-        localStorage.setItem(LS.coins, String(updatedTotalCoins));
+        depositCoins(coinsEarned);
+        const current = questStateRef.current;
+        saveQuests({ ...current, highestLevel: Math.max(current.highestLevel, level), totalCoinsCollected: current.totalCoinsCollected + coinsEarned });
+      },
+      onTreasureCoin: (amount) => {
+        depositCoins(amount); // Saved as each bouncing coin reaches the HUD.
+        const current = questStateRef.current;
+        saveQuests({ ...current, totalCoinsCollected: current.totalCoinsCollected + amount });
+      },
+      onStageReward: (_mode, level, unbankedCoins) => {
+        if (unbankedCoins) depositCoins(unbankedCoins);
+        if (level > num(LS.bestLevel)) {
+          localStorage.setItem(LS.bestLevel, String(level));
+          setBestLevel(level);
+        }
+        const current = questStateRef.current;
+        saveQuests({
+          ...current,
+          highestScore: Math.max(current.highestScore, g.score),
+          highestLevel: Math.max(current.highestLevel, level),
+          totalCoinsCollected: current.totalCoinsCollected + unbankedCoins,
+        });
       },
     });
-
     g.setWeapon(getWeapon(localStorage.getItem(LS.weapon) || 'pistol').id);
     gameRef.current = g;
-    return () => g.destroy();
-  }, [questState]);
+    return () => {
+      g.destroy();
+      gameRef.current = null;
+    };
+  }, []);
+
+  // The menu, results and modal screens use their own lightweight effects;
+  // the heavy level canvas has nothing to simulate behind those overlays.
+  useEffect(() => { gameRef.current?.setActive(active && screen === 'playing'); }, [active, screen]);
 
   // Floating upright weapon preview on main menu (matching Screenshot 1)
   useEffect(() => {
-    if (screen !== 'menu') return;
+    if (screen !== 'menu' || arsenalOpen || questOpen || leaderboardOpen) return;
     const cv = previewCanvasRef.current;
     if (!cv) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const pw = 240;
     const ph = 210;
     cv.width = pw * dpr;
@@ -163,9 +200,15 @@ export default function App({ onExit }: { onExit?: () => void }) {
 
     let raf = 0;
     const start = performance.now();
+    let lastDraw = -Infinity;
     const curW = getWeapon(weapon);
 
     const loop = (now: number) => {
+      if (now - lastDraw < 1000 / 30 - 1) {
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+      lastDraw = now;
       const t = (now - start) / 1000;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, pw, ph);
@@ -190,62 +233,76 @@ export default function App({ onExit }: { onExit?: () => void }) {
       ctx.scale(sc, sc);
 
       // drawGunCentered puts the geometric mass center EXACTLY at (0, 0)!
-      drawGunCentered(ctx, curW.id, t, 0, true);
+      drawGunCentered(ctx, curW.id, t, 0, true, undefined, true);
       ctx.restore();
 
-      raf = requestAnimationFrame(loop);
+      if (active) raf = requestAnimationFrame(loop);
     };
 
-    raf = requestAnimationFrame(loop);
+    loop(start); // a still preview even before this slide has focus
     return () => cancelAnimationFrame(raf);
-  }, [screen, weapon]);
+  }, [screen, weapon, active, arsenalOpen, questOpen, leaderboardOpen]);
 
-  // Roll up score animation on game over
+  // Roll up score only while the slide is active; pause at the current number.
   useEffect(() => {
-    if (screen !== 'over') return;
-    let val = 0;
+    if (screen !== 'over' || !active || displayScore >= result.score) return;
+    const from = displayScore;
     const target = result.score;
-    const dur = 800;
     const start = performance.now();
     const timer = setInterval(() => {
-      const p = Math.min(1, (performance.now() - start) / dur);
-      val = Math.round(target * Math.pow(p, 0.7));
-      setDisplayScore(val);
+      const p = Math.min(1, (performance.now() - start) / 800);
+      setDisplayScore(Math.round(from + (target - from) * Math.pow(p, 0.7)));
       if (p >= 1) clearInterval(timer);
     }, 25);
     return () => clearInterval(timer);
-  }, [screen, result.score]);
+    // Restart this timer only when focus or a new result changes, not per tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, result.score, active]);
 
-  // Start with Hypercasual Ready... GO! transition
+  // Pause the Ready / Go transition with the game, instead of starting a
+  // level unseen if another slide was selected during its countdown.
+  useEffect(() => {
+    if (!active || transitionStep === 0) return;
+    const timer = setTimeout(() => {
+      if (transitionStep === 1) {
+        setTransText('GO!! 🎯');
+        sfx4.match();
+        setTransitionStep(2);
+      } else {
+        setTransitioning(false);
+        gameRef.current?.start();
+        setScreen('playing');
+        setTransitionStep(0);
+      }
+    }, transitionStep === 1 ? 380 : 320);
+    return () => clearTimeout(timer);
+  }, [transitionStep, active]);
+
   const play = () => {
     setTransitioning(true);
     setTransText('READY?');
+    setTransitionStep(1);
     sfx.start();
-
-    setTimeout(() => {
-      setTransText('GO!! 🎯');
-      sfx4.match();
-    }, 380);
-
-    setTimeout(() => {
-      setTransitioning(false);
-      gameRef.current?.start();
-      setScreen('playing');
-    }, 700);
   };
 
   const handleContinueAfterBoss = () => {
+    setBonusAfterBoss(bossDefeatedData?.level ?? 5);
     setBossDefeatedData(null);
-    // Buka halaman BONUS REWARD STAGE yang seru dan rewarding setelah mengalahkan Boss!
+    // Keep the existing boss reward, then play the treasure round next.
     setBonusStageOpen(true);
   };
 
   const handleBonusFinished = (bonusCoins: number) => {
-    const updated = totalCoins + bonusCoins;
-    setTotalCoins(updated);
-    localStorage.setItem(LS.coins, String(updated));
+    depositCoins(bonusCoins);
+    const current = questStateRef.current;
+    saveQuests({ ...current, totalCoinsCollected: current.totalCoinsCollected + bonusCoins });
     setBonusStageOpen(false);
     gameRef.current?.continueAfterBoss();
+  };
+
+  const startSpecial = (stage: 'boulder' | 'bonus' | 'treasure') => {
+    gameRef.current?.startSpecialStage(stage);
+    setScreen('playing');
   };
 
   const toggleMute = () => {
@@ -272,6 +329,14 @@ export default function App({ onExit }: { onExit?: () => void }) {
       <div className="relative overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.9)] w-[420px] h-[760px] flex-shrink-0">
         {/* Canvas Engine */}
         <canvas ref={canvasRef} className="block touch-none w-[420px] h-[760px]" />
+
+        {/* A low-cost, soft rarity aura around the gun, never over the target.
+            This is the same FX Lab / Knife Boss ray treatment as the arsenal. */}
+        {screen === 'playing' && (
+          <div className="pointer-events-none absolute left-0 top-[510px] h-[180px] w-full opacity-40" aria-hidden="true">
+            <SunburstFX size={420} color={gunSunburstColor(getWeapon(weapon).rarity)} intensity={0.55} speed={36} core={false} stars={false} />
+          </div>
+        )}
 
         {/* Transition Overlay (Hypercasual READY GO) */}
         {transitioning && (
@@ -333,16 +398,45 @@ export default function App({ onExit }: { onExit?: () => void }) {
               </div>
             </div>
 
-            {/* Upright Floating Gun Avatar */}
+            {/* Upright gun with a layered, rarity-aware Sunburst FX Lab halo. */}
             <div className="flex flex-col items-center justify-center my-auto">
-              <canvas
-                ref={previewCanvasRef}
-                style={{ width: 240, height: 210 }}
-                className="block filter drop-shadow-[0_16px_30px_rgba(0,0,0,0.85)] cursor-pointer hover:scale-105 transition-transform"
-                onClick={() => setArsenalOpen(true)}
-              />
-              <div className="text-xs sm:text-sm font-black text-amber-300 font-game tracking-widest bg-black/60 px-5 py-1.5 rounded-full border-2 border-white/20 -mt-2 shadow-2xl">
+              <div className="relative h-[210px] w-[240px]">
+                <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+                  <SunburstFX size={500} color={gunSunburstColor(getWeapon(weapon).rarity)} intensity={0.72} speed={32} stars={false} />
+                </div>
+                <canvas
+                  ref={previewCanvasRef}
+                  style={{ width: 240, height: 210 }}
+                  className="relative z-10 block filter drop-shadow-[0_16px_30px_rgba(0,0,0,0.85)] cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => setArsenalOpen(true)}
+                />
+              </div>
+              <div className="relative z-10 text-xs sm:text-sm font-black text-amber-300 font-game tracking-widest bg-black/60 px-5 py-1.5 rounded-full border-2 border-white/20 -mt-2 shadow-2xl">
                 {getWeapon(weapon).name}
+              </div>
+            </div>
+
+            {/* Playable Diamond Breaker rounds; also reached naturally at levels 3, 4 and 6. */}
+            <div className="w-full mb-3 rounded-2xl border border-cyan-300/25 bg-[#061520]/75 p-2.5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-md">
+              <div className="mb-1.5 text-center text-[10px] font-black tracking-[0.2em] text-cyan-100/80">
+                ✦ STAGE SPESIAL · COBA LANGSUNG ✦
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button onClick={() => startSpecial('boulder')} className="rounded-xl border border-cyan-300/40 bg-cyan-400/10 py-2 text-center transition hover:bg-cyan-400/25 active:scale-95">
+                  <span className="block text-lg leading-none">💎</span>
+                  <span className="block mt-1 text-[10px] font-black text-cyan-100">BATU</span>
+                  <span className="block text-[9px] text-cyan-100/60">Level 3</span>
+                </button>
+                <button onClick={() => startSpecial('bonus')} className="rounded-xl border border-amber-300/40 bg-amber-400/10 py-2 text-center transition hover:bg-amber-400/25 active:scale-95">
+                  <span className="block text-lg leading-none">🪙</span>
+                  <span className="block mt-1 text-[10px] font-black text-amber-100">BONUS</span>
+                  <span className="block text-[9px] text-amber-100/60">Level 4</span>
+                </button>
+                <button onClick={() => startSpecial('treasure')} className="rounded-xl border border-pink-300/40 bg-pink-400/10 py-2 text-center transition hover:bg-pink-400/25 active:scale-95">
+                  <span className="block text-lg leading-none">🧰</span>
+                  <span className="block mt-1 text-[10px] font-black text-pink-100">HARTA KARUN</span>
+                  <span className="block text-[9px] text-pink-100/60">Level 6</span>
+                </button>
               </div>
             </div>
 
@@ -450,8 +544,9 @@ export default function App({ onExit }: { onExit?: () => void }) {
         {/* PILIHAN POWER UP DARI BINTANG */}
         {starBuffOpen && (
           <StarBuffModal
+            treasure={starBuffTreasure}
             onPick={(kind) => {
-              (gameRef.current as unknown as { applyBuff?: (k: typeof kind) => void })?.applyBuff?.(kind);
+              gameRef.current?.applyBuff(kind);
               setStarBuffOpen(false);
             }}
           />
@@ -460,7 +555,7 @@ export default function App({ onExit }: { onExit?: () => void }) {
         {/* HALAMAN BONUS REWARD STAGE YANG SERU & REWARDING BANGET! */}
         {bonusStageOpen && (
           <BonusStageModal
-            currentStage={bestLevel}
+            currentStage={bonusAfterBoss}
             onClaimAndContinue={handleBonusFinished}
           />
         )}

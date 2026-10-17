@@ -130,7 +130,12 @@ export function drawModernGrip(
   c.clip();
   const ag = c.createLinearGradient(cx - 12, y + 30, cx + 6, y + 104);
   ag.addColorStop(0, 'rgba(255,255,255,0.10)');
-  ag.addColorStop(1, accent + '18');
+  // CanvasGradient rejects five-digit hex (#111 + 18 => #11118). Some
+  // weapons use shorthand accents; expand them before adding alpha or a
+  // single Arsenal thumbnail can throw and blank the entire React slide.
+  const hex = /^#[\da-f]{3}$/i.test(accent)
+    ? `#${[...accent.slice(1)].map(ch => ch + ch).join('')}` : accent;
+  ag.addColorStop(1, /^#[\da-f]{6}$/i.test(hex) ? `${hex}18` : 'rgba(255,255,255,0.09)');
   c.fillStyle = ag;
   c.fillRect(cx - 14, y + 28, 46, 80);
   // ambient occlusion di pinggir bawah

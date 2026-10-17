@@ -3,6 +3,7 @@ import { STAGE_META, type StageKind } from "../stages";
 import { Dust, GodRays } from "./Effects";
 import { GreenButton } from "./Effects";
 import { sfx, vibrate } from "../sfx";
+import { useSlideActive } from "../../shared/SlideActivity";
 
 /* ============ LEVEL SELESAI — untuk normal / bonus / treasure ============ */
 export function LevelCompleteScreen({
@@ -86,22 +87,24 @@ export function FailScreen({
   level: number; kind: StageKind; progressText: string;
   onReviveAd: () => void; onRetry: () => void; onMap: () => void;
 }) {
+  const active = useSlideActive();
   const meta = STAGE_META[kind];
   const [n, setN] = useState(FAIL_COUNT);
   const [showGiveUp, setShowGiveUp] = useState(false);
 
   useEffect(() => {
-    if (n <= 0) return;
+    if (!active || n <= 0) return;
     if (n < FAIL_COUNT) sfx.tick(n <= 3);
     if (n <= 3) vibrate(8);
     const t = setTimeout(() => setN((v) => v - 1), 1000);
     return () => clearTimeout(t);
-  }, [n]);
+  }, [n, active]);
 
   useEffect(() => {
+    if (!active) return;
     const t = setTimeout(() => setShowGiveUp(true), 2500);
     return () => clearTimeout(t);
-  }, []);
+  }, [active]);
 
   const R = 96;
   const C = 2 * Math.PI * R;

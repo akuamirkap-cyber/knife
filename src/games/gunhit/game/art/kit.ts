@@ -2,7 +2,7 @@ export const TAU = Math.PI * 2;
 export const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 /** shared mutable state the game sets before drawing (e.g. minigun spin) */
-export const gunState = { spin: 0, spinAngle: 0, sinceShot: 9, charge: 0, shots: 0, tint: '244,63,94', bigShot: 0 };
+export const gunState = { spin: 0, spinAngle: 0, sinceShot: 9, reloadT: 0, charge: 0, shots: 0, tint: '244,63,94', bigShot: 0 };
 
 type C = CanvasRenderingContext2D;
 

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { 
   Crosshair, 
-  Sparkles, 
   Gamepad2, 
   Sword, 
   Trophy, 
@@ -14,7 +13,7 @@ import {
   Crown
 } from 'lucide-react';
 
-export type GameKey = 'rifle-rock' | 'sunburst' | 'gunhit' | 'knife-hit';
+export type GameKey = 'rifle-rock' | 'gunhit' | 'knife-hit';
 
 interface GameItem {
   id: GameKey;
@@ -53,26 +52,6 @@ const GAMES: GameItem[] = [
     ],
     tags: ['Recoil Physics', 'Layer Shatter', 'Buff Cards', 'Arsenal'],
     icon: Crosshair,
-  },
-  {
-    id: 'sunburst',
-    zipName: '2d-sunburst-animation-effect.zip',
-    title: 'Sunburst FX Lab',
-    subtitle: 'Gacha • Bonus Wheel • Treasure',
-    description: 'Eksplorasi efek sinar Sunburst ala game gacha dengan 3 panggung interaktif: Sunburst Gacha Pedang Legendary, Bonus Wheel, dan Treasure Hunt lempar pisau.',
-    badge: '3-in-1 Stage Playground',
-    badgeColor: 'bg-violet-500/20 text-violet-300 border-violet-400/30',
-    themeColor: 'violet',
-    borderGlow: 'hover:border-violet-400/50 hover:shadow-violet-500/20',
-    bgGradient: 'from-violet-950/40 via-fuchsia-950/30 to-neutral-950/80',
-    buttonGradient: 'from-violet-500 to-fuchsia-600 hover:from-violet-400 hover:to-fuchsia-500 text-white',
-    stats: [
-      { label: 'Panggung', value: '3 Mode' },
-      { label: 'Efek', value: 'Custom Rays' },
-      { label: 'Mekanik', value: 'Knife Hit & Gacha' }
-    ],
-    tags: ['Radial Glow', 'Bonus Wheel', 'Treasure Chest', 'Custom Rays'],
-    icon: Sparkles,
   },
   {
     id: 'gunhit',
@@ -136,7 +115,7 @@ export default function Launcher({ onSelectGame }: LauncherProps) {
         <header className="text-center max-w-3xl mx-auto mb-10 sm:mb-14">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs sm:text-sm font-medium text-amber-300 mb-4 backdrop-blur-md">
             <Gamepad2 className="w-4 h-4 text-amber-400" />
-            <span>4 Game Koleksi Lengkap Siap Dimainkan Langsung</span>
+            <span>3 Game Koleksi Lengkap Siap Dimainkan Langsung</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-tight">
@@ -147,11 +126,11 @@ export default function Launcher({ onSelectGame }: LauncherProps) {
           </h1>
 
           <p className="mt-4 text-base sm:text-lg text-neutral-400 leading-relaxed max-w-2xl mx-auto">
-            Semua 4 game dari berkas Anda telah diintegrasikan ke dalam satu portal arcade. Pilih game mana saja untuk langsung bermain, dan kembali ke menu ini kapan saja!
+            Ketiga game terintegrasi dalam satu portal arcade. Pilih game mana saja untuk langsung bermain, dan kembali ke menu ini kapan saja!
           </p>
         </header>
 
-        {/* 4 Games Grid */}
+        {/* 3 Games Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
           {GAMES.map((game, idx) => {
             const Icon = game.icon;
@@ -253,7 +232,7 @@ export default function Launcher({ onSelectGame }: LauncherProps) {
 
             <div className="flex items-center gap-3">
               <span className="px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-neutral-300">
-                4/4 Game Ready
+                3/3 Game Ready
               </span>
             </div>
           </div>
@@ -261,7 +240,7 @@ export default function Launcher({ onSelectGame }: LauncherProps) {
 
         {/* Footer */}
         <footer className="mt-12 text-center text-xs text-neutral-500">
-          Game Arcade Hub • Mengintegrasikan 2D Rifle Rock Destruction, Sunburst FX Lab, Gun Hit, dan Perfect Shot Knife Boss.
+          Game Arcade Hub • Diamond Breaker, Gun Hit Arcade, dan Knife Boss 100 Lv.
         </footer>
       </div>
     </div>

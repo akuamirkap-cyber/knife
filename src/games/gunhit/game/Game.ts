@@ -7,9 +7,18 @@ import { sfx5 } from './sfx5';
 import { gunState } from './art/kit';
 import { FX, spawnImpact, spawnMuzzle, spawnSpeedLines, drawFxParticle, type Particle, type FxSink } from './fx';
 import { drawPreciseWeaponDecal } from './art/decalSystem';
+import { SNOWBALL_MAG_SIZE } from './art/guns2';
+import { drawMaterialTrail } from './art/projectileTrails';
+import { drawClassicBeam, drawLaserBeam, drawVoidTether } from './art/beamEffects';
+import { getGunEffect } from './art/gunVariants';
+import { drawWetSurface } from './art/waterSurface';
 import { drawFace, STYLE_COLORS, type Style } from './faces';
 import { drawGun, drawProjectile, WEAPONS, getWeapon, type Weapon, type WeaponId, type ProjKind } from './weapons';
-import { drawBoulder, drawStar, drawRockFragment } from './art/boulder';
+import { drawStar, drawRockFragment } from './art/boulder';
+import { DiamondRock, drawRockDiamond, type BrokenRockCell } from './art/diamondRock';
+import { drawBonusCoin, TreasureChest } from './art/bonusArt';
+import { advanceTreasureCoins, throwTreasureCoins, type TreasureCoin } from './treasureShower';
+import { drawBreakerCoin } from '../../shared/coinArt';
 import { getBossDef, type BossType } from './bossRoster';
 import { getExactBossRadius, onBossAssetsLoaded } from './bossAssetProcessor';
 
@@ -17,6 +26,13 @@ export const W = 420;
 export const H = 760;
 const CX = W / 2;
 const CY = 255;
+const SPECIAL_CY = 282; // Give the full-size Diamond Breaker rock room below the HUD.
+const ROCK_RADIUS = 166; // ~80% of the 420px screen, as on Diamond Breaker's 480px screen.
+const TWIN_SPACING = 46;
+const SINGLE_BARREL = [0] as const;
+const TWIN_BARRELS = [-TWIN_SPACING, TWIN_SPACING] as const;
+const CLASSIC_COIN_RADIUS = 13.5 * 1.2; // compact original coin, enlarged only 20%
+const CLASSIC_DIAMOND_SCALE = 1.2;
 const TOTAL_LEN = 42; // total standard bullet length
 const EMBED = 21; // tertancap setengah (50% masuk ke dalam)
 const L = TOTAL_LEN - EMBED; // hanya terlihat setengah (50% di luar)
@@ -80,18 +96,27 @@ const PAINT = ['244,63,94', '250,204,21', '34,211,238', '168,85,247', '74,222,12
 
 type ItemType = 'bullet' | 'old' | 'spike' | 'coin' | 'diamond_chest';
 interface Item { angle: number; type: ItemType; age: number; w?: WeaponId; scale?: number; vel?: number; harvested?: boolean; tint?: string; big?: number; hits?: number }
-interface Proj { x: number; y: number; vx: number; vy: number; pierced?: number; hist?: { x: number; y: number }[]; tint?: string; big?: number }
-type StepRes = { res: 'none' | 'stick' | 'fail'; spike?: boolean; local?: number };
+interface Proj { x: number; y: number; vx: number; vy: number; originX?: number; pierced?: number; hist?: { x: number; y: number }[]; tint?: string; big?: number; mini?: boolean; giant?: boolean }
+type StepRes = { res: 'none' | 'stick' | 'fail' | 'hit'; spike?: boolean; local?: number };
 interface Light { x: number; y: number; r: number; rgb: string; life: number; max: number }
 interface Fragment { x: number; y: number; vx: number; vy: number; rot: number; vr: number; a0: number; a1: number }
 interface Flyer { x: number; y: number; vx: number; vy: number; rot: number; vr: number; kind: ItemType; w?: WeaponId }
-interface Beam { y: number; life: number; max: number; rgb: string }
+interface Beam { x: number; y: number; life: number; max: number; rgb: string }
 interface Portal { x: number; y: number; life: number; max: number; rgb: string }
 interface BossProjectile { x: number; y: number; vx: number; vy: number; rot: number; type: BossType }
 interface RockFragment { x: number; y: number; vx: number; vy: number; rot: number; vr: number; size: number; seed: number; life: number; max: number }
-interface Star { x: number; y: number; r: number; life: number; max: number }
+/** Coordinates and angle are local to a rock cell (or to the open chest). */
+interface EmbeddedShot { x: number; y: number; angle: number; age: number; w: WeaponId; scale: number; big: number; tint?: string; cellId?: number }
+interface FallingCell { id: number; cx: number; cy: number; x: number; y: number; vx: number; vy: number; rot: number; vr: number; life: number; bullets: EmbeddedShot[] }
+interface Star { x: number; y: number; r: number; vx: number; baseY: number; age: number; life: number; max: number }
+interface BonusCoin { angle: number; radius: number; phase: number; taken: boolean }
+export type TreasureBuff = 'rapid' | 'double' | 'mini' | 'giant';
+export type BuffKind = 'speed' | 'ammo' | 'power' | TreasureBuff;
+export type SpecialMode = 'bonus' | 'treasure';
+export type LevelMode = 'classic' | 'boulder' | 'double' | SpecialMode;
 
-export type LevelMode = 'classic' | 'boulder' | 'double';
+const STAGE_SECONDS: Record<'boulder' | SpecialMode, number> = { boulder: 65, bonus: 45, treasure: 10 };
+const isSpecial = (mode: LevelMode): mode is 'boulder' | SpecialMode => mode === 'boulder' || mode === 'bonus' || mode === 'treasure';
 
 type PatternName = 'constant' | 'wave' | 'pendulum' | 'stopgo' | 'jerk' | 'chaos';
 const PATTERNS: Record<PatternName, (t: number, b: number, d: number) => number> = {
@@ -148,25 +173,30 @@ export function makeLevel(n: number): LevelCfg {
   const coins = (Math.random() < 0.65 ? 1 : 0) + (Math.random() < 0.3 ? 1 : 0);
   const bossIdx = Math.floor(n / 5) - 1;
   const style: Style = boss ? BOSS_STYLES[Math.max(0, bossIdx) % BOSS_STYLES.length] : WORLD_STYLES[world % WORLD_STYLES.length];
-  // Mode baru: boulder stage tiap level kelipatan 7 + 3, double gun tiap kelipatan 7 + 6
-  const mode: LevelMode = boss ? 'classic' : n % 7 === 3 ? 'boulder' : n % 7 === 6 ? 'double' : 'classic';
-  const maxHp = mode === 'boulder' ? 34 + n * 6 : 0;
+  // Level 3 = Diamond Breaker rock, 4 = coin bonus, 5 = boss, 6 = treasure.
+  // Afterwards treasure follows each boss; bonus recurs every ten levels.
+  const mode: LevelMode = boss ? 'classic'
+    : n > 1 && n % 5 === 1 ? 'treasure'
+    : n % 10 === 4 ? 'bonus'
+    : n % 7 === 3 ? 'boulder'
+    : n % 7 === 6 ? 'double' : 'classic';
   return {
-    n, boss, ammo, base, pattern, dir: Math.random() < 0.5 ? 1 : -1,
-    radius: boss ? 122 : mode === 'boulder' ? 112 : 106, style,
+    n, boss, ammo: isSpecial(mode) ? 12 : ammo, base, pattern, dir: Math.random() < 0.5 ? 1 : -1,
+    radius: boss ? 122 : mode === 'boulder' || mode === 'bonus' ? ROCK_RADIUS : 106, style,
     name: boss ? BOSS_NAMES[Math.max(0, bossIdx) % BOSS_NAMES.length] : '',
-    old: mode === 'boulder' ? 0 : old, spikes: mode === 'boulder' ? 0 : spikes, coins: mode === 'boulder' ? 2 : coins,
-    mode, hp: maxHp, maxHp,
+    old: isSpecial(mode) ? 0 : old, spikes: isSpecial(mode) ? 0 : spikes, coins: isSpecial(mode) ? 0 : coins,
+    mode, hp: 0, maxHp: 0, // populated from the actual number of breakable chunks
   };
 }
 
 export interface GameEvents {
-  onGameOver: (score: number, level: number, coins: number) => void;
+  onGameOver: (score: number, level: number, coinsToBank: number, runCoins: number) => void;
   onBossDefeated?: (bossName: string, level: number, coinsEarned: number) => void;
-  /** Dipanggil saat bintang power-up mengenai semua senjata */
-  onStarHit?: () => void;
-  /** Terapkan buff pilihan pemain */
-  applyStarBuff?: (kind: 'speed' | 'ammo' | 'power') => void;
+  /** The treasure counter and saved balance both grow as each flying coin reaches the HUD. */
+  onTreasureCoin?: (amount: number) => void;
+  /** Bank any remaining special-stage reward at its end, exactly once. */
+  onStageReward?: (mode: 'boulder' | SpecialMode, level: number, unbankedCoins: number) => void;
+  onStarHit?: (treasure: boolean) => void;
 }
 
 type State = 'idle' | 'intro' | 'play' | 'clear' | 'fail' | 'over';
@@ -179,6 +209,8 @@ export class Game {
   private dpr = 1;
   private raf = 0;
   private last = 0;
+  private active = false;
+  private hasRendered = false;
 
   state: State = 'idle';
   level: LevelCfg;
@@ -220,7 +252,7 @@ export class Game {
   private slowT = 0;
   private slowF = 0.3;
   private slowRgb = '170,230,255';
-  private slowKind: 'ice' | 'water' | 'time' | 'stun' = 'ice';
+  private slowKind: 'ice' | 'water' | 'honey' | 'time' | 'stun' = 'ice';
   private aiming = false;
   private aimT = 0;
   private spin = 0;
@@ -234,10 +266,28 @@ export class Game {
   private portals: Portal[] = [];
   private glitchT = 0;
   private rockFragments: RockFragment[] = [];
+  private rockBullets: EmbeddedShot[] = [];
+  private fallenCells: FallingCell[] = [];
+  private chestBullets: EmbeddedShot[] = [];
+  private treasureCoins: TreasureCoin[] = [];
+  private stageRewardPaid = false;
+  private lastCoinSound = -10;
+  private coinPulse = 0;
+  private rock: DiamondRock | null = null;
+  private bonusCoins: BonusCoin[] = [];
+  private chest: TreasureChest | null = null;
+  private stageTime = 0;
+  private reloadT = 0;
+  private snowLoaded = SNOWBALL_MAG_SIZE;
+  private stageStartCoins = 0;
+  private bankedCoins = 0;
+  private diamondPing = 0;
+  private choosingBuff = false;
+  private buff: 'speed' | 'ammo' | 'power' | 'double' | null = null;
+  private treasureBuff: TreasureBuff | null = null;
+  private twinGuns = false;
   private star: Star | null = null;
   private starTimer = 6;
-  private gunAngle = 0;
-  private gunAngleTarget = 0;
   private speedMult = 1;
   private dmgMult = 1;
   private maxAmmoMult = 1;
@@ -272,7 +322,15 @@ export class Game {
     this.weapon = getWeapon(id);
     this.aiming = false;
     this.spin = 0;
+    // A newly equipped cannon starts with no more balls than the level's
+    // remaining ammo; changing guns never grants additional stage shots.
+    if (id === 'snowball') this.snowLoaded = this.state === 'idle'
+      ? SNOWBALL_MAG_SIZE : Math.min(SNOWBALL_MAG_SIZE, this.ammoLeft);
   }
+
+  private get targetY() { return isSpecial(this.level.mode) ? SPECIAL_CY : CY; }
+  private get hasTwinGuns() { return this.level.mode === 'double' || this.twinGuns; }
+  private get gunOffsets(): readonly number[] { return this.hasTwinGuns ? TWIN_BARRELS : SINGLE_BARREL; }
 
   constructor(canvas: HTMLCanvasElement, events: GameEvents) {
     this.canvas = canvas;
@@ -293,8 +351,9 @@ export class Game {
     window.addEventListener('pointerup', this.onRelease);
     window.addEventListener('pointercancel', this.onRelease);
     window.addEventListener('blur', this.onRelease);
-    this.last = performance.now();
-    this.raf = requestAnimationFrame(this.loop);
+    // Paint a still frame for inactive slides; start the simulation only on focus.
+    this.render();
+    this.hasRendered = true;
     onBossAssetsLoaded(() => {
       if (this.level.boss) {
         this.buildFace();
@@ -302,8 +361,25 @@ export class Game {
     });
   }
 
+  setActive(active: boolean) {
+    if (this.active === active) return;
+    this.active = active;
+    if (active) {
+      // Discard elapsed time while unfocused; never fast-forward a level or timer.
+      this.last = performance.now();
+      this.raf = requestAnimationFrame(this.loop);
+    } else {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      // A held mouse/key must not resume firing when this slide is selected again.
+      this.holding = false;
+      this.aiming = false;
+      this.charging = false;
+    }
+  }
+
   destroy() {
-    cancelAnimationFrame(this.raf);
+    this.setActive(false);
     window.removeEventListener('resize', this.resize);
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('keyup', this.onKeyUp);
@@ -326,6 +402,7 @@ export class Game {
   };
 
   private press() {
+    if (this.choosingBuff) return;
     this.holding = true;
     if (this.weapon.scope) {
       if (this.state === 'play' && this.cooldown <= 0 && this.ammoLeft > 0 && !this.aiming) {
@@ -366,14 +443,20 @@ export class Game {
 
   private resize = () => {
     this.scale = 1;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    // Cap the backing store: a 420×760 game remains crisp at 2× without
+    // rasterizing the costly canvas effects at 2.5–3× on mobile devices.
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.style.width = `${W}px`;
     this.canvas.style.height = `${H}px`;
     this.canvas.width = Math.round(W * this.dpr);
     this.canvas.height = Math.round(H * this.dpr);
+    // Resizing clears the backing store. Restore a single still frame even
+    // if the game is paused rather than leaving an empty thumbnail.
+    if (this.hasRendered && !this.active) this.render();
   };
 
   private onKey = (e: KeyboardEvent) => {
+    if (!this.active) return;
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') {
       if (this.state === 'play' || this.state === 'intro') {
         e.preventDefault();
@@ -395,41 +478,70 @@ export class Game {
     this.press();
   };
 
-  start() {
+  private startRun(level: number) {
     sfx.unlock();
     sfx.start();
     this.score = 0;
     this.coins = 0;
+    this.bankedCoins = 0;
     this.particles = [];
     this.frags = [];
     this.flyers = [];
-    this.loadLevel(1);
+    this.loadLevel(level);
   }
+
+  start() { this.startRun(1); }
+
+  /** Menu shortcuts enter the same real, playable levels as the Arcade progression. */
+  startSpecialStage(mode: 'boulder' | SpecialMode) { this.startRun(mode === 'boulder' ? 3 : mode === 'bonus' ? 4 : 6); }
 
   toIdle() {
     this.state = 'idle';
+    this.snowLoaded = SNOWBALL_MAG_SIZE;
     this.level = makeLevel(1);
     this.level.style = 'orange';
     this.items = [];
     this.projs = [];
     this.bossProjs = [];
+    this.rock = null;
+    this.chest = null;
+    this.bonusCoins = [];
+    this.rockBullets = [];
+    this.fallenCells = [];
+    this.chestBullets = [];
+    this.treasureCoins = [];
+    this.stageRewardPaid = false;
+    this.coinPulse = 0;
+    this.rockFragments = [];
+    this.choosingBuff = false;
+    this.twinGuns = false;
+    this.star = null;
     this.placeObstacles();
     this.buildFace();
   }
 
-  continueAfterBoss() {
-    this.loadLevel(this.level.n + 1);
-  }
+  continueAfterBoss() { this.loadLevel(this.level.n + 1); }
 
-  startBossChallenge() {
-    sfx.unlock();
-    sfx.boss();
-    this.score = 0;
-    this.coins = 0;
-    this.particles = [];
-    this.frags = [];
-    this.flyers = [];
-    this.loadLevel(5); // Direct jump to Boss Fight!
+  startBossChallenge() { this.startRun(5); }
+
+  applyBuff(kind: BuffKind) {
+    if (!this.choosingBuff) return;
+    if (this.level.mode === 'treasure') {
+      if (!['rapid', 'double', 'mini', 'giant'].includes(kind)) return;
+      this.treasureBuff = kind as TreasureBuff;
+    } else {
+      if (!['speed', 'ammo', 'power', 'double'].includes(kind)) return;
+      this.buff = kind as 'speed' | 'ammo' | 'power' | 'double';
+      if (kind === 'ammo') {
+        this.maxAmmoMult = 2;
+        this.ammoLeft += this.level.ammo;
+        if (this.weapon.id === 'snowball' && this.snowLoaded === 0 && this.reloadT === 0) this.reloadT = 0.85;
+      }
+      if (kind === 'power') this.dmgMult = 2;
+    }
+    if (kind === 'double') this.twinGuns = true;
+    this.choosingBuff = false;
+    sfx4.magic();
   }
 
   drawGunNowDirect(c: CanvasRenderingContext2D, id: WeaponId, cx: number, y0: number, t: number) {
@@ -440,18 +552,33 @@ export class Game {
   tryTapStar(x: number, y: number): boolean {
     if (!this.star) return false;
     const s = this.star;
-    if (Math.hypot(x - s.x, y - s.y) <= s.r * 1.6) {
-      // Semua senjata mengarah ke bintang
-      this.gunAngleTarget = Math.atan2(s.x - CX, GUN_Y - s.y);
+    if (Math.hypot(x - s.x, y - s.y) <= s.r * 1.35) {
+      // The pickup moves; the weapon stays upright before and after selection.
       this.hitStar();
       return true;
     }
     return false;
   }
 
+  private spawnFloatingStar() {
+    const bottom = this.targetY + this.level.radius;
+    const midGap = (bottom + GUN_Y) / 2;
+    const baseY = Math.min(GUN_Y - 75, Math.max(bottom + 48, midGap + rand(-18, 18)));
+    const fromLeft = Math.random() < 0.5;
+    this.star = {
+      x: fromLeft ? -40 : W + 40, y: baseY, baseY,
+      vx: (fromLeft ? 1 : -1) * rand(125, 155), r: 26,
+      age: 0, life: 6, max: 6,
+    };
+    sfx2.scope();
+  }
+
   private hitStar() {
     const s = this.star!;
     this.star = null;
+    this.holding = false;
+    this.projs = [];
+    this.choosingBuff = true;
     sfx4.magic();
     this.flashWhite = Math.max(this.flashWhite, 0.35);
     this.sink.light(s.x, s.y, 220, '250,204,21', 0.6);
@@ -462,7 +589,7 @@ export class Game {
       this.sink.push({ x: s.x, y: s.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.4, 0.9), max: 0.9, size: rand(3, 7), color: pick(['#fde047', '#ffffff', '#fbbf24']), kind: 'star', rot: 0, vr: 0, g: 0, drag: 2 });
     }
     this.addText('★ POWER UP!', s.x, s.y - 40, '#fde047', 26);
-    this.events.onStarHit?.();
+    this.events.onStarHit?.(this.level.mode === 'treasure');
   }
 
   private loadLevel(n: number) {
@@ -470,16 +597,34 @@ export class Game {
     this.items = [];
     this.projs = [];
     this.rockFragments = [];
+    this.rockBullets = [];
+    this.fallenCells = [];
+    this.chestBullets = [];
+    this.treasureCoins = [];
+    this.stageRewardPaid = false;
+    this.coinPulse = 0;
+    this.rock = this.level.mode === 'boulder' || this.level.mode === 'bonus' ? new DiamondRock() : null;
+    this.chest = this.level.mode === 'treasure' ? new TreasureChest() : null;
+    this.bonusCoins = this.level.mode === 'bonus' ? this.buildBonusCoins() : [];
+    this.stageTime = isSpecial(this.level.mode) ? STAGE_SECONDS[this.level.mode] : 0;
+    this.stageStartCoins = this.coins;
+    this.reloadT = 0;
+    this.diamondPing = 0;
+    this.choosingBuff = false;
+    this.buff = null;
+    this.treasureBuff = null;
+    this.twinGuns = false;
     this.star = null;
-    this.starTimer = 5 + Math.random() * 3;
-    this.gunAngle = 0;
-    this.gunAngleTarget = 0;
+    // The treasure star flies across early enough for its buff to be useful.
+    this.starTimer = this.level.mode === 'treasure' ? 2.2 : 5 + Math.random() * 3;
     this.speedMult = 1;
     this.dmgMult = 1;
     this.maxAmmoMult = 1;
-    this.level.hp = this.level.maxHp;
+    this.level.maxHp = this.rock?.total ?? 0;
+    this.level.hp = this.rock?.remaining ?? 0;
     this.placeObstacles();
     this.ammoLeft = this.level.ammo;
+    this.snowLoaded = Math.min(SNOWBALL_MAG_SIZE, this.ammoLeft);
     this.stuck = 0;
     this.combo = 0;
     this.rot = rand(0, TAU);
@@ -503,12 +648,25 @@ export class Game {
       this.bossHp = this.bossMaxHp;
       this.bossHpRed = this.bossMaxHp;
     }
-    this.buildFace();
+    if (!isSpecial(this.level.mode)) this.buildFace();
     if (this.level.boss) sfx.boss();
     else if (n > 1) sfx.level();
   }
 
+  private buildBonusCoins(): BonusCoin[] {
+    const coins: BonusCoin[] = [];
+    for (const { radius, count } of [
+      { radius: 96, count: 12 }, { radius: 132, count: 16 }, { radius: 168, count: 20 },
+    ]) {
+      for (let i = 0; i < count; i++) {
+        coins.push({ angle: i * TAU / count, radius, phase: rand(0, TAU), taken: false });
+      }
+    }
+    return coins;
+  }
+
   private placeObstacles() {
+    if (isSpecial(this.level.mode)) return;
     const place = (type: ItemType, count: number, sep: number) => {
       for (let i = 0; i < count; i++) {
         for (let t = 0; t < 300; t++) {
@@ -554,45 +712,53 @@ export class Game {
 
   // ---------- actions ----------
   shoot() {
-    if (this.state !== 'play') return;
-    if (this.cooldown > 0 || this.ammoLeft <= 0) return;
+    if (this.state !== 'play' || this.choosingBuff) return;
+    if (this.cooldown > 0 || this.ammoLeft <= 0 || this.reloadT > 0) return;
     const w = this.weapon;
+    if (w.id === 'snowball' && this.snowLoaded <= 0) return;
     const n = Math.min(w.burst ?? 1, this.ammoLeft);
     this.ammoLeft -= n;
+    if (w.id === 'snowball') this.snowLoaded = Math.max(0, Math.min(this.snowLoaded - n, this.ammoLeft));
     this.lastShotRT = this.rt;
     this.stretchPlayed = false;
     gunState.shots++;
     const big = w.charge ? this.chargeLevel : 0;
     const tint = w.paint ? pick(PAINT) : undefined;
-    const ang = this.gunAngle;
-    const vx = Math.sin(ang) * w.speed * this.speedMult;
-    const vy = -Math.cos(ang) * w.speed * this.speedMult;
-    const offsets = this.level.mode === 'double' ? [-46, 46] : [0];
+    const vx = 0; // stars never steer the weapon or its shots
+    const vy = -w.speed * this.speedMult;
+    const offsets = this.gunOffsets;
+    const sizeBuff = { mini: this.treasureBuff === 'mini', giant: this.treasureBuff === 'giant' };
     for (const ox of offsets) {
-      if (n === 1) this.projs.push({ x: CX + ox, y: GUN_Y - 4, vx, vy, big, tint });
+      if (n === 1) this.projs.push({ x: CX + ox, originX: CX + ox, y: GUN_Y - 4, vx, vy, big, tint, ...sizeBuff });
       else {
-        const travel = GUN_Y - (CY + this.level.radius);
+        const travel = GUN_Y - (this.targetY + this.level.radius);
         for (let i = 0; i < n; i++) {
           const off = (i - (n - 1) / 2) * 26;
-          this.projs.push({ x: CX + ox, y: GUN_Y - 4, vx: vx + (off * w.speed) / travel, vy, big, tint });
+          this.projs.push({ x: CX + ox, originX: CX + ox, y: GUN_Y - 4, vx: vx + (off * w.speed) / travel, vy, big, tint, ...sizeBuff });
         }
       }
     }
     this.recoil = w.recoil;
     this.muzzle = 0.07;
     const fxp = FX[w.id];
-    spawnMuzzle(this.sink, fxp, w, CX, GUN_Y - 6);
+    for (const ox of offsets) spawnMuzzle(this.sink, fxp, w, CX + ox, GUN_Y - 6);
     this.camY += fxp.kick * 0.5;
-    if (fxp.speedLines) spawnSpeedLines(this.sink, CX, CY + this.level.radius + 20, GUN_Y - 30, w.trail);
-    this.cooldown = w.spinup ? 0.3 - 0.235 * this.spin : w.cooldown;
+    if (fxp.speedLines) for (const ox of offsets) {
+      spawnSpeedLines(this.sink, CX + ox, this.targetY + this.level.radius + 20, GUN_Y - 30, w.trail);
+    }
+    this.cooldown = (w.spinup ? 0.3 - 0.235 * this.spin : w.cooldown)
+      * (this.buff === 'speed' || this.treasureBuff === 'rapid' ? 0.5 : this.treasureBuff === 'mini' ? 0.6 : 1);
+    if (isSpecial(this.level.mode) && this.ammoLeft === 0) this.reloadT = 0.65;
+    else if (w.id === 'snowball' && this.snowLoaded === 0 && this.ammoLeft > 0) this.reloadT = 0.85;
     if (w.burstFx) {
       const b = w.burstFx;
-      for (let i = 0; i < b.n; i++) {
+      for (const ox of offsets) for (let i = 0; i < b.n; i++) {
         const a = rand(-Math.PI * 0.85, -Math.PI * 0.15);
         const v = rand(0.4, 1) * (b.spd ?? 200);
         this.particles.push({
-          x: CX + rand(-6, 6), y: GUN_Y - 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.35, 0.8), max: 0.8,
-          size: b.glow ? rand(3, b.size ?? 6) : rand(2, 4.5), color: pick(b.colors), kind: b.glow ? 'glow' : 'chip',
+          x: CX + ox + rand(-6, 6), y: GUN_Y - 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.35, 0.8), max: 0.8,
+          size: b.glow ? rand(3, b.size ?? 6) : rand(2, 4.5), color: pick(b.colors),
+          kind: w.id === 'soaker' ? 'waterDrop' : w.id === 'snowball' ? 'snowflake' : b.glow ? 'glow' : 'chip',
           rot: rand(0, TAU), vr: rand(-12, 12), g: b.g ?? 600,
         });
       }
@@ -604,21 +770,28 @@ export class Game {
       this.recoil = big === 2 ? 2.4 : 1.4;
       this.shake = Math.max(this.shake, big === 2 ? 9 : 4);
       this.camY += big * 3;
-      this.sink.light(CX, GUN_Y, big === 2 ? 320 : 180, big === 2 ? '254,240,138' : '125,211,252', 0.25);
-      this.sink.push({ x: CX, y: GUN_Y - 8, vx: 0, vy: 0, life: 0.4, max: 0.4, size: big === 2 ? 150 : 80, color: '125,211,252', kind: 'shock', rot: 0, vr: 0, g: 0 });
-      if (big === 2) spawnSpeedLines(this.sink, CX, CY + this.level.radius + 20, GUN_Y - 30, '254,240,138');
+      for (const ox of offsets) {
+        const paired = offsets.length > 1;
+        this.sink.light(CX + ox, GUN_Y, big === 2 ? (paired ? 220 : 320) : (paired ? 130 : 180), big === 2 ? '254,240,138' : '125,211,252', 0.25);
+        this.sink.push({ x: CX + ox, y: GUN_Y - 8, vx: 0, vy: 0, life: 0.4, max: 0.4, size: big === 2 ? (paired ? 105 : 150) : (paired ? 60 : 80), color: '125,211,252', kind: 'shock', rot: 0, vr: 0, g: 0 });
+      }
+      if (big === 2) for (const ox of offsets) {
+        spawnSpeedLines(this.sink, CX + ox, this.targetY + this.level.radius + 20, GUN_Y - 30, '254,240,138');
+      }
     } else FIRE_SFX[w.id]();
     if (w.id === 'slingshot') {
       sfx4.slingRelease();
-      for (const s of [-1, 1]) {
-        for (let i = 0; i < 4; i++) {
-          this.sink.push({ x: CX + s * 24, y: GUN_Y + 6, vx: -s * rand(300, 600), vy: rand(-500, -200), life: 0.12, max: 0.12, size: rand(1, 2), color: 'rgba(255,220,200,0.9)', kind: 'streak', rot: 0, vr: 0, g: 0 });
+      for (const ox of offsets) {
+        for (const s of [-1, 1]) {
+          for (let i = 0; i < 4; i++) {
+            this.sink.push({ x: CX + ox + s * 24, y: GUN_Y + 6, vx: -s * rand(300, 600), vy: rand(-500, -200), life: 0.12, max: 0.12, size: rand(1, 2), color: 'rgba(255,220,200,0.9)', kind: 'streak', rot: 0, vr: 0, g: 0 });
+          }
         }
+        for (let i = 0; i < 6; i++) {
+          this.sink.push({ x: CX + ox + rand(-10, 10), y: GUN_Y + 10, vx: rand(-80, 80), vy: rand(-60, 10), life: rand(0.4, 0.7), max: 0.7, size: rand(5, 10), color: 'rgba(210,190,160,', kind: 'smoke', rot: 0, vr: 0, g: -20, drag: 2 });
+        }
+        this.sink.push({ x: CX + ox, y: GUN_Y + 4, vx: 0, vy: 0, life: 0.25, max: 0.25, size: 70, color: '255,230,200', kind: 'shock', rot: 0, vr: 0, g: 0 });
       }
-      for (let i = 0; i < 6; i++) {
-        this.sink.push({ x: CX + rand(-10, 10), y: GUN_Y + 10, vx: rand(-80, 80), vy: rand(-60, 10), life: rand(0.4, 0.7), max: 0.7, size: rand(5, 10), color: 'rgba(210,190,160,', kind: 'smoke', rot: 0, vr: 0, g: -20, drag: 2 });
-      }
-      this.sink.push({ x: CX, y: GUN_Y + 4, vx: 0, vy: 0, life: 0.25, max: 0.25, size: 70, color: '255,230,200', kind: 'shock', rot: 0, vr: 0, g: 0 });
       this.addText('CTAK!', CX + rand(-50, 50), GUN_Y - 20, '#fde68a', 22);
     }
     if (w.id === 'obliterator') {
@@ -627,41 +800,46 @@ export class Game {
       this.tintRgb = '74,222,128';
     }
     if (w.casing) {
-      this.particles.push({
-        x: CX + 16, y: GUN_Y + (w.ejectY ?? 48), vx: rand(180, 320), vy: rand(-520, -380), life: 1.1, max: 1.1,
-        size: 1, color: w.casing, kind: 'shell', rot: rand(0, TAU), vr: rand(15, 28), g: 1600,
-      });
+      for (const ox of offsets) {
+        const side = ox < 0 ? -1 : 1; // cases eject outwards from mirrored guns
+        this.particles.push({
+          x: CX + ox + side * 16, y: GUN_Y + (w.ejectY ?? 48), vx: side * rand(180, 320), vy: rand(-520, -380), life: 1.1, max: 1.1,
+          size: 1, color: w.casing, kind: 'shell', rot: rand(0, TAU), vr: side * rand(15, 28), g: 1600,
+        });
+      }
     }
     if (!w.energy && !w.noSmoke) {
       const ns = w.backblast || w.id === 'bamboo' || w.id === 'pirate' ? 10 : 4;
-      for (let i = 0; i < ns; i++) {
+      for (const ox of offsets) for (let i = 0; i < ns; i++) {
         this.particles.push({
-          x: CX + rand(-6, 6), y: GUN_Y - 6, vx: rand(-50, 50), vy: rand(-90, -30), life: 0.5, max: 0.5,
+          x: CX + ox + rand(-6, 6), y: GUN_Y - 6, vx: rand(-50, 50), vy: rand(-90, -30), life: 0.5, max: 0.5,
           size: rand(6, w.backblast ? 18 : 12), color: 'rgba(200,200,200,', kind: 'smoke', rot: 0, vr: 0, g: -20,
         });
       }
     }
     if (w.backblast) {
-      for (let i = 0; i < 14; i++) {
+      for (const ox of offsets) for (let i = 0; i < 14; i++) {
         this.particles.push({
-          x: CX + rand(-20, 20), y: H - rand(0, 30), vx: rand(-160, 160), vy: rand(-40, 80), life: rand(0.5, 1), max: 1,
+          x: CX + ox + rand(-20, 20), y: H - rand(0, 30), vx: rand(-160, 160), vy: rand(-40, 80), life: rand(0.5, 1), max: 1,
           size: rand(14, 30), color: 'rgba(180,180,180,', kind: 'smoke', rot: 0, vr: 0, g: -40,
         });
         this.particles.push({
-          x: CX + rand(-14, 14), y: H - rand(0, 20), vx: rand(-120, 120), vy: rand(-30, 60), life: rand(0.2, 0.4), max: 0.4,
+          x: CX + ox + rand(-14, 14), y: H - rand(0, 20), vx: rand(-120, 120), vy: rand(-30, 60), life: rand(0.2, 0.4), max: 0.4,
           size: rand(6, 12), color: '255,150,40', kind: 'glow', rot: 0, vr: 0, g: 0,
         });
       }
     }
     if (w.energy && w.id !== 'laser') {
-      this.particles.push({ x: CX, y: GUN_Y + 10, vx: 0, vy: 0, life: 0.3, max: 0.3, size: w.id === 'cricket' ? 110 : 50, color: w.color, kind: 'ring', rot: 0, vr: 0, g: 0 });
-      for (let i = 0; i < 10; i++) {
-        const a = rand(0, TAU);
-        const v = rand(60, 200);
-        this.particles.push({
-          x: CX, y: GUN_Y + 6, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: rand(0.25, 0.5), max: 0.5,
-          size: rand(3, 6), color: w.trail, kind: 'glow', rot: 0, vr: 0, g: 0,
-        });
+      for (const ox of offsets) {
+        this.particles.push({ x: CX + ox, y: GUN_Y + 10, vx: 0, vy: 0, life: 0.3, max: 0.3, size: w.id === 'cricket' ? 110 : 50, color: w.color, kind: 'ring', rot: 0, vr: 0, g: 0 });
+        for (let i = 0; i < 10; i++) {
+          const a = rand(0, TAU);
+          const v = rand(60, 200);
+          this.particles.push({
+            x: CX + ox, y: GUN_Y + 6, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: rand(0.25, 0.5), max: 0.5,
+            size: rand(3, 6), color: w.trail, kind: 'glow', rot: 0, vr: 0, g: 0,
+          });
+        }
       }
     }
     if (w.id === 'cricket') {
@@ -669,14 +847,22 @@ export class Game {
       this.addText('BOOM!', CX + rand(-40, 40), GUN_Y - 40, '#9fd8ff', 26);
     }
     if (w.beam) {
-      const by = CY + this.level.radius - 4;
-      this.beams.push({ y: by, life: 0.22, max: 0.22, rgb: w.trail });
-      for (let i = 0; i < 14; i++) {
-        const yy = rand(by, GUN_Y);
-        this.sink.push({ x: CX + rand(-3, 3), y: yy, vx: rand(-160, 160), vy: rand(-60, 60), life: rand(0.2, 0.45), max: 0.45, size: rand(2, 4.5), color: w.trail, kind: 'glow', rot: 0, vr: 0, g: 0, drag: 4 });
-      }
-      for (let i = 0; i < 6; i++) {
-        this.sink.push({ x: CX, y: rand(by, GUN_Y), vx: 0, vy: 0, life: 0.2, max: 0.2, size: rand(4, 7), color: '#ffffff', kind: 'star', rot: rand(0, TAU), vr: 0, g: 0 });
+      const by = this.targetY + this.level.radius - 4;
+      for (const ox of offsets) {
+        this.beams.push({ x: CX + ox, y: by, life: 0.22, max: 0.22, rgb: w.trail });
+        for (let i = 0; i < 14; i++) {
+          const yy = rand(by, GUN_Y);
+          this.sink.push({ x: CX + ox + rand(-3, 3), y: yy, vx: rand(-160, 160), vy: rand(-60, 60), life: rand(0.2, 0.45), max: 0.45, size: rand(2, 4.5), color: w.trail, kind: 'glow', rot: 0, vr: 0, g: 0, drag: 4 });
+        }
+        const starTrain = w.id === 'moonbeam' && getGunEffect(w.id) === 'new';
+        for (let i = 0; i < (starTrain ? 16 : 6); i++) {
+          this.sink.push({ x: CX + ox + (starTrain ? rand(-13, 13) : 0),
+            y: rand(by, GUN_Y), vx: starTrain ? rand(-35, 35) : 0, vy: 0,
+            life: starTrain ? 0.34 : 0.2, max: starTrain ? 0.34 : 0.2,
+            size: rand(4, starTrain ? 10 : 7),
+            color: starTrain ? pick(['#ffffff', '#e9ddff', '#ffeabb']) : '#ffffff',
+            kind: 'star', rot: rand(0, TAU), vr: 0, g: 0 });
+        }
       }
     }
   }
@@ -702,7 +888,7 @@ export class Game {
 
   private worldPos(local: number, r: number) {
     const wa = local + this.rot;
-    return { x: CX + Math.cos(wa) * r, y: CY + Math.sin(wa) * r };
+    return { x: CX + Math.cos(wa) * r, y: this.targetY + Math.sin(wa) * r };
   }
 
   /** returns true if a save was consumed */
@@ -781,12 +967,16 @@ export class Game {
     }
     if (w.slow) {
       const water = w.id === 'soaker' || w.slowStyle === 'water';
-      if (water) sfx2.splat();
+      const honey = w.slowStyle === 'honey';
+      if (water || honey) sfx2.splat();
       else sfx.ice();
-      if (this.slowT <= 0) this.addText(w.slowText ?? '❄ BEKU!', hx + rand(-40, 40), hy + 60, water ? '#93c5fd' : '#bff1ff', 24);
+      if (this.slowT <= 0) this.addText(w.slowText ?? '❄ BEKU!', hx + rand(-40, 40), hy + 60,
+        honey ? '#ffd56c' : water ? '#93c5fd' : '#bff1ff', 24);
       if (w.slowStyle === 'stun') sfx4.dizzy();
-      this.applySlow(w.slowTime ?? 1.3, w.slowFactor ?? 0.3, w.slowRgb ?? '170,230,255', w.slowStyle === 'stun' ? 'stun' : water ? 'water' : 'ice');
-      for (let i = 0; i < 14; i++) {
+      this.applySlow(w.slowTime ?? 1.3, w.slowFactor ?? 0.3, w.slowRgb ?? '170,230,255',
+        honey ? 'honey' : w.slowStyle === 'stun' ? 'stun' : water ? 'water' : 'ice');
+      // Both liquids already have their own splash and droplets in spawnImpact.
+      if (w.id !== 'soaker' && w.id !== 'honey') for (let i = 0; i < 14; i++) {
         const a = rand(0, TAU);
         const v = rand(60, 260);
         this.particles.push({
@@ -890,7 +1080,7 @@ export class Game {
     this.addText('DORR! 🎆', x + rand(-30, 30), y + 60, '#fde047', 30);
   }
 
-  private applySlow(time: number, factor: number, rgb: string, kind: 'ice' | 'water' | 'time' | 'stun') {
+  private applySlow(time: number, factor: number, rgb: string, kind: 'ice' | 'water' | 'honey' | 'time' | 'stun') {
     this.slowT = time;
     this.slowF = factor;
     this.slowRgb = rgb;
@@ -969,7 +1159,7 @@ export class Game {
       sfx2.bloom();
       this.addText('⛄ MANUSIA SALJU +3', hx, hy + 70, '#e0f2fe', 24);
       for (let i = 0; i < 20; i++) {
-        this.particles.push({ x: hx + rand(-30, 30), y: hy - rand(0, 40), vx: rand(-60, 60), vy: rand(-40, 40), life: rand(0.8, 1.4), max: 1.4, size: rand(2, 4), color: '#ffffff', kind: 'chip', rot: 0, vr: 0, g: 60 });
+        this.particles.push({ x: hx + rand(-30, 30), y: hy - rand(0, 40), vx: rand(-60, 60), vy: rand(-40, 40), life: rand(0.8, 1.4), max: 1.4, size: rand(2, 4), color: '#ffffff', kind: 'snowDust', rot: 0, vr: 0, g: 60 });
       }
     }
     if (w.breakSpike) {
@@ -1224,6 +1414,7 @@ export class Game {
       sfx.combo(this.combo);
       this.comboPop = 1;
     }
+    pts *= this.dmgMult; // POWER also doubles classic points / boss damage, not only rock damage.
     this.score += pts;
     this.bump = 1;
     this.hitFlash = 1;
@@ -1425,24 +1616,37 @@ export class Game {
 
   // ---------- loop ----------
   private loop = (now: number) => {
-    const dt = Math.min(0.033, (now - this.last) / 1000);
-    this.last = now;
-    this.update(dt);
-    this.render();
+    if (!this.active) return;
+    // 60 FPS during play (also on 120 Hz displays); the covered menu needs
+    // only a few frames. Never spend RAF time on an unfocused slide.
+    const interval = this.state === 'idle' || this.state === 'over' ? 1000 / 15 : 1000 / 60;
+    if (now - this.last >= interval - 1) {
+      const dt = Math.min(0.033, (now - this.last) / 1000);
+      this.last = now;
+      this.update(dt);
+      this.render();
+    }
     this.raf = requestAnimationFrame(this.loop);
   };
 
   private stepProj(p: Proj): StepRes {
+    // A floating star can be collected by a straight shot before it reaches the target.
+    if (this.state === 'play' && this.star
+      && Math.hypot(p.x - this.star.x, p.y - this.star.y) < this.star.r + this.weapon.half * 0.5) {
+      this.hitStar();
+      return { res: 'hit' };
+    }
     const isBoss = this.level.boss;
     const bType = isBoss ? (this.level.style as BossType) : null;
     const px = p.x - CX;
-    const py = p.y - CY;
+    const py = p.y - this.targetY;
     const worldA = Math.atan2(py, px);
     const local = norm(worldA - this.rot);
     // Exact pixel-perfect raycast radius matching the cutout silhouette of the generated boss head!
     const effectiveR = bType ? getExactBossRadius(bType, local, this.level.radius) : this.level.radius;
     const dist = Math.hypot(px, py);
     if (dist > effectiveR + L + 4) return { res: 'none' };
+    if (isSpecial(this.level.mode)) return this.stepSpecialProjectile(p);
     const w = this.weapon;
     const R = effectiveR;
 
@@ -1499,7 +1703,7 @@ export class Game {
         if (it.type === 'coin') {
           if (hitDistance < w.coinRadius + 8) this.collectCoin(it);
         } else if (it.type === 'diamond_chest') {
-          if (hitDistance < w.coinRadius + 10) {
+          if (hitDistance < w.coinRadius + 12) {
             if ((it.hits || 0) < 1) {
               this.hitDiamond(it);
             } else {
@@ -1509,99 +1713,346 @@ export class Game {
         }
       }
     }
-    if (dist <= R) {
-      // ═══════ MODE BOULDER: rusak batu, bukan nancap ═══════
-      if (this.level.mode === 'boulder' && this.level.hp > 0) {
-        this.damageBoulder(p);
-        return { res: 'none' };
-      }
-      return { res: 'stick', local };
-    }
+    if (dist <= R) return { res: 'stick', local };
     return { res: 'none' };
   }
 
-  /** Kerusakan bongkahan batu oleh peluru */
-  private damageBoulder(p: Proj) {
-    const w = this.weapon;
-    const dmg = Math.round((4 + w.stats.power * 3 + w.points * 2) * this.dmgMult);
-    this.level.hp = Math.max(0, this.level.hp - dmg);
-    this.score += 1;
-    this.hitStop = Math.max(this.hitStop, 0.02);
-    this.shake = Math.max(this.shake, 3);
-    const ang = Math.atan2(p.y - CY, p.x - CX);
-    const px = p.x;
-    const py = p.y;
-    // percikan batu
-    const cols = ['#a8a29e', '#78716c', '#d6d3d1', '#57534e'];
-    for (let i = 0; i < 12; i++) {
-      const a = ang + rand(-1.1, 1.1);
-      const v = rand(150, 520);
-      this.particles.push({ x: px, y: py, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.3, 0.7), max: 0.7, size: rand(2, 5), color: pick(cols), kind: 'shard', rot: rand(0, TAU), vr: rand(-20, 20), g: 1400 });
+  /** Each projectile is consumed on its first rock/coin/chest collision. */
+  private stepSpecialProjectile(p: Proj): StepRes {
+    const mode = this.level.mode;
+    const ty = this.targetY;
+    if (mode === 'treasure') {
+      // Same open, coin-filled chest as the 10-second Diamond Breaker round.
+      if (!this.chest || Math.abs(p.x - CX) > 97 || p.y < ty - 90 || p.y > ty + 88) return { res: 'none' };
+      const power = Math.max(1, this.weapon.stats.power + (p.big ?? 0) * 2);
+      this.chest.hit(power);
+      const reward = Math.max(1, Math.round(power * 0.48 + rand(0, 1))) * (this.treasureBuff === 'giant' ? 2 : 1);
+      // The reward is not credited on impact: it physically erupts from the
+      // chest, bounces on the floor, then reaches the counter in small steps.
+      this.treasureCoins.push(...throwTreasureCoins(p.x, ty, reward));
+      // Embedded rounds move with the rattling chest, not with the screen.
+      const len = this.weapon.stick + EMBED;
+      const embedded = this.makeEmbeddedShot(p, p.x - CX, 68 - len * 0.5, Math.PI / 2);
+      // A new hit in the same spot knocks the previous round loose instead of
+      // stacking dozens of identical sprites into one blinding column.
+      for (let i = this.chestBullets.length - 1; i >= 0; i--) {
+        if (Math.abs(this.chestBullets[i].x - embedded.x) < Math.max(14, this.weapon.half * 2.5)) {
+          this.dislodgeChestShot(this.chestBullets.splice(i, 1)[0]);
+        }
+      }
+      this.chestBullets.push(embedded);
+      if (this.chestBullets.length > 18) this.dislodgeChestShot(this.chestBullets.shift()!);
+      this.specialImpact(p.x, p.y, 'gold');
+      this.burstSpecial(p.x, p.y, 'gold', 8);
+      return { res: 'hit' };
     }
-    // debu
-    for (let i = 0; i < 5; i++) {
-      const a = ang + rand(-0.9, 0.9);
-      this.particles.push({ x: px, y: py, vx: Math.cos(a) * rand(40, 140), vy: Math.sin(a) * rand(40, 140), life: rand(0.4, 0.8), max: 0.8, size: rand(8, 16), color: 'rgba(170,160,145,', kind: 'smoke', rot: 0, vr: 0, g: -30, drag: 2 });
+
+    const rock = this.rock;
+    if (!rock) return { res: 'none' };
+    const sc = this.level.radius / 196;
+    const a = -this.rot;
+    const dx = p.x - CX, dy = p.y - ty;
+    const local = { x: (dx * Math.cos(a) - dy * Math.sin(a)) / sc, y: (dx * Math.sin(a) + dy * Math.cos(a)) / sc };
+
+    if (mode === 'bonus') {
+      // Gold rings rotate with the rock; collect a coin once, then consume the shot.
+      const coin = this.bonusCoins.find(c => !c.taken && Math.hypot(local.x - Math.cos(c.angle) * c.radius, local.y - Math.sin(c.angle) * c.radius) < 16 + this.weapon.coinRadius * 0.35);
+      if (coin) {
+        coin.taken = true;
+        const x = CX + Math.cos(coin.angle + this.rot) * coin.radius * sc;
+        const y = ty + Math.sin(coin.angle + this.rot) * coin.radius * sc;
+        this.coins += 2;
+        this.score += 50;
+        this.specialImpact(x, y, 'gold');
+        this.burstSpecial(x, y, 'gold', 8);
+        sfx.coin();
+        if (this.bonusCoins.every(c => c.taken)) this.finishSpecialStage();
+        return { res: 'hit' };
+      }
     }
-    // kilauan kecil di titik pukul
-    this.sink.push({ x: px, y: py, vx: 0, vy: 0, life: 0.25, max: 0.25, size: 40, color: '214,211,209', kind: 'shock', rot: 0, vr: 0, g: 0 });
-    if (this.level.hp <= 0) this.shatterBoulder();
+
+    const dmg = Math.round((4 + (this.weapon.points - 1) * 2 + (p.big ?? 0) * 2) * this.dmgMult);
+    const splash = (mode === 'boulder' ? 43 : 32) + (this.weapon.explode ? 30 : 0);
+    const hit = rock.hitAt(local, dmg, splash);
+    if (!hit) return { res: 'none' };
+    if (hit.kind === 'diamond') {
+      this.diamondPing = 1;
+      this.specialImpact(p.x, p.y, 'diamond');
+      this.burstSpecial(p.x, p.y, 'diamond', 7);
+      sfx3.chime();
+      return { res: 'hit' };
+    }
+    this.level.hp = hit.remaining;
+    this.score += 1 + hit.broken.length * 10;
+    this.specialImpact(p.x, p.y, 'rock');
+    this.hitStop = Math.max(this.hitStop, 0.018);
+    this.shake = Math.max(this.shake, hit.broken.length ? 5 : 2);
+    // Every round belongs to the exact cell it struck, including rounds that
+    // break it immediately. Splash damage can knock off previously hit cells.
+    const tip = 7 / sc;
+    this.rockBullets.push(this.makeEmbeddedShot(p,
+      local.x - Math.sin(this.rot) * tip, local.y - Math.cos(this.rot) * tip,
+      Math.PI / 2 - this.rot, hit.struckId));
+    if (hit.broken.length) {
+      this.detachRockCells(hit.broken);
+      for (const cell of hit.broken) {
+        const x = CX + (cell.x * Math.cos(this.rot) - cell.y * Math.sin(this.rot)) * sc;
+        const y = ty + (cell.x * Math.sin(this.rot) + cell.y * Math.cos(this.rot)) * sc;
+        const outward = Math.atan2(y - ty, x - CX);
+        for (let i = 0; i < 2; i++) {
+          const speed = rand(130, 360);
+          this.rockFragments.push({
+            x, y, vx: Math.cos(outward) * speed + rand(-70, 70), vy: Math.sin(outward) * speed - rand(90, 170),
+            rot: rand(0, TAU), vr: rand(-10, 10), size: rand(5, 12), seed: rand(0, 10), life: 1.3, max: 1.3,
+          });
+        }
+        this.burstSpecial(x, y, 'rock', 3);
+      }
+      sfx4.shatter();
+    } else sfx.hit();
+    if (hit.remaining === 0 && mode === 'boulder') this.finishSpecialStage();
+    return { res: 'hit' };
   }
 
-  /** Batu hancur berkeping-keping */
-  private shatterBoulder() {
+  private dislodgeChestShot(shot: EmbeddedShot) {
+    const side = shot.x < 0 ? -1 : 1;
+    this.flyers.push({
+      x: CX + shot.x, y: this.targetY + 15 + shot.y + BLEN / 2,
+      vx: side * rand(100, 240), vy: rand(-160, 50), rot: 0, vr: side * rand(7, 14),
+      kind: 'bullet', w: shot.w,
+    });
+  }
+
+  private makeEmbeddedShot(p: Proj, x: number, y: number, angle: number, cellId?: number): EmbeddedShot {
+    return {
+      x, y, angle, cellId, age: 0, w: this.weapon.id, big: p.big ?? 0, tint: p.tint,
+      scale: (1 + (p.big ?? 0) * 0.3) * (p.mini ? 0.65 : p.giant ? 1.8 : 1),
+    };
+  }
+
+  private detachRockCells(cells: BrokenRockCell[]) {
+    const ids = new Set(cells.map(cell => cell.id));
+    const bullets = new Map<number, EmbeddedShot[]>();
+    this.rockBullets = this.rockBullets.filter(shot => {
+      if (shot.cellId === undefined || !ids.has(shot.cellId)) return true;
+      const group = bullets.get(shot.cellId) ?? [];
+      group.push(shot);
+      bullets.set(shot.cellId, group);
+      return false;
+    });
+    const sc = this.level.radius / 196;
+    const rot = this.rot;
+    for (const cell of cells) {
+      const x = CX + (cell.x * Math.cos(rot) - cell.y * Math.sin(rot)) * sc;
+      const y = this.targetY - this.bump * 9 + (cell.x * Math.sin(rot) + cell.y * Math.cos(rot)) * sc;
+      const outward = Math.atan2(y - this.targetY, x - CX);
+      const speed = rand(120, 290);
+      this.fallenCells.push({
+        id: cell.id, cx: cell.x, cy: cell.y, x, y,
+        vx: Math.cos(outward) * speed + rand(-55, 55),
+        vy: Math.sin(outward) * speed - rand(140, 230),
+        rot, vr: rand(-7, 7), life: 1.5, bullets: bullets.get(cell.id) ?? [],
+      });
+    }
+  }
+
+  /** Keep the normal weapon's signature hit effect, with the correct material palette. */
+  private specialImpact(x: number, y: number, material: 'rock' | 'diamond' | 'gold') {
+    const w = this.weapon;
+    const fx = FX[w.id];
+    const dx = x - CX, dy = y - this.targetY;
+    const dist = Math.hypot(dx, dy) || 1;
+    const chips = material === 'rock' ? ['#aab6c6', '#627388', '#e1ebf7']
+      : material === 'diamond' ? ['#a5f3fc', '#67e8f9', '#e0f2fe']
+        : ['#fbbf24', '#fde68a', '#a16207'];
+    spawnImpact(this.sink, fx, w, x, y, dx / dist, dy / dist, chips);
+    this.hitStop = Math.max(this.hitStop, fx.hitstop);
+    this.camY -= fx.kick;
+    this.bump = Math.max(this.bump, material === 'rock' ? 0.55 : 0.2);
+    this.shake = Math.max(this.shake, 3 + fx.kick * 0.8);
+    if (fx.tint) {
+      this.tintA = Math.max(this.tintA, fx.tint);
+      this.tintRgb = fx.light;
+    }
+    if (HIT_SFX[w.id]) HIT_SFX[w.id]!();
+    else if (w.energy && !w.slow && !w.pullCoins) sfx.zap();
+    // Reuse the weapon's normal-stage signature effects without importing
+    // classic-target perks (which would alter special-stage coin accounting).
+    if (w.explode) this.explodeAt(x, y, w.id === 'bazooka' ? 1.3 : w.id === 'bamboo' ? 1.2 : 1, w.explodeFx ?? 'fire');
+    if (w.id === 'cricket') {
+      this.particles.push({ x, y, vx: 0, vy: 0, life: 0.5, max: 0.5, size: 180, color: '#7cc8ff', kind: 'ring', rot: 0, vr: 0, g: 0 });
+      this.shake = Math.max(this.shake, 12);
+    }
+    if (w.id === 'storm') this.sink.push({ x, y: -20, tx: x, ty: y, vx: 0, vy: 0, life: 0.3, max: 0.3, size: 4, color: '#dbeafe', kind: 'bolt', rot: 0, vr: 0, g: 0 });
+    if (w.id === 'meteor') this.sink.push({ x: x - 160, y: -40, tx: x, ty: y, vx: 0, vy: 0, life: 0.15, max: 0.15, size: 5, color: '#fb923c', kind: 'bolt', rot: 0, vr: 0, g: 0 });
+    // Match the normal stage's weapon-specific flourish as well as its shared
+    // impact profile. Only visual effects go here: chest coins still need to
+    // fly to the counter, and obstacle perks must not invent classic targets.
+    if (w.burn || w.id === 'dragon') for (let i = 0; i < 14; i++) {
+      this.sink.push({ x: x + rand(-10, 10), y, vx: rand(-120, 120), vy: rand(-200, 40), life: rand(0.3, 0.6), max: 0.6,
+        size: rand(5, 10), color: pick(['255,200,80', '255,120,30', '255,60,20']), kind: 'glow', rot: 0, vr: 0, g: -200 });
+    }
+    if (w.confetti) for (let i = 0; i < 28; i++) {
+      this.sink.push({ x, y, vx: rand(-340, 340), vy: rand(-370, -80), life: rand(0.8, 1.4), max: 1.4,
+        size: rand(3, 6), color: pick(['#f43f5e', '#facc15', '#22d3ee', '#a855f7', '#4ade80', '#fb923c']),
+        kind: 'chip', rot: rand(0, TAU), vr: rand(-25, 25), g: 350 });
+    }
+    if (w.rope) this.sink.push({ x, y, vx: 0, vy: 0, life: 0.45, max: 0.45, size: 70, color: '#a5f3fc', kind: 'ring', rot: 0, vr: 0, g: 0 });
+    if (w.notes) {
+      sfx3.note(this.perkCount++ % 10);
+      for (let i = 0; i < 3; i++) this.sink.push({ x: x + rand(-20, 20), y, vx: rand(-60, 60), vy: rand(-160, -80),
+        life: 1.1, max: 1.1, size: 18, color: pick(['#fde68a', '#fca5a5', '#a5f3fc', '#bbf7d0']), kind: 'text',
+        rot: 0, vr: 0, g: 0, text: pick(['♪', '♫', '♬']) });
+    }
+    if (w.id === 'fish') sfx.splash();
+    if (material === 'rock' && w.slow) {
+      const water = w.slowStyle === 'water' || w.id === 'soaker';
+      const honey = w.slowStyle === 'honey';
+      if (this.slowT <= 0) this.addText(w.slowText ?? '❄ BEKU!', x, y + 50,
+        honey ? '#ffd56c' : water ? '#93c5fd' : '#bff1ff', 22);
+      this.applySlow(w.slowTime ?? 1.3, w.slowFactor ?? 0.3, w.slowRgb ?? '170,230,255',
+        honey ? 'honey' : w.slowStyle === 'stun' ? 'stun' : water ? 'water' : 'ice');
+      if (w.id !== 'soaker' && w.id !== 'honey') for (let i = 0; i < 10; i++) {
+        const a = rand(0, TAU), speed = rand(60, 260);
+        this.particles.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, life: rand(0.4, 0.8), max: 0.8,
+          size: rand(2, 4), color: pick(water ? ['#ffffff', '#93c5fd', '#3b82f6'] : ['#ffffff', '#d6f6ff', '#9be7ff']),
+          kind: 'chip', rot: rand(0, TAU), vr: rand(-10, 10), g: water ? 900 : 300 });
+      }
+    }
+  }
+
+  private drawEmbeddedShot(c: CanvasRenderingContext2D, shot: EmbeddedShot, x: number, y: number, surfaceOffset = 0) {
+    c.save();
+    c.translate(x, y);
+    c.rotate(shot.angle - Math.PI / 2);
+    // The rock stores the impact 7px inside its cell; the chest stores it
+    // half a bullet inside the lid. Align honey, peeled fruit, hornet,
+    // energy orbs and celestial star art without moving the hitboxes.
+    const surfaceAligned = shot.w === 'honey' || shot.w === 'banana'
+      || shot.w === 'bee' || shot.w === 'moonbeam' || shot.w === 'plasma' || shot.w === 'blackhole';
+    if (surfaceAligned) c.translate(0, surfaceOffset - (getWeapon(shot.w).stick + EMBED)
+      * (shot.w === 'moonbeam' ? 0.53 : 0.5));
+    if (shot.w === 'snowball') c.translate(0, surfaceOffset);
+    c.scale(shot.scale, shot.scale);
+    const oldBig = gunState.bigShot, oldTint = gunState.tint;
+    gunState.bigShot = shot.big;
+    if (shot.tint) gunState.tint = shot.tint;
+    this.drawProj(c, shot.w, undefined, shot.age, shot.w === 'snowball' || surfaceAligned);
+    gunState.bigShot = oldBig;
+    gunState.tint = oldTint;
+    c.restore();
+  }
+
+  private burstSpecial(x: number, y: number, type: 'rock' | 'diamond' | 'gold', count: number) {
+    const palette = type === 'gold' ? ['#ffe99e', '#ffc83d', '#ffffff']
+      : type === 'diamond' ? ['#a5f3fc', '#ffffff', '#67e8f9'] : ['#aab6c6', '#6a7b91', '#e1ebf7'];
+    for (let i = 0; i < count; i++) {
+      const a = rand(0, TAU), speed = rand(100, 320);
+      this.particles.push({
+        x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed - 80,
+        life: rand(0.35, 0.7), max: 0.7, size: rand(2, 5), color: pick(palette),
+        kind: type === 'rock' ? 'shard' : 'star', rot: rand(0, TAU), vr: rand(-12, 12), g: type === 'rock' ? 1000 : 280,
+      });
+    }
+  }
+
+  private payStageReward() {
+    if (this.stageRewardPaid || this.state !== 'clear' || !isSpecial(this.level.mode)) return;
+    // A chest hit isn't a payout until every coin has bounced and reached the HUD.
+    if (this.level.mode === 'treasure' && this.treasureCoins.length) return;
+    this.stageRewardPaid = true;
+    const earned = this.coins - this.stageStartCoins;
+    if (this.level.mode === 'treasure') {
+      this.addText(`🧰 HARTA +${earned}!`, CX, this.targetY + 185, '#fde68a', 26);
+      this.stateT = 0; // Show the final amount before loading the next level.
+    }
+    // Treasure coins were deposited one by one on arrival. Stage rewards for
+    // stone/bonus (or a game without onTreasureCoin) are still paid here.
+    const unbanked = this.level.mode === 'treasure' && this.events.onTreasureCoin ? 0 : earned;
+    if (this.events.onStageReward) {
+      this.bankedCoins += unbanked;
+      this.events.onStageReward(this.level.mode, this.level.n, unbanked);
+    }
+  }
+
+  private finishSpecialStage() {
+    if (this.state !== 'play' || !isSpecial(this.level.mode)) return;
+    const mode = this.level.mode;
     this.state = 'clear';
     this.stateT = 0;
     this.projs = [];
     this.star = null;
-    const R = this.level.radius;
-    const count = 22;
-    for (let i = 0; i < count; i++) {
-      const a = (i / count) * TAU + rand(-0.2, 0.2);
-      const v = rand(200, 620);
-      const size = rand(9, 22);
-      this.rockFragments.push({
-        x: CX + Math.cos(a) * R * 0.7,
-        y: CY + Math.sin(a) * R * 0.7,
-        vx: Math.cos(a) * v,
-        vy: Math.sin(a) * v - 260,
-        rot: rand(0, TAU),
-        vr: rand(-12, 12),
-        size,
-        seed: rand(0, 10),
-        life: 2.2,
-        max: 2.2,
-      });
+    this.holding = false;
+    this.choosingBuff = false;
+    this.flashWhite = 0.42;
+    this.shake = Math.max(this.shake, 8);
+    if (mode === 'boulder') {
+      this.coins += 3;
+      this.score += 75;
+      this.addText('💎 DIAMOND BERSIH! +3 🪙', CX, this.targetY + 185, '#a5f3fc', 28);
+    } else if (mode === 'bonus') {
+      this.addText(`🪙 BONUS +${this.coins - this.stageStartCoins}!`, CX, this.targetY + 185, '#fde68a', 26);
+    } else if (this.treasureCoins.length) {
+      this.addText('🪙 KOIN BERTEBARAN!', CX, this.targetY + 185, '#fde68a', 26);
     }
-    // debu tebal + percikan
-    for (let i = 0; i < 40; i++) {
-      const a = rand(0, TAU);
-      const v = rand(150, 700);
-      this.particles.push({ x: CX, y: CY, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 200, life: rand(0.7, 1.3), max: 1.3, size: rand(4, 9), color: pick(['#a8a29e', '#78716c', '#d6d3d1', '#57534e', '#e7e5e4']), kind: 'shard', rot: rand(0, TAU), vr: rand(-24, 24), g: 1400 });
+    this.payStageReward();
+    this.sink.light(CX, this.targetY, 250, mode === 'boulder' ? '125,230,255' : '255,213,74', 0.8);
+    this.burstSpecial(CX, this.targetY, mode === 'boulder' ? 'diamond' : 'gold', 38);
+    sfx4.match();
+  }
+
+  private updateTreasureShower(dt: number) {
+    this.coinPulse = Math.max(0, this.coinPulse - dt * 5);
+    if (!this.treasureCoins.length) return;
+    const landed = advanceTreasureCoins(this.treasureCoins, dt, (x, y) => this.burstSpecial(x, y, 'gold', 3));
+    if (landed > 0) {
+      this.coins += landed;
+      this.score += landed * 25;
+      this.coinPulse = 1;
+      this.sink.light(W - 28, 34, 58, '255,215,90', 0.18);
+      this.burstSpecial(W - 28, 34, 'gold', Math.min(7, landed + 2));
+      if (this.time - this.lastCoinSound > 0.08) {
+        sfx.coin();
+        this.lastCoinSound = this.time;
+      }
+      if (this.events.onTreasureCoin) {
+        this.bankedCoins += landed;
+        this.events.onTreasureCoin(landed);
+      }
     }
-    for (let i = 0; i < 22; i++) {
-      const a = rand(0, TAU);
-      this.particles.push({ x: CX + Math.cos(a) * R * 0.5, y: CY + Math.sin(a) * R * 0.5, vx: rand(-120, 120), vy: rand(-140, 20), life: rand(0.9, 1.6), max: 1.6, size: rand(16, 34), color: 'rgba(170,160,145,', kind: 'smoke', rot: 0, vr: 0, g: -30, drag: 2 });
-    }
-    // ledakan kilauan berlian
-    for (let i = 0; i < 20; i++) {
-      const a = rand(0, TAU);
-      const v = rand(200, 520);
-      this.particles.push({ x: CX, y: CY, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.6, 1.1), max: 1.1, size: rand(5, 10), color: pick(['#ffffff', '#e0f2fe', '#7dd3fc', '#fde047']), kind: 'star', rot: 0, vr: 0, g: 0, drag: 1.6 });
-    }
-    this.sink.light(CX, CY, R * 3.6, '125,211,252', 0.9);
-    this.sink.push({ x: CX, y: CY, vx: 0, vy: 0, life: 0.6, max: 0.6, size: R * 3, color: '125,211,252', kind: 'shock', rot: 0, vr: 0, g: 0 });
-    sfx.explosion();
-    sfx4.shatter();
-    this.shake = 22;
-    this.flashWhite = 0.8;
-    this.hitStop = 0.12;
-    this.coins += 3;
-    this.score += 5;
-    this.addText('💎 BATU HANCUR! +3 💰', CX, CY - 20, '#7dd3fc', 30);
+    if (this.state === 'clear' && !this.treasureCoins.length) this.payStageReward();
+  }
+
+  private advanceReload(dt: number) {
+    if (this.reloadT <= 0) return;
+    this.reloadT = Math.max(0, this.reloadT - dt);
+    if (this.reloadT > 0) return;
+    // Special stages also refill their stage allowance; ordinary stages only
+    // reload the snow hopper, never granting extra shots beyond their quota.
+    if (isSpecial(this.level.mode) && this.ammoLeft === 0) this.ammoLeft = this.level.ammo * this.maxAmmoMult;
+    if (this.weapon.id === 'snowball') this.snowLoaded = Math.min(SNOWBALL_MAG_SIZE, this.ammoLeft);
   }
 
   private update(dt: number) {
+    // The stage clock and gun must stop while the player chooses a star upgrade.
+    if (this.choosingBuff) return;
+    this.rock?.update(dt);
+    this.chest?.update(dt);
+    this.diamondPing = Math.max(0, this.diamondPing - dt * 3);
+    if (isSpecial(this.level.mode) && this.state === 'play') {
+      this.stageTime = Math.max(0, this.stageTime - dt);
+      if (this.stageTime === 0) {
+        if (this.level.mode === 'boulder') {
+          this.state = 'fail';
+          this.stateT = 0;
+          this.projs = [];
+          this.holding = false;
+          this.addText('WAKTU HABIS!', CX, this.targetY + 185, '#fb7185', 26);
+          sfx.clang();
+        } else this.finishSpecialStage();
+      }
+    }
+    this.advanceReload(dt);
     this.timeScale += (1 - this.timeScale) * Math.min(1, dt * 2.5);
     let s = dt * this.timeScale;
     if (this.hitStop > 0) {
@@ -1624,15 +2075,17 @@ export class Game {
         this.chargeStage = stage;
         if (stage === 1) sfx4.chargeStart();
         else sfx4.chargeFull();
-        this.sink.push({ x: CX, y: GUN_Y + 2, vx: 0, vy: 0, life: 0.3, max: 0.3, size: stage === 2 ? 90 : 50, color: stage === 2 ? '254,240,138' : '125,211,252', kind: 'shock', rot: 0, vr: 0, g: 0 });
+        for (const ox of this.gunOffsets) this.sink.push({ x: CX + ox, y: GUN_Y + 2, vx: 0, vy: 0, life: 0.3, max: 0.3, size: stage === 2 ? 90 : 50, color: stage === 2 ? '254,240,138' : '125,211,252', kind: 'shock', rot: 0, vr: 0, g: 0 });
       }
-      if (Math.random() < 0.6) {
-        const a = rand(0, TAU);
-        const d = rand(40, 70);
-        this.sink.push({ x: CX + Math.cos(a) * d, y: GUN_Y + 2 + Math.sin(a) * d, vx: -Math.cos(a) * d * 4, vy: -Math.sin(a) * d * 4, life: 0.25, max: 0.25, size: rand(2, 4), color: stage === 2 ? '254,240,138' : '125,211,252', kind: 'glow', rot: 0, vr: 0, g: 0 });
+      for (const ox of this.gunOffsets) {
+        if (Math.random() < 0.6) {
+          const a = rand(0, TAU);
+          const d = rand(40, 70);
+          this.sink.push({ x: CX + ox + Math.cos(a) * d, y: GUN_Y + 2 + Math.sin(a) * d, vx: -Math.cos(a) * d * 4, vy: -Math.sin(a) * d * 4, life: 0.25, max: 0.25, size: rand(2, 4), color: stage === 2 ? '254,240,138' : '125,211,252', kind: 'glow', rot: 0, vr: 0, g: 0 });
+        }
+        this.sink.light(CX + ox, GUN_Y, 60 + Math.min(1, this.chargeT) * 120, stage === 2 ? '254,240,138' : '125,211,252', 0.05);
       }
       if (stage === 2 && Math.random() < 0.15) sfx4.chargeHum(2);
-      this.sink.light(CX, GUN_Y, 60 + Math.min(1, this.chargeT) * 120, stage === 2 ? '254,240,138' : '125,211,252', 0.05);
     }
     gunState.charge = this.charging ? Math.min(1, this.chargeT) : 0;
     this.tintA = Math.max(0, this.tintA - dt * 1.6);
@@ -1646,10 +2099,14 @@ export class Game {
       if (this.lights[i].life <= 0) this.lights.splice(i, 1);
     }
     this.time += s;
+    // Real-time, staggered coin arrivals continue during the treasure-clear
+    // celebration, but freeze while the star's choice modal is open.
+    this.updateTreasureShower(dt);
 
     if (this.state !== 'clear') {
       this.levelTime += s;
-      const v = this.state === 'idle' ? 1.1 : PATTERNS[this.level.pattern](this.levelTime, this.level.base, this.level.dir);
+      const v = this.state === 'idle' ? 1.1 : this.level.mode === 'bonus' ? this.level.dir * 1.05
+        : this.level.mode === 'treasure' ? 0 : PATTERNS[this.level.pattern](this.levelTime, this.level.base, this.level.dir);
       const f0 = this.slowF;
       const slowF = this.slowT > 0 ? f0 + (1 - f0) * Math.max(0, (0.3 - this.slowT) / 0.3) : 1;
       const aimF = this.aiming ? 0.28 : 1;
@@ -1714,30 +2171,35 @@ export class Game {
       if (this.portals[i].life <= 0) this.portals.splice(i, 1);
     }
 
-    // ═══════ SUDUT SENAPAN mengikuti target bintang ═══════
-    const gd = this.gunAngleTarget - this.gunAngle;
-    this.gunAngle += gd * Math.min(1, dt * 10);
-
-    // ═══════ SPAWN BINTANG POWER-UP ═══════
+    // Star flies across the open lane between the target and the upright gun.
     if (this.state === 'play' && !this.star) {
       this.starTimer -= dt;
       if (this.starTimer <= 0) {
         this.starTimer = 14 + Math.random() * 8;
-        this.star = {
-          x: rand(90, W - 90),
-          y: rand(120, CY + 40),
-          r: 26,
-          life: 9,
-          max: 9,
-        };
-        sfx2.scope();
-        this.addText('★ TEMBAK BINTANG!', CX, CY + 130, '#fde047', 20);
+        this.spawnFloatingStar();
       }
     }
     if (this.star) {
+      this.star.age += dt;
       this.star.life -= dt;
-      this.star.y += Math.sin(this.time * 2) * 12 * dt;
-      if (this.star.life <= 0) this.star = null;
+      this.star.x += this.star.vx * dt;
+      this.star.y = this.star.baseY + Math.sin(this.star.age * 3.2) * 6;
+      if (this.star.life <= 0 || this.star.x < -55 || this.star.x > W + 55) this.star = null;
+    }
+
+    // Rounds retain the local position/orientation of their exact rock cell;
+    // detached cells and every round trapped in them share one rigid transform.
+    for (const shot of this.rockBullets) shot.age += s;
+    for (const shot of this.chestBullets) shot.age += s;
+    for (let i = this.fallenCells.length - 1; i >= 0; i--) {
+      const f = this.fallenCells[i];
+      f.vy += 1500 * s;
+      f.x += f.vx * s;
+      f.y += f.vy * s;
+      f.rot += f.vr * s;
+      f.life -= dt;
+      for (const shot of f.bullets) shot.age += s;
+      if (f.life <= 0 || f.y > H + 90) this.fallenCells.splice(i, 1);
     }
 
     // ═══════ FRAGMEN BATU ═══════
@@ -1826,7 +2288,7 @@ export class Game {
         this.shake = Math.max(this.shake, 7);
         this.score += 2;
         // AMMO KEMBALI 1 KALO BERHASIL HANCURKAN SERANGAN BOS!
-        this.ammoLeft = Math.min(this.level.ammo, this.ammoLeft + 1);
+        this.ammoLeft = Math.min(this.level.ammo * this.maxAmmoMult, this.ammoLeft + 1);
         this.addText('💥 TANGKIS! +1 AMMO +2', bp.x, bp.y - 15, '#38bdf8', 22);
         this.sink.push({ x: bp.x, y: bp.y, vx: 0, vy: 0, life: 0.4, max: 0.4, size: 90, color: '#38bdf8', kind: 'shock', rot: 0, vr: 0, g: 0 });
         for (let k = 0; k < 12; k++) {
@@ -1838,12 +2300,12 @@ export class Game {
       }
 
       // 2. Boss projectile damage: only knocks player weapon or grazes (no unfair sudden deaths!)
-      if (bp.y >= GUN_Y - 15 && bp.y <= GUN_Y + 70 && Math.abs(bp.x - CX) < 26) {
+      if (bp.y >= GUN_Y - 15 && bp.y <= GUN_Y + 70 && this.gunOffsets.some(ox => Math.abs(bp.x - (CX + ox)) < 26)) {
         this.bossProjs.splice(i, 1);
         sfx.clang();
         this.shake = Math.max(this.shake, 8);
         this.recoil = 1.6;
-        this.addText('SERANGAN BOS!', CX, GUN_Y - 20, '#ef4444', 20);
+        this.addText('SERANGAN BOS!', bp.x, GUN_Y - 20, '#ef4444', 20);
         this.sink.push({ x: bp.x, y: bp.y, vx: 0, vy: 0, life: 0.35, max: 0.35, size: 50, color: '#ef4444', kind: 'shock', rot: 0, vr: 0, g: 0 });
         break;
       }
@@ -1868,8 +2330,35 @@ export class Game {
     }
     const tw = this.weapon;
     for (const p of this.projs) {
+      // The portal is a self-contained vortex. Even isolated glow motes in a
+      // straight line make it read as a round head with a tadpole's tail.
+      if (tw.id === 'portal') continue;
       const px = p.x + rand(-4, 4);
       const py = p.y + rand(20, 46);
+      if (tw.id === 'snowball') {
+        for (let k = 0; k < 6; k++) {
+          this.sink.push({ x: p.x + rand(-16, 16), y: p.y + rand(29, 69),
+            vx: rand(-60, 60), vy: rand(25, 90), life: rand(0.25, 0.49), max: 0.49,
+            size: rand(1.5, 3.6), color: pick(['#ffffff', '#f8fdff', '#eaf6fb']), kind: 'snowDust',
+            rot: 0, vr: 0, g: 110, drag: 1.4 });
+        }
+        for (let k = 0; k < 2; k++) {
+          this.sink.push({ x: p.x + rand(-15, 15), y: p.y + rand(36, 64),
+            vx: rand(-50, 50), vy: rand(20, 85), life: rand(0.3, 0.52), max: 0.52,
+            size: rand(2.2, 4.2), color: '#ffffff', kind: 'snowflake',
+            rot: rand(0, TAU), vr: rand(-5, 5), g: 75, drag: 1.7 });
+        }
+        continue;
+      }
+      if (tw.id === 'soaker') {
+        for (let k = 0; k < 3; k++) {
+          this.sink.push({ x: p.x + rand(-11, 11), y: p.y + rand(23, 67), vx: rand(-95, 95),
+            vy: rand(45, 155), life: rand(0.23, 0.45), max: 0.45, size: rand(1.6, 4.1),
+            color: pick(['#ddfaff', '#7dd3fc', '#bae6fd']), kind: 'waterDrop',
+            rot: 0, vr: 0, g: 800, drag: 0.8 });
+        }
+        continue;
+      }
       switch (tw.trailFx) {
         case 'glow':
         case 'void':
@@ -1952,6 +2441,11 @@ export class Game {
         this.projs.splice(i, 1);
         this.stickAt(r.local ?? norm(Math.PI / 2 - this.rot), p);
         if ((this.state as State) === 'clear') break;
+      } else if (r.res === 'hit') {
+        // Consume one projectile per stone/star hit; a star pauses further shots.
+        const idx = this.projs.indexOf(p);
+        if (idx >= 0) this.projs.splice(idx, 1);
+        if (this.choosingBuff || (this.state as State) === 'clear') break;
       } else if (r.res === 'fail') {
         if (this.trySave(p, !!r.spike)) {
           const idx = this.projs.indexOf(p);
@@ -1962,6 +2456,8 @@ export class Game {
         this.failProjAngle = 0;
         this.fail(p);
         break;
+      } else if (p.y < -80 || p.x < -80 || p.x > W + 80) {
+        this.projs.splice(i, 1);
       }
     }
 
@@ -1983,7 +2479,8 @@ export class Game {
       p.y += p.vy * s;
       p.rot += p.vr * s;
       if (p.kind === 'text') p.vy *= Math.exp(-s * 3);
-      if ((p.kind === 'chip' || p.kind === 'shard' || p.kind === 'drop') && p.y > H - 14 && p.vy > 0) {
+      if ((p.kind === 'chip' || p.kind === 'shard' || p.kind === 'drop' || p.kind === 'snowChunk' || p.kind === 'waterDrop')
+        && p.y > H - 14 && p.vy > 0) {
         p.y = H - 14;
         p.vy *= -0.35;
         p.vx *= 0.7;
@@ -2021,9 +2518,10 @@ export class Game {
 
     if (this.state === 'clear') {
       this.stateT += dt;
-      if (this.stateT > 1.3) {
+      if (this.stateT > 1.3 && (this.level.mode !== 'treasure' || this.stageRewardPaid)) {
         if (this.level.boss && this.events.onBossDefeated) {
           this.state = 'idle';
+          this.bankedCoins += 5; // the boss reward was already included in this.coins
           this.events.onBossDefeated(this.level.name, this.level.n, 5);
         } else {
           this.loadLevel(this.level.n + 1);
@@ -2033,7 +2531,7 @@ export class Game {
       this.stateT += dt;
       if (this.stateT > 1.25) {
         this.state = 'over';
-        this.events.onGameOver(this.score, this.level.n, this.coins);
+        this.events.onGameOver(this.score, this.level.n, Math.max(0, this.coins - this.bankedCoins), this.coins);
       }
     }
   }
@@ -2062,38 +2560,9 @@ export class Game {
     c.stroke();
   }
 
-  private drawCoin(c: CanvasRenderingContext2D, t: number) {
-    const sx = Math.abs(Math.cos(t * 3)) * 0.6 + 0.4;
-    c.save();
-    // 1.4X LEBIH BESAR DI PAPAN TEMPAT NEMBAKNYA!
-    c.scale(sx * 1.4, 1.4);
-    const g = c.createRadialGradient(-4, -4, 1, 0, 0, 14);
-    g.addColorStop(0, '#fffbeb');
-    g.addColorStop(0.35, '#fde047');
-    g.addColorStop(0.7, '#eab308');
-    g.addColorStop(1, '#a16207');
-    c.beginPath();
-    c.arc(0, 0, 13.5, 0, TAU);
-    c.fillStyle = g;
-    c.shadowColor = '#facc15';
-    c.shadowBlur = 12;
-    c.fill();
-    c.shadowBlur = 0;
-    c.strokeStyle = '#713f12';
-    c.lineWidth = 1.6;
-    c.stroke();
-    // Inner bevel circle
-    c.beginPath();
-    c.arc(0, 0, 9.5, 0, TAU);
-    c.strokeStyle = '#fde68a';
-    c.lineWidth = 1.2;
-    c.stroke();
-    c.fillStyle = '#713f12';
-    c.font = 'bold 14px sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText('$', 0, 1);
-    c.restore();
+  private drawCoin(c: CanvasRenderingContext2D, t: number, glowing = true) {
+    // HUD and classic pickups share Diamond Breaker's reflective dollar coin.
+    drawBreakerCoin(c, 0, 0, CLASSIC_COIN_RADIUS, t, 0, Math.abs(Math.cos(t * 3)) * 0.6 + 0.4, glowing);
   }
 
   // Berlian / Diamond tertancap ke papan arena:
@@ -2104,8 +2573,9 @@ export class Game {
     const shake = hits === 1 ? Math.sin(t * 34) * 1.6 : 0;
     c.save();
     c.translate(shake, 0);
+    c.scale(CLASSIC_DIAMOND_SCALE, CLASSIC_DIAMOND_SCALE);
 
-    const D_SIZE = 14; // Seukuran koin
+    const D_SIZE = 14; // Entire normal-stage diamond, including facets and badge, is 20% larger.
 
     // Pendaran kilau kristal (glow aura)
     c.shadowColor = hits === 1 ? '#fb7185' : '#38bdf8';
@@ -2214,9 +2684,9 @@ export class Game {
     c.restore();
   }
 
-  private drawProj(c: CanvasRenderingContext2D, kind: ProjKind, len?: number, age = 99) {
+  private drawProj(c: CanvasRenderingContext2D, kind: ProjKind, len?: number, age = 99, embedded = false) {
     const l = len ?? (kind === 'old' ? BLEN : getWeapon(kind).stick + EMBED);
-    drawProjectile(c, kind, l, this.time, age);
+    drawProjectile(c, kind, l, this.time, age, embedded);
   }
 
   private drawGunNow(c: CanvasRenderingContext2D) {
@@ -2224,98 +2694,157 @@ export class Game {
     const y0 = GUN_Y + ry;
     const R = this.level.radius;
 
-    // laser sight
+    // Two upright barrels get two straight sights; a star never steers either.
     if (this.state === 'play' || this.state === 'intro') {
-      const lg = c.createLinearGradient(0, y0, 0, CY);
+      const lg = c.createLinearGradient(0, y0, 0, this.targetY);
       lg.addColorStop(0, this.weapon.color + '66');
       lg.addColorStop(1, this.weapon.color + '00');
       c.fillStyle = lg;
-      c.fillRect(CX - 0.75, CY + R, 1.5, y0 - CY - R);
+      for (const ox of this.gunOffsets) {
+        c.fillRect(CX + ox - 0.75, this.targetY + R, 1.5, y0 - this.targetY - R);
+      }
     }
 
     // laser beams
     for (const b of this.beams) {
       const a = b.life / b.max;
+      if ((this.weapon.id === 'laser' || this.weapon.id === 'moonbeam')
+        && getGunEffect(this.weapon.id) === 'original') {
+        drawClassicBeam(c, b.x, b.y, y0, a, b.rgb);
+        continue;
+      }
+      if (this.weapon.id === 'laser') {
+        drawLaserBeam(c, b.x, b.y, y0, a, this.time);
+        continue;
+      }
       c.save();
       c.globalCompositeOperation = 'lighter';
       const wdt = 14 * a + 2;
-      const bg = c.createLinearGradient(CX - wdt, 0, CX + wdt, 0);
+      const bg = c.createLinearGradient(b.x - wdt, 0, b.x + wdt, 0);
       bg.addColorStop(0, `rgba(${b.rgb},0)`);
       bg.addColorStop(0.5, `rgba(${b.rgb},${a * 0.9})`);
       bg.addColorStop(1, `rgba(${b.rgb},0)`);
       c.fillStyle = bg;
-      c.fillRect(CX - wdt, b.y, wdt * 2, y0 - b.y);
-      c.fillStyle = `rgba(255,255,255,${a})`;
-      c.fillRect(CX - 1.5 * a - 0.5, b.y, 3 * a + 1, y0 - b.y);
-      const hg = c.createRadialGradient(CX, b.y, 1, CX, b.y, 30);
+      c.fillRect(b.x - wdt, b.y, wdt * 2, y0 - b.y);
+      if (this.weapon.id === 'moonbeam') {
+        // Instant beam mechanics stay intact, but the beam reads as a stream
+        // of bright stars released from the wand rather than a laser rifle.
+        c.shadowColor = '#d9c5ff'; c.shadowBlur = 12;
+        c.strokeStyle = `rgba(255,244,218,${a * 0.75})`;
+        c.lineWidth = 2.5 * a; c.lineCap = 'round';
+        c.beginPath(); c.moveTo(b.x, b.y);
+        for (let i = 0; i < 6; i++) {
+          const yy = b.y + (y0 - b.y) * ((i + 1) / 6);
+          c.lineTo(b.x + Math.sin(i * 2.4 + this.time * 8) * 6, yy);
+        }
+        c.stroke(); c.shadowBlur = 0;
+        for (let i = 0; i < 8; i++) {
+          const yy = b.y + (y0 - b.y) * ((i + 0.5) / 8);
+          const xx = b.x + Math.sin(i * 2.8 + this.time * 8) * 7;
+          const r = (i % 3 === 0 ? 8 : 5) * a;
+          c.fillStyle = i % 3 === 0 ? '#fff2c5' : '#f7eeff';
+          c.beginPath();
+          for (let n = 0; n < 12; n++) {
+            const theta = n * TAU / 12 - Math.PI / 2;
+            const rad = n % 2 ? r * 0.4 : r;
+            c.lineTo(xx + Math.cos(theta) * rad, yy + Math.sin(theta) * rad);
+          }
+          c.closePath(); c.fill();
+        }
+      } else {
+        c.fillStyle = `rgba(255,255,255,${a})`;
+        c.fillRect(b.x - 1.5 * a - 0.5, b.y, 3 * a + 1, y0 - b.y);
+      }
+      const hg = c.createRadialGradient(b.x, b.y, 1, b.x, b.y, 30);
       hg.addColorStop(0, `rgba(255,255,255,${a})`);
       hg.addColorStop(1, `rgba(${b.rgb},0)`);
       c.fillStyle = hg;
       c.beginPath();
-      c.arc(CX, b.y, 30, 0, TAU);
+      c.arc(b.x, b.y, 30, 0, TAU);
       c.fill();
       c.restore();
     }
 
-    const ready = this.state === 'idle' || (this.cooldown <= 0 && this.ammoLeft > 0) || this.state === 'intro';
+    const ready = this.state === 'idle' || this.state === 'intro'
+      || (this.cooldown <= 0 && this.reloadT === 0 && this.ammoLeft > 0
+        && (this.weapon.id !== 'snowball' || this.snowLoaded > 0));
     gunState.sinceShot = this.state === 'idle' ? 9 : this.rt - this.lastShotRT;
+    gunState.reloadT = this.reloadT;
     const flash = Math.max(0, this.muzzle / 0.07);
 
-    if (this.level.mode === 'double') {
-      // ═══ DOUBLE GUN: 2 senjata sejajar, grip kiri & kanan ═══
-      // Senjata 1 (grip ke kanan - normal)
-      c.save();
-      c.translate(CX - 46, y0);
-      c.rotate(this.gunAngle);
-      drawGun(c, this.weapon.id, 0, 0, this.time, flash, ready);
-      c.restore();
-      // Senjata 2 (grip ke kiri - dicerminkan)
-      c.save();
-      c.translate(CX + 46, y0);
-      c.scale(-1, 1);
-      c.rotate(this.gunAngle);
-      drawGun(c, this.weapon.id, 0, 0, this.time, flash, ready);
-      c.restore();
+    if (this.hasTwinGuns) {
+      // Left gun mirrored and right gun normal: their grips/magazines face OUT,
+      // matching the side-by-side AK-47 silhouette rather than overlapping.
+      for (const ox of this.gunOffsets) {
+        c.save();
+        c.translate(CX + ox, y0);
+        if (ox < 0) c.scale(-1, 1);
+        drawGun(c, this.weapon.id, 0, 0, this.time, flash, ready, this.snowLoaded);
+        c.restore();
+      }
     } else {
       c.save();
       c.translate(CX, y0);
-      c.rotate(this.gunAngle);
-      drawGun(c, this.weapon.id, 0, 0, this.time, flash, ready);
+      drawGun(c, this.weapon.id, 0, 0, this.time, flash, ready, this.snowLoaded);
       c.restore();
     }
 
-    // ═══ ARAH BIDIKAN ke bintang (garis putus-putus) ═══
-    if (this.star) {
-      const dx = this.star.x - CX;
-      const dy = this.star.y - y0;
-      const dist = Math.hypot(dx, dy);
-      c.save();
-      c.setLineDash([6, 8]);
-      c.strokeStyle = `rgba(250,204,21,0.55)`;
-      c.lineWidth = 1.5;
-      c.beginPath();
-      c.moveTo(CX, y0);
-      c.lineTo(this.star.x, this.star.y);
-      c.stroke();
-      c.restore();
-      // panah arah
-      const ux = dx / dist;
-      const uy = dy / dist;
-      c.save();
-      c.translate(CX + ux * dist * 0.45, y0 + uy * dist * 0.45);
-      c.rotate(Math.atan2(uy, ux));
-      c.fillStyle = 'rgba(250,204,21,0.75)';
-      c.beginPath();
-      c.moveTo(10, 0);
-      c.lineTo(-6, 6);
-      c.lineTo(-6, -6);
-      c.closePath();
-      c.fill();
-      c.restore();
-    }
   }
 
+  private forestBackdrop: HTMLCanvasElement | null = null;
+  private forestBackdropKey = '';
+
   private drawForestBackground(c: CanvasRenderingContext2D, pal: (typeof STYLE_COLORS)[Style], R: number) {
+    // Sky, silhouettes and target lighting do not change each frame. Cache
+    // them at retina resolution; keep the drifting fireflies and grass live.
+    const key = `${this.level.style}:${R}:${this.targetY}:${this.dpr}`;
+    if (key !== this.forestBackdropKey || !this.forestBackdrop) {
+      const backdrop = document.createElement('canvas');
+      const density = Math.ceil(this.dpr);
+      backdrop.width = W * density;
+      backdrop.height = H * density;
+      const bg = backdrop.getContext('2d')!;
+      bg.setTransform(density, 0, 0, density, 0, 0);
+      this.paintForestBackdrop(bg, pal, R);
+      this.forestBackdrop = backdrop;
+      this.forestBackdropKey = key;
+    }
+    c.drawImage(this.forestBackdrop, 0, 0, W, H);
+
+    // 5. Kunang-Kunang Hutan Emas Melayang (Glowing Fireflies Sesuai Foto 1!)
+    for (const d of this.dust) {
+      const pulse = 0.4 + 0.6 * Math.sin(this.time * 2.5 + d.x);
+      // Soft glow aura
+      c.fillStyle = `rgba(250, 204, 21, ${0.28 * pulse})`;
+      c.beginPath();
+      c.arc(d.x, d.y, d.s * 2.8, 0, TAU);
+      c.fill();
+      // Bright core
+      c.fillStyle = `rgba(254, 240, 138, ${0.9 * pulse})`;
+      c.beginPath();
+      c.arc(d.x, d.y, d.s * 0.9, 0, TAU);
+      c.fill();
+    }
+
+    // 6. Rerumputan Liar 2D di Bagian Bawah Layar (Bottom Grass Blades Sesuai Foto 1!)
+    c.fillStyle = '#020507';
+    c.beginPath();
+    c.moveTo(0, H);
+    const blades = 28;
+    for (let i = 0; i <= blades; i++) {
+      const bx = (i / blades) * W;
+      const wind = Math.sin(this.time * 2 + i * 0.5) * 4;
+      const hBlade = 22 + (i % 3) * 12 + Math.sin(i * 1.5) * 8;
+      c.lineTo(bx - 4, H);
+      c.quadraticCurveTo(bx + wind * 0.5, H - hBlade * 0.6, bx + wind, H - hBlade);
+      c.quadraticCurveTo(bx + 4 + wind * 0.5, H - hBlade * 0.6, bx + 6, H);
+    }
+    c.lineTo(W, H);
+    c.closePath();
+    c.fill();
+  }
+
+  private paintForestBackdrop(c: CanvasRenderingContext2D, pal: (typeof STYLE_COLORS)[Style], R: number) {
     // 1. Gradasi Langit Hutan 2D (+20% lebih cerah khas Knife Hit)
     const bg = c.createLinearGradient(0, 0, 0, H);
     bg.addColorStop(0, pal.bgTop);
@@ -2377,44 +2906,24 @@ export class Game {
     c.fill();
 
     // 4. Ambient Target Glow (Cahaya lembut di sekitar buah / target)
-    const targetGlow = c.createRadialGradient(CX, CY, 20, CX, CY, R * 2.5);
+    const targetGlow = c.createRadialGradient(CX, this.targetY, 20, CX, this.targetY, R * 2.5);
     targetGlow.addColorStop(0, pal.glow);
     targetGlow.addColorStop(0.6, pal.glow.replace(/[\d.]+\)$/, '0.06)'));
     targetGlow.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = targetGlow;
     c.fillRect(0, 0, W, H);
 
-    // 5. Kunang-Kunang Hutan Emas Melayang (Glowing Fireflies Sesuai Foto 1!)
-    for (const d of this.dust) {
-      const pulse = 0.4 + 0.6 * Math.sin(this.time * 2.5 + d.x);
-      // Soft glow aura
-      c.fillStyle = `rgba(250, 204, 21, ${0.28 * pulse})`;
-      c.beginPath();
-      c.arc(d.x, d.y, d.s * 2.8, 0, TAU);
-      c.fill();
-      // Bright core
-      c.fillStyle = `rgba(254, 240, 138, ${0.9 * pulse})`;
-      c.beginPath();
-      c.arc(d.x, d.y, d.s * 0.9, 0, TAU);
-      c.fill();
-    }
+  }
 
-    // 6. Rerumputan Liar 2D di Bagian Bawah Layar (Bottom Grass Blades Sesuai Foto 1!)
-    c.fillStyle = '#020507';
-    c.beginPath();
-    c.moveTo(0, H);
-    const blades = 28;
-    for (let i = 0; i <= blades; i++) {
-      const bx = (i / blades) * W;
-      const wind = Math.sin(this.time * 2 + i * 0.5) * 4;
-      const hBlade = 22 + (i % 3) * 12 + Math.sin(i * 1.5) * 8;
-      c.lineTo(bx - 4, H);
-      c.quadraticCurveTo(bx + wind * 0.5, H - hBlade * 0.6, bx + wind, H - hBlade);
-      c.quadraticCurveTo(bx + 4 + wind * 0.5, H - hBlade * 0.6, bx + 6, H);
+  private drawBonusRing(c: CanvasRenderingContext2D, radius: number) {
+    c.save();
+    c.scale(radius / 196, radius / 196);
+    for (const coin of this.bonusCoins) {
+      if (coin.taken) continue;
+      const x = Math.cos(coin.angle) * coin.radius, y = Math.sin(coin.angle) * coin.radius;
+      drawBonusCoin(c, x, y, 11, this.time, coin.phase, true);
     }
-    c.lineTo(W, H);
-    c.closePath();
-    c.fill();
+    c.restore();
   }
 
   private render() {
@@ -2424,15 +2933,26 @@ export class Game {
     const pal = STYLE_COLORS[this.level.style];
     const R = this.level.radius;
 
-    // Latar Belakang Hutan 2D Simple & Elegan Sesuai Foto Referensi 1
+    // Keep Gun Hit's forest, but give each Diamond Breaker round its own lighting.
     this.drawForestBackground(c, pal, R);
+    if (isSpecial(this.level.mode)) {
+      const tint = c.createLinearGradient(0, 0, 0, H);
+      const gold = this.level.mode === 'treasure' || this.level.mode === 'bonus';
+      tint.addColorStop(0, gold ? 'rgba(54,24,56,0.62)' : 'rgba(9,32,65,0.58)');
+      tint.addColorStop(1, gold ? 'rgba(44,23,10,0.36)' : 'rgba(10,34,54,0.28)');
+      c.fillStyle = tint; c.fillRect(0, 0, W, H);
+      const halo = c.createRadialGradient(CX, this.targetY, 24, CX, this.targetY, 245);
+      halo.addColorStop(0, gold ? 'rgba(251,191,36,0.26)' : 'rgba(103,232,249,0.24)');
+      halo.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = halo; c.fillRect(0, 0, W, H);
+    }
 
     c.save();
     if (this.shake > 0.1) c.translate(rand(-1, 1) * this.shake, rand(-1, 1) * this.shake);
     c.translate(0, this.camY);
 
-    // target
-    if (this.state !== 'clear' && this.state !== 'idle') {
+    // Keep the clean diamond / chest visible through the special-stage celebration.
+    if (this.state !== 'idle' && (this.state !== 'clear' || isSpecial(this.level.mode))) {
       let sc = 1;
       if (this.state === 'intro') {
         const t = Math.min(1, this.introT / 0.5);
@@ -2441,14 +2961,18 @@ export class Game {
         sc = 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
       }
       c.save();
-      c.translate(CX, CY - this.bump * 9);
+      c.translate(CX, this.targetY - this.bump * 9);
       c.scale(sc, sc);
-      // shadow
-      c.beginPath();
-      c.arc(0, 10, R + 6, 0, TAU);
-      c.fillStyle = 'rgba(0,0,0,0.35)';
-      c.fill();
-      c.rotate(this.rot);
+      // Ordinary round targets keep their drop shadow. The special rock and
+      // treasure chest must NOT sit on a large black disk as chunks fall away.
+      if (!isSpecial(this.level.mode)) {
+        c.beginPath();
+        c.arc(0, 10, R + 6, 0, TAU);
+        c.fillStyle = 'rgba(0,0,0,0.35)';
+        c.fill();
+      }
+      if (this.rock) drawRockDiamond(c, R, this.time, this.diamondPing);
+      if (this.level.mode !== 'treasure') c.rotate(this.rot);
       for (const it of this.items) {
         if (it.type === 'bullet' || it.type === 'old') {
           c.save();
@@ -2461,11 +2985,18 @@ export class Game {
           const embedDepth = totalWeaponLen * 0.5;
           const pencilEmbedBonus = it.w === 'pencil' ? Math.sin(it.angle * 13) * 5 : 0;
           const itemR = this.level.boss ? getExactBossRadius(this.level.style as BossType, it.angle, R) : R;
-          c.translate(0, itemR - (embedDepth + pencilEmbedBonus) * sc + sink);
+          const snowball = it.type === 'bullet' && it.w === 'snowball';
+          const portal = it.type === 'bullet' && it.w === 'portal';
+          // Place the snowy hemisphere or portal ring at the hit surface. The
+          // target hides their inner halves without any new portal physics.
+          c.translate(0, snowball ? itemR + sink : portal ? itemR - 11 * sc + sink
+            : itemR - (embedDepth + pencilEmbedBonus) * sc + sink);
           c.scale(sc, sc);
           gunState.bigShot = it.big ?? 0;
           if (it.tint) gunState.tint = it.tint;
-          this.drawProj(c, it.type === 'old' ? 'old' : it.w || 'pistol', len, it.age);
+          this.drawProj(c, it.type === 'old' ? 'old' : it.w || 'pistol', len, it.age,
+            snowball || it.w === 'honey' || it.w === 'banana'
+              || it.w === 'bee' || it.w === 'moonbeam' || it.w === 'plasma' || it.w === 'blackhole');
           gunState.bigShot = 0;
           c.restore();
         } else if (it.type === 'spike') {
@@ -2480,12 +3011,23 @@ export class Game {
         }
       }
       const facePad = this.level.boss ? 40 : 4;
-      if (this.level.mode === 'boulder' && this.level.hp > 0) {
-        drawBoulder(c, R, this.level.hp / this.level.maxHp, this.time);
+      if (this.rock) {
+        this.rock.draw(c, R, this.time);
+        const sc = R / 196;
+        for (const shot of this.rockBullets) this.drawEmbeddedShot(c, shot, shot.x * sc, shot.y * sc, 7);
+        if (this.level.mode === 'bonus') this.drawBonusRing(c, R);
+      } else if (this.chest) {
+        c.save();
+        c.translate(0, 15);
+        this.chest.draw(c, this.time, cc => {
+          for (const shot of this.chestBullets) this.drawEmbeddedShot(cc, shot, shot.x, shot.y,
+            (getWeapon(shot.w).stick + EMBED) * 0.5);
+        });
+        c.restore();
       } else {
         c.drawImage(this.face, -R - facePad, -R - facePad, (R + facePad) * 2, (R + facePad) * 2);
       }
-      if (this.hitFlash > 0) {
+      if (this.hitFlash > 0 && !isSpecial(this.level.mode)) {
         c.beginPath();
         c.arc(0, 0, R, 0, TAU);
         c.fillStyle = `rgba(255,255,255,${this.hitFlash * 0.28})`;
@@ -2493,84 +3035,86 @@ export class Game {
       }
       if (this.slowT > 0) {
         const fa = Math.min(1, this.slowT / 0.3);
-        c.beginPath();
-        c.arc(0, 0, R, 0, TAU);
-        c.fillStyle = `rgba(${this.slowRgb},${0.28 * fa})`;
-        c.fill();
-        c.strokeStyle = `rgba(${this.slowRgb},${0.9 * fa})`;
-        c.lineWidth = 4;
-        c.stroke();
-        c.strokeStyle = `rgba(255,255,255,${0.5 * fa})`;
-        c.lineWidth = 1.2;
-        if (this.slowKind === 'ice') {
-          for (let i = 0; i < 8; i++) {
-            const a = (i / 8) * TAU;
-            c.beginPath();
-            c.moveTo(Math.cos(a) * R * 0.3, Math.sin(a) * R * 0.3);
-            c.lineTo(Math.cos(a + 0.15) * R * 0.95, Math.sin(a + 0.15) * R * 0.95);
-            c.stroke();
-          }
-        } else if (this.slowKind === 'stun') {
-          c.save();
-          c.rotate(-this.rot);
-          for (let i = 0; i < 5; i++) {
-            const a = this.time * 4 + (i / 5) * TAU;
-            const sx = Math.cos(a) * R * 0.75;
-            const sy = -R - 18 + Math.sin(a) * 10;
-            c.save();
-            c.translate(sx, sy);
-            c.rotate(this.time * 6 + i);
-            c.globalAlpha = fa;
-            c.fillStyle = i % 2 ? '#fde047' : '#ffffff';
-            c.beginPath();
-            for (let k = 0; k < 10; k++) {
-              const rr2 = k % 2 === 0 ? 7 : 3;
-              const aa = (k / 10) * TAU - Math.PI / 2;
-              c.lineTo(Math.cos(aa) * rr2, Math.sin(aa) * rr2);
+        if (this.slowKind === 'water') {
+          drawWetSurface(c, R, this.time, fa);
+        } else {
+          c.beginPath();
+          c.arc(0, 0, R, 0, TAU);
+          c.fillStyle = `rgba(${this.slowRgb},${(this.slowKind === 'honey' ? 0.10 : 0.28) * fa})`;
+          c.fill();
+          c.strokeStyle = `rgba(${this.slowRgb},${(this.slowKind === 'honey' ? 0.48 : 0.9) * fa})`;
+          c.lineWidth = 4;
+          c.stroke();
+          c.strokeStyle = `rgba(255,255,255,${0.5 * fa})`;
+          c.lineWidth = 1.2;
+          if (this.slowKind === 'honey') {
+            // The honey film clings to the turning target instead of becoming
+            // the Soaker's blue wet sheen or a field of icy glass cracks.
+            c.strokeStyle = `rgba(255,232,143,${0.5 * fa})`;
+            c.lineWidth = 2.4; c.lineCap = 'round';
+            c.beginPath(); c.arc(0, 0, R - 6, 0.2, 1.85); c.stroke();
+          } else if (this.slowKind === 'ice') {
+            for (let i = 0; i < 8; i++) {
+              const a = (i / 8) * TAU;
+              c.beginPath();
+              c.moveTo(Math.cos(a) * R * 0.3, Math.sin(a) * R * 0.3);
+              c.lineTo(Math.cos(a + 0.15) * R * 0.95, Math.sin(a + 0.15) * R * 0.95);
+              c.stroke();
             }
-            c.closePath();
-            c.fill();
+          } else if (this.slowKind === 'stun') {
+            c.save();
+            c.rotate(-this.rot);
+            for (let i = 0; i < 5; i++) {
+              const a = this.time * 4 + (i / 5) * TAU;
+              const sx = Math.cos(a) * R * 0.75;
+              const sy = -R - 18 + Math.sin(a) * 10;
+              c.save();
+              c.translate(sx, sy);
+              c.rotate(this.time * 6 + i);
+              c.globalAlpha = fa;
+              c.fillStyle = i % 2 ? '#fde047' : '#ffffff';
+              c.beginPath();
+              for (let k = 0; k < 10; k++) {
+                const rr2 = k % 2 === 0 ? 7 : 3;
+                const aa = (k / 10) * TAU - Math.PI / 2;
+                c.lineTo(Math.cos(aa) * rr2, Math.sin(aa) * rr2);
+              }
+              c.closePath();
+              c.fill();
+              c.restore();
+            }
+            c.strokeStyle = `rgba(255,255,255,${0.6 * fa})`;
+            c.lineWidth = 2;
+            c.beginPath();
+            for (let k = 0; k < 40; k++) {
+              const a = this.time * 6 + k * 0.4;
+              const rr2 = 4 + k * 1.2;
+              c.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2);
+            }
+            c.stroke();
+            c.restore();
+          } else {
+            c.save();
+            c.rotate(-this.rot);
+            c.strokeStyle = `rgba(254,240,138,${0.9 * fa})`;
+            c.lineWidth = 2;
+            for (let i = 0; i < 12; i++) {
+              const a = (i / 12) * TAU;
+              c.beginPath();
+              c.moveTo(Math.cos(a) * (R - 12), Math.sin(a) * (R - 12));
+              c.lineTo(Math.cos(a) * (R - 3), Math.sin(a) * (R - 3));
+              c.stroke();
+            }
+            c.lineWidth = 4;
+            c.lineCap = 'round';
+            c.beginPath();
+            c.moveTo(0, 0);
+            c.lineTo(0, -R * 0.6);
+            c.moveTo(0, 0);
+            c.lineTo(R * 0.4, 0);
+            c.stroke();
             c.restore();
           }
-          c.strokeStyle = `rgba(255,255,255,${0.6 * fa})`;
-          c.lineWidth = 2;
-          c.beginPath();
-          for (let k = 0; k < 40; k++) {
-            const a = this.time * 6 + k * 0.4;
-            const rr2 = 4 + k * 1.2;
-            c.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2);
-          }
-          c.stroke();
-          c.restore();
-        } else if (this.slowKind === 'water') {
-          c.fillStyle = `rgba(147,197,253,${0.7 * fa})`;
-          for (let i = 0; i < 10; i++) {
-            const a = (i / 10) * TAU;
-            c.beginPath();
-            c.ellipse(Math.cos(a) * R * 0.7, Math.sin(a) * R * 0.7, 3, 5, a, 0, TAU);
-            c.fill();
-          }
-        } else {
-          c.save();
-          c.rotate(-this.rot);
-          c.strokeStyle = `rgba(254,240,138,${0.9 * fa})`;
-          c.lineWidth = 2;
-          for (let i = 0; i < 12; i++) {
-            const a = (i / 12) * TAU;
-            c.beginPath();
-            c.moveTo(Math.cos(a) * (R - 12), Math.sin(a) * (R - 12));
-            c.lineTo(Math.cos(a) * (R - 3), Math.sin(a) * (R - 3));
-            c.stroke();
-          }
-          c.lineWidth = 4;
-          c.lineCap = 'round';
-          c.beginPath();
-          c.moveTo(0, 0);
-          c.lineTo(0, -R * 0.6);
-          c.moveTo(0, 0);
-          c.lineTo(R * 0.4, 0);
-          c.stroke();
-          c.restore();
         }
       }
       if (this.burnT > 0) {
@@ -2613,6 +3157,24 @@ export class Game {
       c.drawImage(this.face, -R - fragPad, -R - fragPad, (R + fragPad) * 2, (R + fragPad) * 2);
       c.restore();
     }
+    // Real, textured chunks keep their embedded rounds as they tumble away.
+    for (const f of this.fallenCells) {
+      c.save();
+      c.globalAlpha = Math.min(1, f.life * 3);
+      c.translate(f.x, f.y);
+      c.rotate(f.rot);
+      c.shadowColor = 'rgba(0,0,0,0.38)';
+      c.shadowBlur = 5;
+      c.shadowOffsetY = 3;
+      this.rock?.drawFallenCell(c, f.id, R);
+      c.shadowBlur = 0;
+      c.shadowOffsetY = 0;
+      const sc = R / 196;
+      for (const shot of f.bullets) {
+        this.drawEmbeddedShot(c, shot, (shot.x - f.cx) * sc, (shot.y - f.cy) * sc, 7);
+      }
+      c.restore();
+    }
     // ═══ FRAGMEN BATU (boulder shatter) ═══
     for (const f of this.rockFragments) {
       const a = Math.max(0, Math.min(1, f.life / 0.6));
@@ -2624,10 +3186,20 @@ export class Game {
       c.restore();
     }
 
-    // ═══ BINTANG POWER-UP ═══
+    // The star travels across the gap with a short glowing trail, not a gun-aim arrow.
     if (this.star) {
       const st = this.star;
-      const blink = st.life < 2 ? (Math.floor(this.time * 8) % 2 ? 0.35 : 1) : 1;
+      const blink = st.life < 0.8 ? (Math.floor(this.time * 8) % 2 ? 0.35 : 1) : 1;
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      for (let i = 1; i <= 3; i++) {
+        c.globalAlpha = blink * (0.52 - i * 0.11);
+        c.fillStyle = '#ffd54a';
+        c.beginPath();
+        c.ellipse(st.x - Math.sign(st.vx) * (st.r + i * 12), st.y + Math.sin(st.age * 4 - i) * 5, 6 - i, 4 - i * 0.5, 0, 0, TAU);
+        c.fill();
+      }
+      c.restore();
       c.save();
       c.globalAlpha = blink;
       drawStar(c, st.x, st.y, st.r, this.time, '250,204,21');
@@ -2657,8 +3229,8 @@ export class Game {
         c.strokeStyle = 'rgba(254,243,199,0.9)';
         c.lineWidth = 1.2;
         c.beginPath();
-        c.moveTo(CX - 14, GUN_Y + 198 + this.recoil * 22);
-        c.quadraticCurveTo(CX + 10, (p.y + GUN_Y) / 2 + 30, p.x, p.y + 40);
+        c.moveTo((p.originX ?? CX) - 14, GUN_Y + 198 + this.recoil * 22);
+        c.quadraticCurveTo((p.originX ?? CX) + 10, (p.y + GUN_Y) / 2 + 30, p.x, p.y + 40);
         c.stroke();
       }
       const fxp = FX[wid];
@@ -2675,43 +3247,54 @@ export class Game {
           c.restore();
         }
       }
+      // The moving singularity pulls a helical light tether from its actual
+      // muzzle (both muzzles when doubled). It still collides as a projectile.
+      if (wid === 'blackhole' && getGunEffect(wid) === 'new') {
+        drawVoidTether(c, p.x, p.y, p.originX ?? CX,
+          GUN_Y + this.recoil * 22, this.time);
+      }
       c.save();
       c.translate(p.x, p.y);
       c.rotate(-ang);
-      // tapered motion streak
-      const tl = Math.min(260, 50 + this.weapon.speed * 0.045) * fxp.streak;
-      const tw = Math.max(2, this.weapon.half) * 1.25;
-      c.globalCompositeOperation = 'lighter';
-      const tg = c.createLinearGradient(0, 6, 0, 6 + tl);
-      tg.addColorStop(0, `rgba(${trailCol},0.75)`);
-      tg.addColorStop(0.35, `rgba(${trailCol},0.28)`);
-      tg.addColorStop(1, `rgba(${trailCol},0)`);
-      c.fillStyle = tg;
-      c.beginPath();
-      c.moveTo(-tw, 8);
-      c.lineTo(tw, 8);
-      c.lineTo(0.5, 8 + tl);
-      c.lineTo(-0.5, 8 + tl);
-      c.closePath();
-      c.fill();
-      const cg = c.createLinearGradient(0, 6, 0, 6 + tl * 0.55);
-      cg.addColorStop(0, 'rgba(255,255,255,0.85)');
-      cg.addColorStop(1, 'rgba(255,255,255,0)');
-      c.fillStyle = cg;
-      c.fillRect(-0.9, 8, 1.8, tl * 0.55);
-      const hr = tw * 4.5;
-      const hg = c.createRadialGradient(0, 6, 0, 0, 6, hr);
-      hg.addColorStop(0, `rgba(${trailCol},0.55)`);
-      hg.addColorStop(1, `rgba(${trailCol},0)`);
-      c.fillStyle = hg;
-      c.beginPath();
-      c.arc(0, 6, hr, 0, TAU);
-      c.fill();
-      c.globalCompositeOperation = 'source-over';
+      // Water/snow have material trails, and a portal must remain a compact
+      // ring; the usual white laser wedge made all three look like tadpoles.
+      if (!drawMaterialTrail(c, wid)) {
+        const tl = Math.min(260, 50 + this.weapon.speed * 0.045) * fxp.streak;
+        const tw = Math.max(2, this.weapon.half) * 1.25 * (p.mini ? 0.65 : p.giant ? 1.8 : 1);
+        c.globalCompositeOperation = 'lighter';
+        const tg = c.createLinearGradient(0, 6, 0, 6 + tl);
+        tg.addColorStop(0, `rgba(${trailCol},0.75)`);
+        tg.addColorStop(0.35, `rgba(${trailCol},0.28)`);
+        tg.addColorStop(1, `rgba(${trailCol},0)`);
+        c.fillStyle = tg;
+        c.beginPath();
+        c.moveTo(-tw, 8);
+        c.lineTo(tw, 8);
+        c.lineTo(0.5, 8 + tl);
+        c.lineTo(-0.5, 8 + tl);
+        c.closePath();
+        c.fill();
+        const cg = c.createLinearGradient(0, 6, 0, 6 + tl * 0.55);
+        cg.addColorStop(0, 'rgba(255,255,255,0.85)');
+        cg.addColorStop(1, 'rgba(255,255,255,0)');
+        c.fillStyle = cg;
+        c.fillRect(-0.9, 8, 1.8, tl * 0.55);
+        const hr = tw * 4.5;
+        const hg = c.createRadialGradient(0, 6, 0, 0, 6, hr);
+        hg.addColorStop(0, `rgba(${trailCol},0.55)`);
+        hg.addColorStop(1, `rgba(${trailCol},0)`);
+        c.fillStyle = hg;
+        c.beginPath();
+        c.arc(0, 6, hr, 0, TAU);
+        c.fill();
+        c.globalCompositeOperation = 'source-over';
+      }
       if (wid === 'disc') c.rotate(this.time * 30);
       gunState.bigShot = p.big ?? 0;
       if (p.tint) gunState.tint = p.tint;
       if (p.big) c.scale(1 + p.big * 0.3, 1 + p.big * 0.3);
+      if (p.mini) c.scale(0.65, 0.65);
+      if (p.giant) c.scale(1.8, 1.8);
       if (this.weapon.spinFly) {
         const l2 = this.weapon.stick + EMBED;
         c.translate(0, l2 / 2);
@@ -2821,6 +3404,14 @@ export class Game {
 
     if (this.state !== 'idle') {
       this.drawGunNow(c);
+    }
+
+    // Real gold pieces leap out of the chest, scatter, fall and bounce, then
+    // sweep into the HUD. They render in front of the guns and behind the HUD.
+    for (const coin of this.treasureCoins) {
+      if (coin.delay > 0) continue;
+      const scale = coin.state === 'collect' ? 1 - 0.45 * coin.collectT / coin.collectDuration : 1;
+      drawBonusCoin(c, coin.x, coin.y, coin.r * scale, this.time, coin.phase, true);
     }
 
     // particles
@@ -2981,35 +3572,35 @@ export class Game {
       c.save();
       c.beginPath();
       c.rect(0, 0, W, H);
-      c.arc(CX, CY + R * 0.5, rr2, 0, TAU, true);
+      c.arc(CX, this.targetY + R * 0.5, rr2, 0, TAU, true);
       c.fillStyle = `rgba(0,0,0,${0.75 * k2})`;
       c.fill('evenodd');
       c.strokeStyle = `rgba(0,0,0,${0.9 * k2})`;
       c.lineWidth = 6;
       c.beginPath();
-      c.arc(CX, CY + R * 0.5, rr2, 0, TAU);
+      c.arc(CX, this.targetY + R * 0.5, rr2, 0, TAU);
       c.stroke();
       c.strokeStyle = `rgba(255,40,40,${0.85 * k2})`;
       c.lineWidth = 1.2;
       c.beginPath();
-      c.moveTo(CX, CY + R * 0.5 - rr2);
-      c.lineTo(CX, CY + R * 0.5 + rr2);
-      c.moveTo(CX - rr2, CY + R * 0.5);
-      c.lineTo(CX + rr2, CY + R * 0.5);
+      c.moveTo(CX, this.targetY + R * 0.5 - rr2);
+      c.lineTo(CX, this.targetY + R * 0.5 + rr2);
+      c.moveTo(CX - rr2, this.targetY + R * 0.5);
+      c.lineTo(CX + rr2, this.targetY + R * 0.5);
       c.stroke();
       c.beginPath();
-      c.arc(CX, CY + R, 6, 0, TAU);
+      c.arc(CX, this.targetY + R, 6, 0, TAU);
       c.stroke();
       for (let i = 1; i < 5; i++) {
         c.beginPath();
-        c.moveTo(CX - 5, CY + R * 0.5 + i * 22);
-        c.lineTo(CX + 5, CY + R * 0.5 + i * 22);
+        c.moveTo(CX - 5, this.targetY + R * 0.5 + i * 22);
+        c.lineTo(CX + 5, this.targetY + R * 0.5 + i * 22);
         c.stroke();
       }
       c.fillStyle = `rgba(255,80,80,${k2})`;
       c.font = "13px 'Russo One', sans-serif";
       c.textAlign = 'center';
-      c.fillText('LEPAS UNTUK MENEMBAK', CX, CY + R + rr2 * 0.55);
+      c.fillText('LEPAS UNTUK MENEMBAK', CX, this.targetY + R + rr2 * 0.55);
       c.restore();
     }
     // glitch screen
@@ -3042,12 +3633,12 @@ export class Game {
     c.textBaseline = 'middle';
     // score
     c.textAlign = 'left';
-    c.font = font(40);
+    c.font = font(isSpecial(this.level.mode) ? 29 : 40);
     c.lineWidth = 5;
     c.strokeStyle = 'rgba(0,0,0,0.6)';
-    c.strokeText(String(this.score), 22, 46);
+    c.strokeText(String(this.score), 22, isSpecial(this.level.mode) ? 34 : 46);
     c.fillStyle = '#ffffff';
-    c.fillText(String(this.score), 22, 46);
+    c.fillText(String(this.score), 22, isSpecial(this.level.mode) ? 34 : 46);
 
     // combo badge di HUD kiri atas (di bawah skor angka, tidak menutupi target!)
     const cWindow = this.weapon.comboWindow ?? 0.5;
@@ -3078,61 +3669,61 @@ export class Game {
     // coins
     c.textAlign = 'right';
     c.font = font(22);
-    c.strokeText(String(this.coins), W - 46, 44);
-    c.fillStyle = '#ffd23f';
-    c.fillText(String(this.coins), W - 46, 44);
+    const coinY = isSpecial(this.level.mode) ? 34 : 44;
+    c.strokeText(String(this.coins), W - 46, coinY);
     c.save();
-    c.translate(W - 28, 44);
-    this.drawCoin(c, 0);
+    c.fillStyle = '#ffd23f';
+    c.shadowColor = '#fbbf24';
+    c.shadowBlur = 13 * this.coinPulse;
+    c.fillText(String(this.coins), W - 46, coinY);
+    c.restore();
+    c.save();
+    c.translate(W - 28, coinY);
+    c.scale(1 + this.coinPulse * 0.16, 1 + this.coinPulse * 0.16);
+    this.drawCoin(c, 0, false); // no oversized halo clipped by the HUD edge
     c.restore();
 
-    // level + stage dots
+    // Stage identity and countdown are above the target, never over the diamond.
     const n = this.level.n;
     c.textAlign = 'center';
-    c.font = font(16);
-    c.fillStyle = this.level.boss ? '#ff5050' : 'rgba(255,255,255,0.9)';
-    const modeLabel = this.level.mode === 'boulder' ? `💎 BOULDER • LEVEL ${n}` : this.level.mode === 'double' ? `🔫🔫 DOUBLE GUN • LEVEL ${n}` : this.level.boss ? `BOSS • ${this.level.name}` : `LEVEL ${n}`;
-    c.fillText(modeLabel, CX, 30);
+    const modeLabel = this.level.mode === 'boulder' ? `💎 DIAMOND BREAKER • LV ${n}`
+      : this.level.mode === 'bonus' ? `🪙 BONUS STAGE • LV ${n}`
+      : this.level.mode === 'treasure' ? `🧰 HARTA KARUN • LV ${n}`
+      : this.level.mode === 'double' ? `🔫🔫 DOUBLE GUN • LEVEL ${n}`
+      : this.level.boss ? `BOSS • ${this.level.name}` : `LEVEL ${n}`;
+    c.font = font(isSpecial(this.level.mode) ? 13 : 16);
+    c.fillStyle = this.level.mode === 'treasure' || this.level.mode === 'bonus' ? '#fde68a'
+      : this.level.mode === 'boulder' ? '#a5f3fc' : this.level.boss ? '#ff5050' : '#ffffff';
+    c.fillText(modeLabel, CX, isSpecial(this.level.mode) ? 20 : 30);
 
-    // ═══ HP BAR BOULDER (Tekken-style) ═══
-    if (this.level.mode === 'boulder' && this.level.hp > 0) {
-      const barW = 220;
-      const barH = 13;
-      const barX = CX - barW / 2;
-      const barY = 44;
-      const ratio = Math.max(0, this.level.hp / this.level.maxHp);
+    if (isSpecial(this.level.mode)) {
       c.save();
-      // frame
-      c.beginPath();
-      c.roundRect(barX - 3, barY - 3, barW + 6, barH + 6, 6);
-      c.fillStyle = '#0a0d14';
-      c.fill();
-      c.strokeStyle = '#facc15';
-      c.lineWidth = 1.6;
-      c.stroke();
-      // background
-      c.fillStyle = '#261214';
-      c.fillRect(barX, barY, barW, barH);
-      // hp gradient
-      const hg = c.createLinearGradient(barX, barY, barX + barW, barY);
-      hg.addColorStop(0, '#f43f5e');
-      hg.addColorStop(0.5, '#fb923c');
-      hg.addColorStop(1, '#facc15');
-      c.fillStyle = hg;
-      c.fillRect(barX, barY, barW * ratio, barH);
-      // gloss
-      c.fillStyle = 'rgba(255,255,255,0.35)';
-      c.fillRect(barX, barY, barW * ratio, barH * 0.45);
-      // hp text
-      c.font = 'bold 9px sans-serif';
+      c.fillStyle = 'rgba(5,12,24,0.78)';
+      c.strokeStyle = this.level.mode === 'boulder' ? 'rgba(103,232,249,0.7)' : 'rgba(252,211,77,0.7)';
+      c.lineWidth = 1.5;
+      c.beginPath(); c.roundRect(CX - 62, 39, 124, 31, 12); c.fill(); c.stroke();
+      c.font = font(18);
+      c.fillStyle = this.stageTime < 8 ? '#fb7185' : '#ffffff';
+      c.fillText(`⏱ ${this.stageTime.toFixed(1)}s`, CX, 56);
+      c.font = font(12);
       c.fillStyle = '#ffffff';
-      c.textAlign = 'center';
-      c.fillText(`${Math.ceil(this.level.hp)} / ${this.level.maxHp}`, CX, barY + barH * 0.68);
-      // bintang aktif?
-      if (this.star) {
-        c.font = font(12);
-        c.fillStyle = '#fde047';
-        c.fillText('★ TEMBAK BINTANG UNTUK POWER UP!', CX, barY + 30);
+      if (this.level.mode === 'boulder') {
+        const barX = CX - 105, barY = 102, ratio = 1 - this.level.hp / Math.max(1, this.level.maxHp);
+        c.fillStyle = 'rgba(2,12,25,0.85)';
+        c.beginPath(); c.roundRect(barX - 3, barY - 3, 216, 15, 7); c.fill();
+        c.fillStyle = '#164e63'; c.fillRect(barX, barY, 210, 9);
+        const g = c.createLinearGradient(barX, 0, barX + 210, 0);
+        g.addColorStop(0, '#38bdf8'); g.addColorStop(1, '#a5f3fc');
+        c.fillStyle = g; c.fillRect(barX, barY, 210 * ratio, 9);
+        c.fillStyle = '#d9f9ff';
+        c.fillText(`BATU TERKIKIS ${Math.round(ratio * 100)}%`, CX, 87);
+      } else if (this.level.mode === 'bonus') {
+        c.fillStyle = '#fde68a';
+        c.fillText(`KOIN ${this.bonusCoins.filter(coin => coin.taken).length}/${this.bonusCoins.length} • TEMBAK YANG BERPUTAR`, CX, 88);
+      } else {
+        c.fillStyle = '#fde68a';
+        c.fillText(this.treasureBuff === 'double' ? '2 SENJATA AKTIF'
+          : this.treasureBuff ? `BONUS ${this.treasureBuff.toUpperCase()} AKTIF` : 'TEMBAK PETI SEBANYAK MUNGKIN!', CX, 88);
       }
       c.restore();
     }
@@ -3183,7 +3774,7 @@ export class Game {
       c.textAlign = 'center';
       c.fillText(`${Math.round(this.bossHp)} / ${this.bossMaxHp} HP`, CX, barY + barH * 0.7);
       c.restore();
-    } else {
+    } else if (!isSpecial(this.level.mode)) {
       const idx = (n - 1) % 5;
       for (let i = 0; i < 5; i++) {
         const x = CX - 52 + i * 26;
@@ -3211,8 +3802,8 @@ export class Game {
       }
     }
 
-    // ammo column
-    const total = this.level.ammo;
+    // Timed stages refill automatically; the regular ammo buff adds one finite magazine.
+    const total = this.level.ammo * this.maxAmmoMult;
     const spacing = Math.min(26, (H * 0.48) / total);
     for (let i = 0; i < total; i++) {
       const x = 30;
@@ -3232,13 +3823,13 @@ export class Game {
     c.textAlign = 'left';
     c.font = font(14);
     c.fillStyle = 'rgba(255,255,255,0.75)';
-    c.fillText(`x${this.ammoLeft}`, 46, H - 30);
+    c.fillText(this.reloadT > 0 ? 'ISI ULANG…' : `x${this.ammoLeft}`, 46, H - 30);
 
     // weapon label
     c.textAlign = 'right';
     c.font = font(12);
     c.fillStyle = this.weapon.energy ? this.weapon.color : 'rgba(255,255,255,0.6)';
-    c.fillText(`${this.weapon.name} • ${this.weapon.perk}`, W - 14, H - 16);
+    c.fillText(`${this.weapon.name}${this.hasTwinGuns ? ' ×2' : ''} • ${this.weapon.perk}`, W - 14, H - 16);
     const wq = this.weapon;
     let info = '';
     if (wq.saves) info = `${wq.emoji} NYAWA: ${'●'.repeat(this.savesLeft)}${'○'.repeat(Math.max(0, wq.saves - this.savesLeft))}`;
@@ -3273,7 +3864,7 @@ export class Game {
       const a = Math.min(1, t * 2.5) * Math.min(1, (1.8 - t) * 5);
       c.save();
       c.globalAlpha = a;
-      c.translate(CX, CY + this.level.radius + 115);
+      c.translate(CX, isSpecial(this.level.mode) ? this.targetY + this.level.radius + 46 : CY + this.level.radius + 115);
       const s = 1 + Math.max(0, (t - 1.5)) * 1.5;
       c.scale(s, s);
       c.textAlign = 'center';
@@ -3289,6 +3880,16 @@ export class Game {
         c.font = font(16);
         c.fillStyle = '#ffd0d0';
         c.fillText(this.level.name, 0, 20);
+      } else if (isSpecial(this.level.mode)) {
+        const title = this.level.mode === 'boulder' ? '💎 DIAMOND BREAKER'
+          : this.level.mode === 'bonus' ? '🪙 BONUS STAGE' : '🧰 HARTA KARUN';
+        const hint = this.level.mode === 'boulder' ? 'Kikis batu hingga diamond bersih!'
+          : this.level.mode === 'bonus' ? 'Bidik koin yang berputar!' : '10 detik! Berondong petinya!';
+        c.font = font(27); c.lineWidth = 5; c.strokeStyle = 'rgba(0,0,0,0.9)';
+        c.strokeText(title, 0, -9);
+        c.fillStyle = this.level.mode === 'boulder' ? '#a5f3fc' : '#fde68a';
+        c.fillText(title, 0, -9);
+        c.font = font(13); c.fillStyle = '#ffffff'; c.fillText(hint, 0, 25);
       } else {
         c.font = font(38);
         c.lineWidth = 6;
