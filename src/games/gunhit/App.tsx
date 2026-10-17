@@ -233,7 +233,7 @@ export default function App({ onExit }: { onExit?: () => void }) {
       ctx.scale(sc, sc);
 
       // drawGunCentered puts the geometric mass center EXACTLY at (0, 0)!
-      drawGunCentered(ctx, curW.id, t, 0, true);
+      drawGunCentered(ctx, curW.id, t, 0, true, undefined, true);
       ctx.restore();
 
       if (active) raf = requestAnimationFrame(loop);

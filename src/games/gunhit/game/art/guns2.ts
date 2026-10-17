@@ -1,4 +1,5 @@
 import { TAU, rand, lin, vlin, steel, chrome, wood, rr, grip, guard, glow, star, radial, gunState } from './kit';
+import { shotPulse } from './commonGunMotion';
 
 type C = CanvasRenderingContext2D;
 export const SNOWBALL_MAG_SIZE = 5;
@@ -6,7 +7,7 @@ export const SNOWBALL_MAG_SIZE = 5;
 // ------------------------------------------------------------- KETAPEL PRO (animated draw / release)
 const easeInOut = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
 
-function slingshotPro(c: C, cx: number, y0: number, ready: boolean) {
+function slingshotPro(c: C, cx: number, y0: number, t: number, ready: boolean) {
   const s = gunState.sinceShot;
   const REST = 14;
   const DRAWN = 104;
@@ -31,8 +32,8 @@ function slingshotPro(c: C, cx: number, y0: number, ready: boolean) {
     py = REST + (DRAWN - REST) * k;
     stretch = k;
   } else {
-    py = DRAWN + Math.sin(s * 47) * 0.9;
-    px = Math.sin(s * 31) * 0.6;
+    py = DRAWN + Math.sin(t * 3.2) * 1.4;
+    px = Math.sin(t * 2.4) * 0.9;
     stretch = 1;
   }
   const bend = stretch * 3.5; // fork tips bend inward under tension
@@ -223,6 +224,15 @@ function slingshotPro(c: C, cx: number, y0: number, ready: boolean) {
     c.restore();
   }
 
+  // Warm moving highlight on the fork; during release the bands already
+  // vibrate and the existing whoosh takes over.
+  c.strokeStyle = `rgba(255,221,169,${0.24 + 0.22 * Math.sin(t * 2.6) ** 2})`;
+  c.lineWidth = 1.5;
+  c.beginPath();
+  c.moveTo(cx - 3, y0 + 72);
+  c.quadraticCurveTo(cx - 8, y0 + 41, tipL.x + 3, tipL.y + 8);
+  c.stroke();
+
   // ---- release whoosh arcs
   if (vib > 0.3) {
     c.save();
@@ -239,8 +249,8 @@ function slingshotPro(c: C, cx: number, y0: number, ready: boolean) {
 }
 
 // ------------------------------------------------------------- KETAPEL
-export function slingshot(c: C, cx: number, y0: number, ready: boolean) {
-  slingshotPro(c, cx, y0, ready);
+export function slingshot(c: C, cx: number, y0: number, t: number, ready: boolean) {
+  slingshotPro(c, cx, y0, t, ready);
 }
 export const _legacySlingshot = (c: C, cx: number, y0: number, ready: boolean) => slingshotOld(c, cx, y0, ready);
 
@@ -306,7 +316,8 @@ function slingshotOld(c: C, cx: number, y0: number, ready: boolean) {
 }
 
 // ------------------------------------------------------------- SUMPIT DAYAK
-export function blowgun(c: C, cx: number, y0: number) {
+export function blowgun(c: C, cx: number, y0: number, t: number) {
+  const breath = shotPulse(gunState.sinceShot, 0.32);
   // tube
   rr(c, cx - 5, y0, 10, 286, 4, lin(c, cx - 5, cx + 5, ['#2b1406', '#7a4420', '#3a1a08']), '#140800', 1.5);
   // motif bands (zigzag Dayak)
@@ -359,14 +370,28 @@ export function blowgun(c: C, cx: number, y0: number) {
   for (let i = 0; i < 9; i++) {
     c.beginPath();
     c.moveTo(cx + 10, y0 + 52);
-    c.quadraticCurveTo(cx + 16 + i, y0 + 62, cx + 12 + i * 1.6, y0 + 78 + (i % 3) * 3);
+    c.quadraticCurveTo(cx + 16 + i + breath * 7, y0 + 62,
+      cx + 12 + i * 1.6 + Math.sin(t * 5 + i * 0.6) * 3 + breath * 11,
+      y0 + 78 + (i % 3) * 3);
     c.stroke();
   }
   rr(c, cx - 7, y0 - 2, 14, 6, 2, '#1c1917');
+  if (breath > 0.02) {
+    c.strokeStyle = `rgba(230,255,212,${breath * 0.72})`;
+    c.lineWidth = 2;
+    for (const side of [-1, 1]) {
+      c.beginPath();
+      c.moveTo(cx + side * 5, y0 - 3);
+      c.quadraticCurveTo(cx + side * (10 + breath * 6), y0 - 13,
+        cx + side * (13 + breath * 11), y0 - 25);
+      c.stroke();
+    }
+  }
 }
 
 // ------------------------------------------------------------- SHOTGUN
-export function shotgun(c: C, cx: number, y0: number, ready: boolean) {
+export function shotgun(c: C, cx: number, y0: number, t: number, ready: boolean) {
+  const kick = shotPulse(gunState.sinceShot, 0.38);
   // stock
   c.beginPath();
   c.moveTo(cx - 10, y0 + 196);
@@ -402,8 +427,11 @@ export function shotgun(c: C, cx: number, y0: number, ready: boolean) {
   c.fillRect(cx - 5, y0 + 4, 2, 140);
   // bead sight
   glow(c, cx - 2.5, y0 + 6, 2, '#fbbf24', 4);
-  // pump forend
-  const py = ready ? y0 + 72 : y0 + 92;
+  // Pump cycles on each shot and rocks through the actual reload period.
+  const travel = gunState.reloadT > 0
+    ? Math.min(1, gunState.reloadT / 0.18) * (10 + 10 * Math.sin(t * 11))
+    : ready ? 20 * kick : 20 - 12 * kick;
+  const py = y0 + 72 + travel + (ready ? Math.sin(t * 2.3) * 1.5 : 0);
   rr(c, cx - 11, py, 26, 46, 5, wood(c, cx - 11, cx + 15), '#2a1205');
   c.strokeStyle = 'rgba(0,0,0,0.35)';
   c.lineWidth = 1.5;
@@ -418,10 +446,13 @@ export function shotgun(c: C, cx: number, y0: number, ready: boolean) {
   c.ellipse(cx - 2.5, y0, 5.5, 2, 0, 0, TAU);
   c.fillStyle = '#000';
   c.fill();
+  c.fillStyle = `rgba(255,234,184,${0.15 + 0.35 * Math.sin(t * 2.7) ** 2})`;
+  c.fillRect(cx - 5, y0 + 148, 3, 24);
 }
 
 // ------------------------------------------------------------- SUPER SOAKER
 export function soaker(c: C, cx: number, y0: number, t: number) {
+  const pressure = shotPulse(gunState.sinceShot, 0.34);
   grip(c, cx, y0 + 112, '#0d9488', '#14b8a6', 0.8);
   guard(c, cx, y0 + 104, '#0f766e');
   // body
@@ -441,7 +472,7 @@ export function soaker(c: C, cx: number, y0: number, t: number) {
   c.stroke();
   c.save();
   c.translate(cx + 8, y0 + 46);
-  c.rotate(-1 + Math.sin(t * 3) * 0.6);
+  c.rotate(-1 + Math.sin(t * 3) * 0.6 + pressure * 1.2);
   c.strokeStyle = '#dc2626';
   c.lineWidth = 1.5;
   c.beginPath();
@@ -456,7 +487,7 @@ export function soaker(c: C, cx: number, y0: number, t: number) {
   c.clip();
   c.fillStyle = 'rgba(191,219,254,0.35)';
   c.fillRect(cx - 40, y0 + 40, 22, 78);
-  const lvl = y0 + 62 + Math.sin(t * 4) * 2;
+  const lvl = y0 + 62 + Math.sin(t * 4) * (2 + pressure * 3) + pressure * 7;
   c.beginPath();
   c.moveTo(cx - 40, lvl);
   for (let x = 0; x <= 22; x += 2) c.lineTo(cx - 40 + x, lvl + Math.sin(t * 6 + x * 0.5) * 1.5);
@@ -480,16 +511,29 @@ export function soaker(c: C, cx: number, y0: number, t: number) {
   c.fillStyle = 'rgba(255,255,255,0.45)';
   c.fillRect(cx - 36, y0 + 46, 3, 64);
   // pump
-  rr(c, cx - 14, y0 + 72, 30, 22, 8, lin(c, cx - 14, cx + 16, ['#c2410c', '#fb923c', '#c2410c']), '#431407');
+  rr(c, cx - 14, y0 + 72 + pressure * 10, 30, 22, 8,
+    lin(c, cx - 14, cx + 16, ['#c2410c', '#fb923c', '#c2410c']), '#431407');
   // nozzle
   rr(c, cx - 7, y0 + 2, 14, 24, [3, 3, 6, 6], lin(c, cx - 7, cx + 7, ['#1d4ed8', '#60a5fa', '#1e40af']), '#172554');
   rr(c, cx - 4, y0 - 3, 8, 7, 2, '#facc15', '#713f12', 1);
   c.fillStyle = 'rgba(255,255,255,0.3)';
   c.fillRect(cx - 14, y0 + 28, 4, 92);
+  if (pressure > 0.02) {
+    // A couple of clear droplets at the nozzle; projectile and splash FX
+    // still come from the existing gameplay system.
+    c.fillStyle = `rgba(215,247,255,${pressure * 0.8})`;
+    for (const side of [-1, 1]) {
+      c.beginPath();
+      c.ellipse(cx + side * (7 + pressure * 7), y0 - 6 - pressure * 9,
+        2.4, 3.8, side * 0.3, 0, TAU);
+      c.fill();
+    }
+  }
 }
 
 // ------------------------------------------------------------- SNOWBALL CANNON
 export function snowball(c: C, cx: number, y0: number, t: number, loaded = SNOWBALL_MAG_SIZE) {
+  const thump = shotPulse(gunState.sinceShot, 0.34);
   grip(c, cx, y0 + 118, '#bae6fd', '#38bdf8', 0.8);
   guard(c, cx, y0 + 110, '#0c4a6e');
   // Five visible chambers: each snowball disappears after a shot, then the
@@ -506,7 +550,7 @@ export function snowball(c: C, cx: number, y0: number, t: number, loaded = SNOWB
     c.beginPath(); c.arc(bx, by, 5.9, 0, TAU);
     c.fillStyle = radial(c, bx, by, 6, ['#ffffff', '#f3fbff', '#c7e8f5']); c.fill();
     c.fillStyle = 'rgba(255,255,255,0.85)';
-    c.beginPath(); c.arc(bx - 1.7, by - 2, 1.1, 0, TAU); c.fill();
+    c.beginPath(); c.arc(bx - 1.7 + Math.sin(t * 3 + i) * 0.8, by - 2, 1.1, 0, TAU); c.fill();
   }
   rr(c, cx - 22, y0 + 90, 8, 8, 2, '#0369a1');
   // tube
@@ -527,28 +571,36 @@ export function snowball(c: C, cx: number, y0: number, t: number, loaded = SNOWB
     }
     c.restore();
   }
-  // rim
-  rr(c, cx - 21, y0, 42, 12, 5, lin(c, cx - 21, cx + 21, ['#0c4a6e', '#bae6fd', '#0c4a6e']), '#082f49');
-  // snow cap
+  // The frosted breech compresses, while the five-ball hopper remains intact.
+  const capY = y0 + thump * 6;
+  rr(c, cx - 21, capY, 42, 12, 5,
+    lin(c, cx - 21, cx + 21, ['#0c4a6e', '#bae6fd', '#0c4a6e']), '#082f49');
   c.fillStyle = '#ffffff';
   c.beginPath();
-  c.moveTo(cx - 22, y0 + 4);
+  c.moveTo(cx - 22, capY + 4);
   for (let i = 0; i <= 8; i++) {
     const x = cx - 22 + i * 5.5;
-    c.quadraticCurveTo(x - 2.7, y0 - 6 - (i % 2) * 3, x, y0 + 2);
+    c.quadraticCurveTo(x - 2.7, capY - 6 - (i % 2) * 3, x, capY + 2);
   }
-  c.lineTo(cx + 22, y0 + 6);
-  c.lineTo(cx - 22, y0 + 6);
+  c.lineTo(cx + 22, capY + 6);
+  c.lineTo(cx - 22, capY + 6);
   c.fill();
-  // icicles
   c.fillStyle = 'rgba(224,242,254,0.95)';
   for (const ix of [-14, -3, 9]) {
     c.beginPath();
-    c.moveTo(cx + ix - 3, y0 + 11);
-    c.lineTo(cx + ix + 3, y0 + 11);
-    c.lineTo(cx + ix, y0 + 22 + Math.abs(ix) * 0.3);
+    c.moveTo(cx + ix - 3, capY + 11);
+    c.lineTo(cx + ix + 3, capY + 11);
+    c.lineTo(cx + ix, capY + 22 + Math.abs(ix) * 0.3);
     c.closePath();
     c.fill();
+  }
+  if (thump > 0.02) {
+    c.fillStyle = `rgba(255,255,255,${thump * 0.85})`;
+    for (const side of [-1, 1]) {
+      c.beginPath();
+      c.arc(cx + side * (17 + thump * 9), y0 - 5 - thump * 8, 2.4, 0, TAU);
+      c.fill();
+    }
   }
 }
 

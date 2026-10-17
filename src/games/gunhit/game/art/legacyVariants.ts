@@ -1,4 +1,5 @@
-import { TAU, rand, lin, rr, grip, guard, glow, star, radial, chrome, wood } from './kit';
+import { TAU, rand, lin, rr, grip, guard, glow, star, radial, chrome, wood, gunState } from './kit';
+import { shotPulse } from './commonGunMotion';
 import type { VariantWeapon } from './gunVariants';
 
 // Pre-overhaul renderers are preserved from git HEAD (c0769f5).
@@ -635,6 +636,7 @@ function chickenGun(c: C, cx: number, y0: number, t: number, ready: boolean) {
 
 // Original glass jar, cloth lid and bee from before the Honey Blaster rework.
 function classicHoney(c: C, cx: number, y0: number, t: number) {
+  const surge = shotPulse(gunState.sinceShot, 0.32);
   grip(c, cx, y0 + 110, '#78350f', '#b45309', 0.8);
   guard(c, cx, y0 + 102, '#451a03');
   // honey jar body
@@ -644,7 +646,7 @@ function classicHoney(c: C, cx: number, y0: number, t: number) {
   c.fill();
   c.save();
   c.clip();
-  const lvl = y0 + 58 + Math.sin(t * 2) * 2;
+  const lvl = y0 + 58 + Math.sin(t * 2) * 2 + surge * 5;
   c.fillStyle = lin(c, cx - 24, cx + 24, ['#b45309', '#fbbf24', '#f59e0b', '#92400e']);
   c.fillRect(cx - 24, lvl, 48, 80);
   c.fillStyle = 'rgba(255,255,255,0.35)';
@@ -662,21 +664,30 @@ function classicHoney(c: C, cx: number, y0: number, t: number) {
       c.stroke();
     }
   }
+  // Small bubbles churn within the original jar, not a replacement design.
+  c.fillStyle = 'rgba(255,248,196,0.75)';
+  for (let i = 0; i < 3; i++) {
+    const by = y0 + 109 - ((t * (9 + surge * 18) + i * 13) % 39);
+    c.beginPath();
+    c.arc(cx - 12 + i * 12 + Math.sin(t * 3 + i) * 1.5, by, 1.7 + surge, 0, TAU);
+    c.fill();
+  }
   c.restore();
   c.beginPath();
   c.roundRect(cx - 24, y0 + 40, 48, 76, [10, 10, 16, 16]);
   c.strokeStyle = '#78350f';
   c.lineWidth = 2;
   c.stroke();
-  // cloth lid
-  rr(c, cx - 27, y0 + 32, 54, 12, 4, '#dc2626', '#7f1d1d');
+  // The old cloth lid compresses for a beat when honey is pumped out.
+  const lidY = y0 + 32 + surge * 4;
+  rr(c, cx - 27, lidY, 54, 12, 4, '#dc2626', '#7f1d1d');
   c.fillStyle = '#fff';
-  for (let i = 0; i < 6; i++) c.fillRect(cx - 24 + i * 9, y0 + 35, 4, 4);
+  for (let i = 0; i < 6; i++) c.fillRect(cx - 24 + i * 9, lidY + 3, 4, 4);
   c.strokeStyle = '#a16207';
   c.lineWidth = 2;
   c.beginPath();
-  c.moveTo(cx - 26, y0 + 44);
-  c.lineTo(cx + 26, y0 + 44);
+  c.moveTo(cx - 26, lidY + 12);
+  c.lineTo(cx + 26, lidY + 12);
   c.stroke();
   // dipper nozzle
   rr(c, cx - 4, y0 + 4, 8, 30, 3, wood(c, cx - 4, cx + 4));
@@ -685,10 +696,18 @@ function classicHoney(c: C, cx: number, y0: number, t: number) {
   const dp = (t * 0.8) % 1;
   c.fillStyle = '#f59e0b';
   c.beginPath();
-  c.ellipse(cx, y0 - 2 + dp * 10, 2.5, 3 + dp * 3, 0, 0, TAU);
+  c.ellipse(cx, y0 - 2 + dp * 10 - surge * 5, 2.5, 3 + dp * 3 + surge, 0, 0, TAU);
   c.fill();
+  if (surge > 0.02) {
+    c.strokeStyle = `rgba(255,213,78,${surge * 0.8})`;
+    c.lineWidth = 2 + surge;
+    c.beginPath();
+    c.moveTo(cx, y0 + 1);
+    c.quadraticCurveTo(cx + surge * 9, y0 - 9, cx, y0 - 16 - surge * 7);
+    c.stroke();
+  }
   // bee buddy
-  const bx = cx + 30 + Math.sin(t * 3) * 4;
+  const bx = cx + 30 + Math.sin(t * 3) * 4 + surge * 7;
   const by = y0 + 30 + Math.cos(t * 4) * 4;
   c.fillStyle = '#facc15';
   c.beginPath();

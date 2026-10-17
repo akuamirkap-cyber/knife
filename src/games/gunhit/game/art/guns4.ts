@@ -1,5 +1,6 @@
 import type { WeaponId } from '../weapons';
 import { TAU, rand, lin, steel, chrome, wood, brass, rr, grip, guard, glow, jag, star, radial, gunState } from './kit';
+import { shotPulse } from './commonGunMotion';
 
 import { drawGunExtra3, FLASH3 } from './guns5';
 export { FLASH3 };
@@ -120,6 +121,11 @@ function honey(c: C, cx: number, y0: number, t: number) {
   c.fillStyle = 'rgba(255,255,255,0.36)';
   c.beginPath(); c.ellipse(cx - 15, y0 + 70, 2.4, 22, 0.09, 0, TAU); c.fill();
   c.beginPath(); c.ellipse(cx + 13, y0 + 92, 1.4, 13, -0.1, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,250,210,0.78)';
+  for (let i = 0; i < 2; i++) {
+    const by = y0 + 110 - ((t * (9 + pump * 19) + i * 17) % 39);
+    c.beginPath(); c.arc(cx - 11 + i * 16, by, 1.6 + pump, 0, TAU); c.fill();
+  }
   c.restore();
   rr(c, cx - 23, y0 + 44, 46, 74, 9, 'rgba(255,223,139,0.10)', '#ffd885', 1.5);
   rr(c, cx - 28, y0 + 36, 56, 10, 3, brass(c, cx - 28, cx + 28), '#5c320f', 2);
@@ -148,6 +154,7 @@ function honey(c: C, cx: number, y0: number, t: number) {
 
 // ------------------------------------------------------------- COCONUT CANNON
 function coconut(c: C, cx: number, y0: number, t: number, ready: boolean) {
+  const recoil = shotPulse(gunState.sinceShot, 0.35);
   // palm-wood stock
   c.beginPath();
   c.moveTo(cx - 10, y0 + 150);
@@ -167,7 +174,7 @@ function coconut(c: C, cx: number, y0: number, t: number, ready: boolean) {
   for (const s of [-1, 1]) {
     c.save();
     c.translate(cx + s * 18, y0 + 120);
-    c.rotate(s * (0.8 + Math.sin(t * 2) * 0.05));
+    c.rotate(s * (0.8 + Math.sin(t * 2) * 0.05 + recoil * 0.32));
     c.fillStyle = '#16a34a';
     c.beginPath();
     c.moveTo(0, 0);
@@ -181,7 +188,8 @@ function coconut(c: C, cx: number, y0: number, t: number, ready: boolean) {
   }
   // hibiscus
   c.save();
-  c.translate(cx + 16, y0 + 60);
+  c.translate(cx + 16 + recoil * 4, y0 + 60 + recoil * 5);
+  c.rotate(recoil * 0.22);
   for (let i = 0; i < 5; i++) {
     c.rotate(TAU / 5);
     c.fillStyle = '#ec4899';
@@ -201,7 +209,7 @@ function coconut(c: C, cx: number, y0: number, t: number, ready: boolean) {
   c.fill();
   if (ready) {
     c.beginPath();
-    c.arc(cx, y0 + 10, 15, 0, TAU);
+    c.arc(cx, y0 + 10 + Math.sin(t * 2.8) * 1.2, 15, 0, TAU);
     c.fillStyle = radial(c, cx, y0 + 10, 15, ['#a3e635', '#65a30d', '#365314']);
     c.fill();
     c.strokeStyle = '#1a2e05';
@@ -218,6 +226,16 @@ function coconut(c: C, cx: number, y0: number, t: number, ready: boolean) {
     c.moveTo(cx + 2, y0);
     c.lineTo(cx + 10, y0 - 14);
     c.stroke();
+  }
+  if (recoil > 0.02) {
+    c.strokeStyle = `rgba(217,249,157,${recoil * 0.72})`;
+    c.lineWidth = 2;
+    for (const side of [-1, 1]) {
+      c.beginPath();
+      c.arc(cx + side * 18, y0 + 12, 8 + recoil * 6,
+        side < 0 ? 1.7 : -1.45, side < 0 ? 3.9 : 0.75);
+      c.stroke();
+    }
   }
 }
 

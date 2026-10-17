@@ -4,6 +4,7 @@ import { drawOriginalGun } from './legacyVariants';
 import { drawLatestGun } from './latestVariants';
 import { drawGunExtra, drawFlashExtra } from './guns3';
 import { gunState } from './kit';
+import { shotPulse } from './commonGunMotion';
 
 const TAU = Math.PI * 2;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -66,13 +67,13 @@ export function drawGun(
     if (isFixedClassicGun(id) || variant === 'original') drawOriginalGun(c, id, cx, y0, t, ready);
     else if (id !== 'honey') drawLatestGun(c, id, cx, y0, t);
   } else switch (id) {
-    case 'pistol': pistol(c, cx, y0); break;
-    case 'ak47': ak(c, cx, y0); break;
+    case 'pistol': pistol(c, cx, y0, t); break;
+    case 'ak47': ak(c, cx, y0, t); break;
     case 'cricket': cricket(c, cx, y0, t); break;
     case 'electro': electro(c, cx, y0, t); break;
-    case 'nail': nailGun(c, cx, y0); break;
+    case 'nail': nailGun(c, cx, y0, t); break;
     case 'fish': fishGun(c, cx, y0, t); break;
-    case 'crossbow': crossbow(c, cx, y0, ready); break;
+    case 'crossbow': crossbow(c, cx, y0, t, ready); break;
     case 'bazooka': bazooka(c, cx, y0, ready); break;
     case 'rpg': rpg(c, cx, y0, ready); break;
     case 'freeze': freeze(c, cx, y0, t); break;
@@ -83,7 +84,8 @@ export function drawGun(
   if (flash > 0) drawFlash(c, id, cx, y0, t, flash);
 }
 
-function pistol(c: CanvasRenderingContext2D, cx: number, y0: number) {
+function pistol(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
+  const slide = shotPulse(gunState.sinceShot, 0.25) * 12;
   angledGrip(c, cx, y0 + 82, '#2b2420', '#4a3a2e');
   triggerGuard(c, cx, y0 + 70);
   c.beginPath();
@@ -93,16 +95,29 @@ function pistol(c: CanvasRenderingContext2D, cx: number, y0: number) {
   c.strokeStyle = '#0b0c0e';
   c.lineWidth = 2;
   c.stroke();
+  // The ejection channel remains fixed while the steel slide racks backward.
+  c.fillStyle = '#0b0d11';
+  c.fillRect(cx - 14, y0 + 3, 28, 52);
+  c.beginPath();
+  c.roundRect(cx - 16, y0 + slide, 32, 53, [6, 6, 2, 2]);
+  c.fillStyle = lin(c, cx - 16, cx + 16, ['#1d2025', '#7d8792', '#b2bdc7', '#1a1d22']);
+  c.fill(); c.stroke();
   c.fillStyle = '#0a0a0b';
   c.beginPath();
-  c.roundRect(cx - 6, y0 - 4, 12, 8, 2);
+  c.roundRect(cx - 6, y0 - 4 + slide, 12, 8, 2);
   c.fill();
   c.fillStyle = '#ff5a36';
-  c.fillRect(cx - 2, y0 + 4, 4, 5);
+  c.fillRect(cx - 2, y0 + 4 + slide, 4, 5);
   c.fillStyle = '#0e0f12';
-  c.fillRect(cx + 2, y0 + 38, 12, 26);
+  c.fillRect(cx + 2, y0 + 38 + slide, 12, 22);
   c.fillStyle = '#c99a3a';
-  c.fillRect(cx + 5, y0 + 42, 6, 18);
+  c.fillRect(cx + 5, y0 + 42 + slide, 6, 14);
+  c.strokeStyle = `rgba(238,248,255,${0.23 + 0.22 * Math.sin(t * 2.8) ** 2})`;
+  c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(cx - 11, y0 + 8 + slide + (t * 18) % 30);
+  c.lineTo(cx - 11, y0 + 18 + slide + (t * 18) % 30);
+  c.stroke();
   c.strokeStyle = 'rgba(0,0,0,0.5)';
   c.lineWidth = 1.5;
   for (let i = 0; i < 6; i++) {
@@ -112,10 +127,12 @@ function pistol(c: CanvasRenderingContext2D, cx: number, y0: number) {
     c.stroke();
   }
   c.fillStyle = 'rgba(255,255,255,0.18)';
-  c.fillRect(cx - 6, y0 + 8, 3, 115);
+  c.fillRect(cx - 6, y0 + 8 + slide, 3, 42);
+  c.fillRect(cx - 6, y0 + 66, 3, 57);
 }
 
-function ak(c: CanvasRenderingContext2D, cx: number, y0: number) {
+function ak(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
+  const bolt = 18 * shotPulse(gunState.sinceShot, 0.22);
   c.beginPath();
   c.moveTo(cx - 11, y0 + 166);
   c.lineTo(cx + 13, y0 + 166);
@@ -157,8 +174,12 @@ function ak(c: CanvasRenderingContext2D, cx: number, y0: number) {
   c.fill();
   c.strokeStyle = '#08090a';
   c.stroke();
-  c.fillStyle = '#6a7079';
-  c.fillRect(cx + 13, y0 + 124, 8, 5);
+  c.fillStyle = '#11151a';
+  c.fillRect(cx + 12, y0 + 116, 11, 29);
+  c.fillStyle = '#8e99a3';
+  c.fillRect(cx + 13, y0 + 117 + bolt, 8, 7);
+  c.fillStyle = '#d9b468';
+  c.fillRect(cx + 16, y0 + 119 + bolt, 4, 3);
   c.beginPath();
   c.roundRect(cx - 4, y0 + 60, 15, 50, 5);
   c.fillStyle = woodG(c, cx - 4, cx + 11);
@@ -181,6 +202,9 @@ function ak(c: CanvasRenderingContext2D, cx: number, y0: number) {
   c.fillStyle = '#050505';
   c.fillRect(cx - 5, y0 + 2, 3, 2);
   c.fillRect(cx - 5, y0 + 7, 3, 2);
+  // A narrow highlight travels along the gas tube, never moving the muzzle.
+  c.fillStyle = `rgba(255,231,176,${0.25 + 0.28 * Math.sin(t * 3) ** 2})`;
+  c.fillRect(cx - 8, y0 + 37 + (t * 23) % 24, 2, 9);
 }
 
 function plasma(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
@@ -442,7 +466,8 @@ function electro(c: CanvasRenderingContext2D, cx: number, y0: number, t: number)
   glowDot(c, cx, y0 + 1, 3.5, '#bff1ff', 16);
 }
 
-function nailGun(c: CanvasRenderingContext2D, cx: number, y0: number) {
+function nailGun(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
+  const drive = shotPulse(gunState.sinceShot, 0.24);
   // magazine strip
   c.beginPath();
   c.moveTo(cx - 14, y0 + 28);
@@ -515,6 +540,15 @@ function nailGun(c: CanvasRenderingContext2D, cx: number, y0: number) {
   c.fill();
   c.fillStyle = '#c62828';
   c.fillRect(cx - 5, y0 + 14, 10, 3);
+  // The exposed driver punches forward then springs back into the yellow body.
+  c.fillStyle = '#111827';
+  c.fillRect(cx - 3.5, y0 + 17, 7, 12);
+  c.fillStyle = '#d1d5db';
+  c.fillRect(cx - 3, y0 - 5 - drive * 10, 6, 23);
+  c.fillStyle = '#f87171';
+  c.fillRect(cx - 4, y0 + 15 - drive * 10, 8, 3);
+  c.fillStyle = `rgba(134,255,164,${0.32 + 0.34 * (drive + Math.sin(t * 3) ** 2) / 2})`;
+  c.fillRect(cx + 12, y0 + 73 + (t * 10) % 11, 3, 9);
 }
 
 function fishGun(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
@@ -604,7 +638,8 @@ function fishGun(c: CanvasRenderingContext2D, cx: number, y0: number, t: number)
   c.fill();
 }
 
-function crossbow(c: CanvasRenderingContext2D, cx: number, y0: number, ready: boolean) {
+function crossbow(c: CanvasRenderingContext2D, cx: number, y0: number, t: number, ready: boolean) {
+  const twang = shotPulse(gunState.sinceShot, 0.3);
   // stock
   c.beginPath();
   c.moveTo(cx - 7, y0 + 30);
@@ -649,8 +684,16 @@ function crossbow(c: CanvasRenderingContext2D, cx: number, y0: number, ready: bo
   c.quadraticCurveTo(cx - 40, y0 + 26, cx, y0 + 38);
   c.quadraticCurveTo(cx + 40, y0 + 26, cx + 70, tipY - 2);
   c.stroke();
-  // string
-  const sy = ready ? y0 + 104 : y0 + 46;
+  // The released string twangs, then draws back toward the stock while the
+  // next bolt is prepared. The weapon's real cooldown still controls ready.
+  const draw = ready ? 1 : Math.max(0, Math.min(1, (gunState.sinceShot - 0.18) / 0.54));
+  const sy = y0 + 46 + 58 * draw + twang * (ready ? -23 : 12);
+  if (gunState.sinceShot >= 0 && gunState.sinceShot < 0.18) {
+    c.strokeStyle = `rgba(255,235,187,${0.38 * (1 - gunState.sinceShot / 0.18)})`;
+    c.lineWidth = 2.5;
+    c.beginPath(); c.moveTo(cx - 72, tipY);
+    c.lineTo(cx, sy + 13); c.lineTo(cx + 72, tipY); c.stroke();
+  }
   c.strokeStyle = '#e8e2d0';
   c.lineWidth = 1.5;
   c.beginPath();
@@ -696,6 +739,9 @@ function crossbow(c: CanvasRenderingContext2D, cx: number, y0: number, ready: bo
   c.fillStyle = '#16181b';
   c.fill();
   glowDot(c, cx - 17.5, y0 + 66, 2, '#ff3030', 6);
+  c.fillStyle = `rgba(255,227,176,${0.22 + Math.sin(t * 3) ** 2 * 0.34})`;
+  c.fillRect(cx - 66 + Math.sin(t * 2.4) * 6, tipY - 3, 11, 2);
+  c.fillRect(cx + 55 - Math.sin(t * 2.4) * 6, tipY - 3, 11, 2);
 }
 
 function bazooka(c: CanvasRenderingContext2D, cx: number, y0: number, ready: boolean) {

@@ -70,7 +70,7 @@ function GunItemCanvas({ weapon, isSelected, variant, size = 110 }: { weapon: We
       ctx.scale(scale, scale);
 
       // drawGunCentered places the true mass center precisely at (0, 0)!
-      drawGunCentered(ctx, weapon.id, t, 0, true, variant);
+      drawGunCentered(ctx, weapon.id, t, 0, true, variant, true);
 
       ctx.restore();
 
@@ -134,7 +134,7 @@ function SpotlightGun({ weapon, variant }: { weapon: Weapon; variant: GunVariant
       const scale = (h * 0.96) / span;
       ctx.scale(scale, scale);
 
-      drawGunCentered(ctx, weapon.id, t, 0, true, variant);
+      drawGunCentered(ctx, weapon.id, t, 0, true, variant, true);
       ctx.restore();
 
       if (active) raf = requestAnimationFrame(loop);

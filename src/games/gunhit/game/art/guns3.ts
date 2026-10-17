@@ -883,9 +883,9 @@ function gravityGun(c: C, cx: number, y0: number, t: number) {
 // ================================================================ dispatch
 export function drawGunExtra(c: C, id: WeaponId, cx: number, y0: number, t: number, ready: boolean, snowLoaded = SNOWBALL_MAG_SIZE) {
   switch (id) {
-    case 'slingshot': slingshot(c, cx, y0, ready); break;
-    case 'blowgun': blowgun(c, cx, y0); break;
-    case 'shotgun': shotgun(c, cx, y0, ready); break;
+    case 'slingshot': slingshot(c, cx, y0, t, ready); break;
+    case 'blowgun': blowgun(c, cx, y0, t); break;
+    case 'shotgun': shotgun(c, cx, y0, t, ready); break;
     case 'soaker': soaker(c, cx, y0, t); break;
     case 'snowball': snowball(c, cx, y0, t, snowLoaded); break;
     case 'sniper': sniper(c, cx, y0); break;
