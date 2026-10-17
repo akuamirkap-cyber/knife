@@ -6,8 +6,13 @@ import { drawGunCentered } from '../game/art/drawCentered';
 import { getGunMetrics } from '../game/art/metrics';
 import { sfx } from '../game/audio';
 import { sfx4 } from '../game/sfx4';
+import { useSlideActive } from '../../shared/SlideActivity';
+import { SunburstFX } from '../../knife-hit/components/Effects';
+import { gunSunburstColor } from '../game/sunburstPalette';
+import { EDITABLE_WEAPONS, GUN_VARIANTS, getGunVariant, setGunVariant, getGunEffect, setGunEffect, canChooseGunDesign, type GunVariant } from '../game/art/gunVariants';
+import GunVariantPicker from './GunVariantPicker';
 
-type Tab = 'ALL' | 'EPIC' | 'LANGKA' | 'LEGENDARIS' | 'UMUM' | 'BOSS';
+type Tab = 'ALL' | 'DESAIN' | 'EPIC' | 'LANGKA' | 'LEGENDARIS' | 'UMUM' | 'BOSS';
 
 interface ArsenalProps {
   current: WeaponId;
@@ -20,13 +25,14 @@ interface ArsenalProps {
 // -------------------------------------------------------------
 // Gun Render: 100% PERFECT CENTER PIVOT, 30% BIGGER & ZERO CROP!
 // -------------------------------------------------------------
-function GunItemCanvas({ weapon, isSelected, size = 110 }: { weapon: Weapon; isSelected: boolean; size?: number }) {
+function GunItemCanvas({ weapon, isSelected, variant, size = 110 }: { weapon: Weapon; isSelected: boolean; variant: GunVariant; size?: number }) {
+  const active = useSlideActive();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     cv.width = size * dpr;
     cv.height = size * dpr;
     const ctx = cv.getContext('2d');
@@ -34,8 +40,14 @@ function GunItemCanvas({ weapon, isSelected, size = 110 }: { weapon: Weapon; isS
 
     let raf = 0;
     const start = performance.now();
+    let lastDraw = -Infinity;
 
     const loop = (now: number) => {
+      if (now - lastDraw < 1000 / 30 - 1) {
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+      lastDraw = now;
       const t = (now - start) / 1000;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, size, size);
@@ -51,23 +63,25 @@ function GunItemCanvas({ weapon, isSelected, size = 110 }: { weapon: Weapon; isS
 
       // 30% LEBIH BESAR + 100% ZERO CROP FORMULA:
       // Weapon span is the true diagonal length of the gun
-      const m = getGunMetrics(weapon.id);
+      const m = getGunMetrics(weapon.id, variant);
       const span = Math.max(m.span, 130);
       // Scale: 30% bigger than standard while safely fitting inside the 110px canvas
       const scale = (size * 0.92) / span;
       ctx.scale(scale, scale);
 
       // drawGunCentered places the true mass center precisely at (0, 0)!
-      drawGunCentered(ctx, weapon.id, t, 0, true);
+      drawGunCentered(ctx, weapon.id, t, 0, true, variant);
 
       ctx.restore();
 
-      raf = requestAnimationFrame(loop);
+      // Eleven static thumbnails and just one animated selection: no grid of
+      // twelve simultaneous canvas loops while browsing the arsenal.
+      if (active && isSelected) raf = requestAnimationFrame(loop);
     };
 
-    raf = requestAnimationFrame(loop);
+    loop(start);
     return () => cancelAnimationFrame(raf);
-  }, [weapon.id, size, isSelected]);
+  }, [weapon.id, size, isSelected, active, variant]);
 
   return (
     <canvas
@@ -81,13 +95,14 @@ function GunItemCanvas({ weapon, isSelected, size = 110 }: { weapon: Weapon; isS
 // -------------------------------------------------------------
 // Top Spotlight Preview with Sunburst Rays
 // -------------------------------------------------------------
-function SpotlightGun({ weapon }: { weapon: Weapon }) {
+function SpotlightGun({ weapon, variant }: { weapon: Weapon; variant: GunVariant }) {
+  const active = useSlideActive();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = 220;
     const h = 170;
     cv.width = w * dpr;
@@ -97,8 +112,14 @@ function SpotlightGun({ weapon }: { weapon: Weapon }) {
 
     let raf = 0;
     const start = performance.now();
+    let lastDraw = -Infinity;
 
     const loop = (now: number) => {
+      if (now - lastDraw < 1000 / 30 - 1) {
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+      lastDraw = now;
       const t = (now - start) / 1000;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
@@ -108,20 +129,20 @@ function SpotlightGun({ weapon }: { weapon: Weapon }) {
 
       ctx.rotate(Math.PI / 4 + Math.sin(t * 2.2) * 0.05);
 
-      const m = getGunMetrics(weapon.id);
+      const m = getGunMetrics(weapon.id, variant);
       const span = Math.max(m.span, 130);
       const scale = (h * 0.96) / span;
       ctx.scale(scale, scale);
 
-      drawGunCentered(ctx, weapon.id, t, 0, true);
+      drawGunCentered(ctx, weapon.id, t, 0, true, variant);
       ctx.restore();
 
-      raf = requestAnimationFrame(loop);
+      if (active) raf = requestAnimationFrame(loop);
     };
 
-    raf = requestAnimationFrame(loop);
+    loop(start);
     return () => cancelAnimationFrame(raf);
-  }, [weapon.id]);
+  }, [weapon.id, active, variant]);
 
   return (
     <canvas
@@ -143,13 +164,20 @@ export default function Arsenal({
   const [page, setPage] = useState(0);
   const [selectedGunId, setSelectedGunId] = useState<WeaponId>(current);
   const [useRandom, setUseRandom] = useState(false);
+  const [editingDesign, setEditingDesign] = useState(false);
+  const [, setDesignRevision] = useState(0);
   const [selectedBoss, setSelectedBoss] = useState<BossProfile>(BOSS_ROSTER[0]);
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { if (gridRef.current) gridRef.current.scrollTop = 0; }, [page, tab]);
 
   const selectedGun = getWeapon(selectedGunId);
+  const selectedVariant = getGunVariant(selectedGunId);
 
   // Filter weapons
   const filteredWeapons = WEAPONS.filter((w) => {
     if (tab === 'ALL') return true;
+    if (tab === 'DESAIN') return canChooseGunDesign(w.id);
     if (tab === 'EPIC') return w.rarity === 'EPIC';
     if (tab === 'LANGKA') return w.rarity === 'LANGKA';
     if (tab === 'LEGENDARIS') return w.rarity === 'LEGENDARIS';
@@ -218,20 +246,6 @@ export default function Arsenal({
 
       {/* TOP SPOTLIGHT */}
       <div className="relative z-10 flex flex-col items-center -mt-1">
-        {/* Sunburst Rays */}
-        <div
-          className="pointer-events-none absolute -top-4 h-56 w-56 rounded-full opacity-65 animate-spin"
-          style={{
-            background:
-              'conic-gradient(from 0deg, rgba(255,255,255,0.7) 0deg 18deg, transparent 18deg 36deg, rgba(230,210,255,0.65) 36deg 54deg, transparent 54deg 72deg, rgba(255,255,255,0.7) 72deg 90deg, transparent 90deg 108deg, rgba(230,210,255,0.65) 108deg 126deg, transparent 126deg 144deg, rgba(255,255,255,0.7) 144deg 162deg, transparent 162deg 180deg, rgba(230,210,255,0.65) 180deg 198deg, transparent 198deg 216deg, rgba(255,255,255,0.7) 216deg 234deg, transparent 234deg 252deg, rgba(230,210,255,0.65) 252deg 270deg, transparent 270deg 288deg, rgba(255,255,255,0.7) 288deg 306deg, transparent 306deg 324deg, rgba(230,210,255,0.65) 324deg 342deg, transparent 342deg 360deg)',
-            animationDuration: '24s',
-            maskImage: 'radial-gradient(circle, black 30%, transparent 72%)',
-            WebkitMaskImage: 'radial-gradient(circle, black 30%, transparent 72%)',
-          }}
-        />
-
-        <div className="pointer-events-none absolute top-4 h-40 w-40 rounded-full bg-gradient-to-r from-purple-300/40 via-white/30 to-indigo-300/40 blur-xl" />
-
         {/* USE ALL & STATUS BADGE */}
         <div className="w-full flex items-center justify-between px-3 text-xs font-bold">
           <div className="flex flex-col items-start gap-1 cursor-pointer" onClick={handleRandomToggle}>
@@ -254,9 +268,12 @@ export default function Arsenal({
           </div>
         </div>
 
-        {/* Spotlight Canvas */}
+        {/* The same layered FX Lab sunburst used by Knife Boss, recolored per rarity. */}
         <div className="relative -my-3 flex items-center justify-center">
-          <SpotlightGun weapon={selectedGun} />
+          <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+            <SunburstFX size={470} color={gunSunburstColor(selectedGun.rarity)} intensity={0.85} speed={30} stars={false} />
+          </div>
+          <div className="relative z-10"><SpotlightGun weapon={selectedGun} variant={selectedVariant} /></div>
         </div>
 
         {/* Active Gun Name & Perk */}
@@ -268,6 +285,13 @@ export default function Arsenal({
             {selectedGun.perk}
           </span>
         </div>
+        {canChooseGunDesign(selectedGunId) && (
+          <button type="button" onClick={() => setEditingDesign(true)}
+            aria-label={`Bandingkan desain ${selectedGun.name}`}
+            className="relative mt-1.5 rounded-xl border border-amber-200/70 bg-[#342354] px-4 py-1 text-[11px] font-black text-amber-200 shadow-[0_0_12px_rgba(250,204,21,0.22)] transition hover:bg-[#4d3475] active:scale-95">
+            ✦ PILIH DESAIN · {GUN_VARIANTS.find((v) => v.id === selectedVariant)?.label.toUpperCase()} ▸
+          </button>
+        )}
       </div>
 
       {/* TABS ROW */}
@@ -275,6 +299,7 @@ export default function Arsenal({
         <div className="flex items-end justify-center gap-1.5 px-2">
           {[
             { id: 'ALL', icon: '👑', label: 'ALL' },
+            { id: 'DESAIN', icon: '🎨', label: 'DESAIN' },
             { id: 'EPIC', icon: '🎬', label: 'EPIC' },
             { id: 'LANGKA', icon: '🎃', label: 'RARE' },
             { id: 'LEGENDARIS', icon: '🎩', label: 'LEGEND' },
@@ -285,6 +310,7 @@ export default function Arsenal({
             return (
               <button
                 key={t.id}
+                aria-label={t.label}
                 onClick={() => {
                   setTab(t.id as Tab);
                   setPage(0);
@@ -305,6 +331,8 @@ export default function Arsenal({
         <div className="bg-[#7e22ce] py-1 text-center text-xs font-black tracking-widest text-white shadow-md uppercase border-t border-purple-300/40">
           {tab === 'ALL'
             ? 'ALL WEAPONS'
+            : tab === 'DESAIN'
+            ? `${EDITABLE_WEAPONS.length} DESAIN · KETUK SENJATA UNTUK MEMILIH`
             : tab === 'EPIC'
             ? 'EPIC ARSENAL'
             : tab === 'LANGKA'
@@ -324,11 +352,12 @@ export default function Arsenal({
           + LABEL RARITY DI ATAS KIRI KOTAK RAPI
           + LABEL NAMA SENJATA DI BAWAH KOTAK 100% TERBACA JELAS
          ------------------------------------------------------------- */}
-      <div className="relative z-10 flex-1 bg-[#120726] p-2.5 border-x border-b border-purple-500/30 shadow-2xl flex flex-col justify-between rounded-b-2xl">
+      <div className="relative z-10 flex-1 min-h-0 bg-[#120726] p-2.5 border-x border-b border-purple-500/30 shadow-2xl flex flex-col rounded-b-2xl">
         {tab !== 'BOSS' ? (
           <>
-            {/* 3 Columns x 4 Rows: KOTAK BESAR 40% (106px x 120px) SANGAT LEGA & MEWAH */}
-            <div className="grid grid-cols-3 grid-rows-4 gap-2.5 flex-1 items-center justify-items-center">
+            {/* Keep all twelve large thumbnails reachable on a 9:16 screen.
+                Scroll only the grid; the spotlight and page controls stay put. */}
+            <div ref={gridRef} aria-label="Senjata, gulir untuk melihat semua" className="grid grid-cols-3 auto-rows-[126px] content-start gap-2.5 flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-0.5 items-center justify-items-center">
               {currentPageWeapons.map((w) => {
                 const isSelected = selectedGunId === w.id;
                 const rc = RARITY_COLOR[w.rarity];
@@ -345,7 +374,7 @@ export default function Arsenal({
                   <button
                     key={w.id}
                     onClick={() => handleSelectGun(w)}
-                    className={`relative flex h-[116px] w-[106px] flex-col items-center justify-between p-2 rounded-2xl transition-all active:scale-95 ${
+                    className={`relative flex h-[124px] w-[104px] flex-col items-center justify-between p-1.5 rounded-2xl transition-all active:scale-95 ${
                       isSelected
                         ? 'border-[3.5px] border-[#fef08a] bg-[#2d1656] shadow-[0_0_24px_rgba(253,224,71,0.95),inset_0_0_12px_rgba(253,224,71,0.35)] z-10 scale-[1.02]'
                         : 'border border-purple-500/30 bg-[#1e1038] hover:bg-[#27144a]'
@@ -368,7 +397,7 @@ export default function Arsenal({
 
                     {/* 2. VISUAL SENJATA: EXACT CENTER PIVOT, 30% LEBIH BESAR, 100% UTUH NO CROP! */}
                     <div className="flex-1 flex items-center justify-center w-full my-auto overflow-visible">
-                      <GunItemCanvas weapon={w} isSelected={isSelected} size={92} />
+                      <GunItemCanvas weapon={w} isSelected={isSelected} variant={getGunVariant(w.id)} size={82} />
                     </div>
 
                     {/* 3. LABEL NAMA SENJATA DI BAWAH KOTAK (JELAS, TEBAL, TIDAK TERPOTONG!) */}
@@ -383,7 +412,7 @@ export default function Arsenal({
               {Array.from({ length: Math.max(0, PAGE_SIZE - currentPageWeapons.length) }).map((_, i) => (
                 <div
                   key={`empty-${i}`}
-                  className="flex h-[116px] w-[106px] items-center justify-center rounded-2xl border border-purple-900/30 bg-[#140b28]/50 opacity-20"
+                  className="flex h-[124px] w-[104px] items-center justify-center rounded-2xl border border-purple-900/30 bg-[#140b28]/50 opacity-20"
                 />
               ))}
             </div>
@@ -495,6 +524,25 @@ export default function Arsenal({
         </span>
         <span className="tracking-widest text-white drop-shadow">GUNS UNLOCKED</span>
       </div>
+      {editingDesign && canChooseGunDesign(selectedGunId) && (
+        <GunVariantPicker
+          weapon={selectedGun}
+          variantId={selectedGunId}
+          selected={selectedVariant}
+          effect={getGunEffect(selectedGunId)}
+          onSelect={(variant) => {
+            setGunVariant(selectedGunId, variant);
+            setDesignRevision((n) => n + 1);
+            sfx.unlock();
+          }}
+          onEffectSelect={(effect) => {
+            setGunEffect(selectedGunId, effect);
+            setDesignRevision((n) => n + 1);
+            sfx.unlock();
+          }}
+          onClose={() => setEditingDesign(false)}
+        />
+      )}
     </div>
   );
 }

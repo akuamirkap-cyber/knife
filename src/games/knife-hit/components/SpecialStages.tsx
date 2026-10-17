@@ -5,17 +5,20 @@ import { Burst, Confetti, Dust, GodRays, Shockwave, SparkleField } from "./Effec
 import { WeaponArt, getWeaponStats, type WeaponDef } from "../weapons";
 import { destroyHP } from "../stages";
 import { sfx, vibrate } from "../sfx";
+import { useSlideActive } from "../../shared/SlideActivity";
 
 type CSSVars = React.CSSProperties & Record<string, string | number>;
 
 /* Auto-lanjut mulus tanpa panel/tombol: langsung panggil onComplete setelah delay singkat */
 function AutoNext({ onComplete, delay = 800 }: { onComplete: () => void; delay?: number }) {
+  const active = useSlideActive();
   const ref = useRef(onComplete);
   ref.current = onComplete;
   useEffect(() => {
+    if (!active) return;
     const t = setTimeout(() => ref.current(), delay);
     return () => clearTimeout(t);
-  }, [delay]);
+  }, [delay, active]);
   return null;
 }
 
@@ -64,6 +67,7 @@ export function BonusStageScreen({
   coins?: number;
   initialStuck?: number[];
 }) {
+  const active = useSlideActive();
   const wrapRef = useRef<HTMLDivElement>(null);
   const wheelRef = useRef<HTMLDivElement>(null);
   const rot = useRef(Math.random() * 360);
@@ -88,6 +92,7 @@ export function BonusStageScreen({
   }, [dir ]);
 
   useEffect(() => {
+    if (!active) return;
     let raf = 0;
     let last = performance.now();
     const loop = (now: number) => {
@@ -99,7 +104,7 @@ export function BonusStageScreen({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [active]);
 
   const norm = (a: number) => {
     let x = a % 360;
@@ -394,6 +399,7 @@ export function TreasureStageScreen({
   level?: number;
   coins?: number;
 }) {
+  const active = useSlideActive();
   const stats = getWeaponStats(weapon);
   const heavy = stats.damage >= 4;
   const [timeLeft, setTimeLeft] = useState(TREASURE_TIME);
@@ -424,6 +430,7 @@ export function TreasureStageScreen({
   const buffUsedRef = useRef(false);
   const starSpawned = useRef(false);
   const starX = useRef(-60);
+  const starPhase = useRef(0);
   const starKind = useRef<BuffKind>("double");
 
   const buffRef = useRef<BuffKind | null>(null);
@@ -436,22 +443,26 @@ export function TreasureStageScreen({
   const CHEST_Y = 262;
   const GUN_Y = 556;
 
-  /* timer 10 detik */
+  /* timer 10 detik: only ticks while this game is selected */
   useEffect(() => {
+    if (!active) return;
     if (timeLeft <= 0) {
-      setFinished(true);
-      stopHold();
-      sfx.reveal();
-      vibrate(20);
+      if (!finishedRef.current) {
+        setFinished(true);
+        stopHold();
+        sfx.reveal();
+        vibrate(20);
+      }
       return;
     }
     if (timeLeft <= 3) sfx.tick(true);
     const t = setTimeout(() => setTimeLeft((v) => v - 1), 1000);
     return () => clearTimeout(t);
-  }, [timeLeft]);
+  }, [timeLeft, active]);
 
   /* bintang bonus: HANYA 1x lewat per run */
   useEffect(() => {
+    if (!active || starSpawned.current) return;
     const t = setTimeout(() => {
       if (starSpawned.current) return;
       starSpawned.current = true;
@@ -462,21 +473,20 @@ export function TreasureStageScreen({
       sfx.whoosh();
     }, 2300);
     return () => clearTimeout(t);
-  }, []);
+  }, [active]);
 
   /* gerak bintang: nyebrang kiri -> kanan + floating naik-turun */
   useEffect(() => {
-    if (!starActive) return;
+    if (!active || !starActive) return;
     let raf = 0;
     let last = performance.now();
-    let t = 0;
     const SPEED = 100;
     const loop = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      t += dt;
+      starPhase.current += dt;
       starX.current += SPEED * dt;
-      const y = 398 + Math.sin(t * 3.4) * 15;
+      const y = 398 + Math.sin(starPhase.current * 3.4) * 15;
       if (starEl.current) {
         starEl.current.style.left = `${starX.current - 30}px`;
         starEl.current.style.top = `${y - 30}px`;
@@ -489,15 +499,17 @@ export function TreasureStageScreen({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [starActive]);
+  }, [starActive, active]);
 
-  /* countdown buff */
+  /* countdown buff: don't reset the two barrels on focus changes */
   useEffect(() => {
-    if (!buff) return;
     if (buff === "double") {
       dualSideRef.current = 0;
       setDualSide(0);
     }
+  }, [buff]);
+  useEffect(() => {
+    if (!active || !buff) return;
     const iv = setInterval(() => {
       setBuffLeft((l) => {
         if (l <= 0.25) {
@@ -509,7 +521,7 @@ export function TreasureStageScreen({
       });
     }, 250);
     return () => clearInterval(iv);
-  }, [buff]);
+  }, [buff, active]);
 
   const shake = (p: number) => {
     wrapRef.current?.animate(
@@ -648,6 +660,7 @@ export function TreasureStageScreen({
     }
   };
   useEffect(() => () => { stopHold(); if (comboTimer.current) window.clearTimeout(comboTimer.current); }, []);
+  useEffect(() => { if (!active) stopHold(); }, [active]);
 
   const buffDef = buff ? BUFF_DEFS[buff] : null;
 
@@ -907,6 +920,7 @@ export function DestroyStageScreen({
   level?: number;
   coins?: number;
 }) {
+  const active = useSlideActive();
   const stats = getWeaponStats(weapon);
   const heavy = stats.damage >= 4;
   const hp = destroyHP(level);
@@ -973,6 +987,7 @@ export function DestroyStageScreen({
     }
   };
   useEffect(() => () => stopHold(), []);
+  useEffect(() => { if (!active) stopHold(); }, [active]);
 
   return (
     <div

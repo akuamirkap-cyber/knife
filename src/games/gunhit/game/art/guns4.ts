@@ -1,5 +1,5 @@
 import type { WeaponId } from '../weapons';
-import { TAU, rand, lin, steel, chrome, wood, brass, rr, grip, guard, glow, jag, star, radial } from './kit';
+import { TAU, rand, lin, steel, chrome, wood, brass, rr, grip, guard, glow, jag, star, radial, gunState } from './kit';
 
 import { drawGunExtra3, FLASH3 } from './guns5';
 export { FLASH3 };
@@ -7,72 +7,143 @@ export { FLASH3 };
 type C = CanvasRenderingContext2D;
 
 // ------------------------------------------------------------- HONEY
+/** The visible hand-pump surges after a shot without modifying ammo/reload. */
+export function honeyPumpPulse(sinceShot: number): number {
+  return sinceShot >= 0 && sinceShot < 0.28
+    ? Math.sin(Math.PI * sinceShot / 0.28) : 0;
+}
+
 function honey(c: C, cx: number, y0: number, t: number) {
-  grip(c, cx, y0 + 110, '#78350f', '#b45309', 0.8);
-  guard(c, cx, y0 + 102, '#451a03');
-  // honey jar body
-  c.beginPath();
-  c.roundRect(cx - 24, y0 + 40, 48, 76, [10, 10, 16, 16]);
-  c.fillStyle = 'rgba(254,243,199,0.35)';
-  c.fill();
-  c.save();
-  c.clip();
-  const lvl = y0 + 58 + Math.sin(t * 2) * 2;
-  c.fillStyle = lin(c, cx - 24, cx + 24, ['#b45309', '#fbbf24', '#f59e0b', '#92400e']);
-  c.fillRect(cx - 24, lvl, 48, 80);
-  c.fillStyle = 'rgba(255,255,255,0.35)';
-  c.fillRect(cx - 18, lvl + 4, 4, 50);
-  // honeycomb
-  c.strokeStyle = 'rgba(120,53,15,0.45)';
-  c.lineWidth = 1;
-  for (let r2 = 0; r2 < 4; r2++) {
-    for (let k = 0; k < 4; k++) {
-      const hx = cx - 15 + k * 10 + (r2 % 2) * 5;
-      const hy = y0 + 70 + r2 * 9;
-      c.beginPath();
-      for (let i = 0; i < 6; i++) c.lineTo(hx + Math.cos((i / 6) * TAU) * 5, hy + Math.sin((i / 6) * TAU) * 5);
-      c.closePath();
-      c.stroke();
+  // A brass pump and a glass reservoir: the amber liquid is the ammunition.
+  const pulse = Math.sin(t * 3);
+  const pump = honeyPumpPulse(gunState.sinceShot);
+  c.lineCap = 'round';
+  c.strokeStyle = '#4b260c'; c.lineWidth = 9;
+  c.beginPath(); c.moveTo(cx + 18, y0 + 107);
+  c.bezierCurveTo(cx + 40, y0 + 107, cx + 37, y0 + 34, cx + 9, y0 + 30); c.stroke();
+  c.strokeStyle = '#e3a945'; c.lineWidth = 4 + pump * 1.5;
+  c.beginPath(); c.moveTo(cx + 18, y0 + 107);
+  c.bezierCurveTo(cx + 40, y0 + 107, cx + 37, y0 + 34, cx + 9, y0 + 30); c.stroke();
+
+  // Thin translucent bee wings stand BEHIND the armor. Their arched golden
+  // veins make the honey tank read as a bee-themed blaster, not a plain jar.
+  for (const side of [-1, 1]) {
+    const wing = c.createLinearGradient(cx + side * 22, y0 + 40,
+      cx + side * 58, y0 + 103);
+    wing.addColorStop(0, 'rgba(255,250,197,0.8)');
+    wing.addColorStop(0.5, 'rgba(247,186,67,0.43)');
+    wing.addColorStop(1, 'rgba(153,77,17,0.69)');
+    c.fillStyle = wing; c.beginPath(); c.moveTo(cx + side * 20, y0 + 51);
+    c.quadraticCurveTo(cx + side * 38, y0 + 26, cx + side * 55, y0 + 26);
+    c.quadraticCurveTo(cx + side * 64, y0 + 49, cx + side * 52, y0 + 76);
+    c.quadraticCurveTo(cx + side * 65, y0 + 104, cx + side * 43, y0 + 116);
+    c.quadraticCurveTo(cx + side * 28, y0 + 104, cx + side * 20, y0 + 51);
+    c.closePath(); c.fill();
+    c.strokeStyle = '#b97928'; c.lineWidth = 2; c.stroke();
+    c.strokeStyle = 'rgba(255,251,219,0.81)'; c.lineWidth = 1.5;
+    for (const [x, y] of [[55, 26], [52, 76], [43, 116]]) {
+      c.beginPath(); c.moveTo(cx + side * 22, y0 + 56);
+      c.quadraticCurveTo(cx + side * 40, y0 + (y + 56) * 0.5,
+        cx + side * x, y0 + y); c.stroke();
     }
   }
+
+  // Real angled stock, checkered grip and exposed trigger. The flask above
+  // is ammunition; this bronze-and-cork assembly is what the player holds.
+  c.beginPath(); c.moveTo(cx + 6, y0 + 115);
+  c.quadraticCurveTo(cx + 31, y0 + 112, cx + 41, y0 + 127);
+  c.lineTo(cx + 63, y0 + 174);
+  c.quadraticCurveTo(cx + 56, y0 + 189, cx + 44, y0 + 182);
+  c.lineTo(cx + 14, y0 + 150); c.lineTo(cx + 5, y0 + 137); c.closePath();
+  c.fillStyle = lin(c, cx + 7, cx + 65,
+    ['#462410', '#ad742c', '#ffdc83', '#945214', '#49250f']);
+  c.fill(); c.strokeStyle = '#46260d'; c.lineWidth = 2.2; c.stroke();
+  c.beginPath(); c.moveTo(cx + 21, y0 + 131);
+  c.lineTo(cx + 37, y0 + 134); c.lineTo(cx + 55, y0 + 170);
+  c.quadraticCurveTo(cx + 53, y0 + 178, cx + 46, y0 + 177);
+  c.lineTo(cx + 19, y0 + 144); c.closePath();
+  c.fillStyle = lin(c, cx + 18, cx + 56, ['#663719', '#d8a253', '#683718']);
+  c.fill(); c.strokeStyle = '#f3cb78'; c.lineWidth = 1.2; c.stroke();
+  c.strokeStyle = 'rgba(74,40,17,0.64)'; c.lineWidth = 1.1;
+  for (let i = 0; i < 5; i++) {
+    c.beginPath(); c.moveTo(cx + 23 + i * 6, y0 + 139 + i * 7);
+    c.lineTo(cx + 31 + i * 6, y0 + 136 + i * 7); c.stroke();
+  }
+  rr(c, cx + 44, y0 + 175, 17, 7, 3, brass(c, cx + 44, cx + 61), '#603412', 1);
+  c.strokeStyle = '#e1af53'; c.lineWidth = 3.2; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(cx - 13, y0 + 113);
+  c.quadraticCurveTo(cx - 17, y0 + 139, cx + 1, y0 + 146);
+  c.quadraticCurveTo(cx + 17, y0 + 148, cx + 19, y0 + 126); c.stroke();
+  c.strokeStyle = '#583017'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(cx + 2, y0 + 127);
+  c.quadraticCurveTo(cx + 7, y0 + 134, cx + 5, y0 + 140); c.stroke();
+  for (const side of [-1, 1]) {
+    c.fillStyle = lin(c, cx - 39, cx + 39, ['#7e420f', '#f8d67c', '#9a530e']);
+    c.beginPath();
+    c.moveTo(cx + side * 21, y0 + 50);
+    c.lineTo(cx + side * 33, y0 + 60);
+    c.lineTo(cx + side * 30, y0 + 107);
+    c.lineTo(cx + side * 21, y0 + 117);
+    c.closePath(); c.fill();
+    c.strokeStyle = '#663710'; c.lineWidth = 2; c.stroke();
+    c.fillStyle = '#fef0b2';
+    for (const yy of [68, 83, 98]) {
+      c.beginPath(); c.arc(cx + side * 27, y0 + yy, 1.3, 0, TAU); c.fill();
+    }
+  }
+
+  rr(c, cx - 24, y0 + 40, 48, 82, 11, '#683814', '#f4ca75', 2);
+  c.save();
+  c.beginPath(); c.roundRect(cx - 20, y0 + 44, 40, 74, 8); c.clip();
+  c.fillStyle = '#40210f'; c.fillRect(cx - 20, y0 + 44, 40, 74);
+  const level = y0 + 59 + pulse * 2;
+  const liquid = c.createLinearGradient(cx - 18, level, cx + 22, y0 + 118);
+  liquid.addColorStop(0, '#fff2a3'); liquid.addColorStop(0.3, '#fbc02d');
+  liquid.addColorStop(0.73, '#d17b10'); liquid.addColorStop(1, '#85430e');
+  c.fillStyle = liquid;
+  c.beginPath(); c.moveTo(cx - 20, level);
+  c.quadraticCurveTo(cx, level - 5, cx + 20, level + 2);
+  c.lineTo(cx + 20, y0 + 119); c.lineTo(cx - 20, y0 + 119); c.closePath(); c.fill();
+  c.strokeStyle = 'rgba(255,248,188,0.86)'; c.lineWidth = 1.6;
+  c.beginPath(); c.moveTo(cx - 17, level + 1); c.quadraticCurveTo(cx, level - 3, cx + 17, level + 2); c.stroke();
+  // Honeycomb suspended inside the reservoir, rather than opaque stripes.
+  c.strokeStyle = 'rgba(111,56,12,0.42)'; c.lineWidth = 1.2;
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
+    const hx = cx - 12 + col * 12 + (row % 2) * 6, hy = y0 + 79 + row * 12;
+    c.beginPath();
+    for (let n = 0; n < 6; n++) {
+      const angle = TAU * (n + 0.5) / 6;
+      c.lineTo(hx + Math.cos(angle) * 6, hy + Math.sin(angle) * 6);
+    }
+    c.closePath(); c.stroke();
+  }
+  c.fillStyle = 'rgba(255,255,255,0.36)';
+  c.beginPath(); c.ellipse(cx - 15, y0 + 70, 2.4, 22, 0.09, 0, TAU); c.fill();
+  c.beginPath(); c.ellipse(cx + 13, y0 + 92, 1.4, 13, -0.1, 0, TAU); c.fill();
   c.restore();
-  c.beginPath();
-  c.roundRect(cx - 24, y0 + 40, 48, 76, [10, 10, 16, 16]);
-  c.strokeStyle = '#78350f';
-  c.lineWidth = 2;
-  c.stroke();
-  // cloth lid
-  rr(c, cx - 27, y0 + 32, 54, 12, 4, '#dc2626', '#7f1d1d');
-  c.fillStyle = '#fff';
-  for (let i = 0; i < 6; i++) c.fillRect(cx - 24 + i * 9, y0 + 35, 4, 4);
-  c.strokeStyle = '#a16207';
-  c.lineWidth = 2;
-  c.beginPath();
-  c.moveTo(cx - 26, y0 + 44);
-  c.lineTo(cx + 26, y0 + 44);
-  c.stroke();
-  // dipper nozzle
-  rr(c, cx - 4, y0 + 4, 8, 30, 3, wood(c, cx - 4, cx + 4));
-  for (let i = 0; i < 3; i++) rr(c, cx - 8, y0 + 2 + i * 6, 16, 4, 2, '#a16207');
-  // drip
-  const dp = (t * 0.8) % 1;
-  c.fillStyle = '#f59e0b';
-  c.beginPath();
-  c.ellipse(cx, y0 - 2 + dp * 10, 2.5, 3 + dp * 3, 0, 0, TAU);
-  c.fill();
-  // bee buddy
-  const bx = cx + 30 + Math.sin(t * 3) * 4;
-  const by = y0 + 30 + Math.cos(t * 4) * 4;
-  c.fillStyle = '#facc15';
-  c.beginPath();
-  c.ellipse(bx, by, 5, 3.5, 0, 0, TAU);
-  c.fill();
-  c.fillStyle = '#111';
-  c.fillRect(bx - 1, by - 3.5, 1.5, 7);
-  c.fillStyle = 'rgba(255,255,255,0.7)';
-  c.beginPath();
-  c.ellipse(bx - 1, by - 5, 3, 2 + Math.abs(Math.sin(t * 40)), 0, 0, TAU);
-  c.fill();
+  rr(c, cx - 23, y0 + 44, 46, 74, 9, 'rgba(255,223,139,0.10)', '#ffd885', 1.5);
+  rr(c, cx - 28, y0 + 36, 56, 10, 3, brass(c, cx - 28, cx + 28), '#5c320f', 2);
+  rr(c, cx - 28, y0 + 117, 56, 8, 3, brass(c, cx - 28, cx + 28), '#5c320f', 2);
+
+  // Carved honeycomb seal and ribbed liquid nozzle.
+  c.fillStyle = '#663213'; c.beginPath(); c.arc(cx, y0 + 92, 10, 0, TAU); c.fill();
+  star(c, cx, y0 + 92, 7, '#ffe08b', 6);
+  c.fillStyle = '#a4570d'; c.beginPath(); c.arc(cx, y0 + 92, 3.3, 0, TAU); c.fill();
+  rr(c, cx - 9, y0 + 9, 18, 28, 4, brass(c, cx - 9, cx + 9), '#5c320f', 2);
+  for (const yy of [14, 23, 32]) rr(c, cx - 11, y0 + yy, 22, 3, 1, '#693810', '#fcd77b', 0.7);
+  rr(c, cx - 14, y0 + 2, 28, 9, 4, brass(c, cx - 14, cx + 14), '#5c320f', 1.5);
+  c.fillStyle = '#7c3d0c'; c.beginPath(); c.ellipse(cx, y0 + 3, 7, 2.5, 0, 0, TAU); c.fill();
+  const drop = (t * 0.7) % 1;
+  c.fillStyle = '#ffd24f'; c.beginPath();
+  c.ellipse(cx + 2, y0 - 4 - drop * 8, 2 + drop * 0.6, 3 + drop, 0, 0, TAU); c.fill();
+  if (pump > 0.04) {
+    c.save(); c.globalAlpha = pump; c.shadowColor = '#ffbe38'; c.shadowBlur = 15;
+    c.fillStyle = '#ffe184'; c.beginPath();
+    c.moveTo(cx - 5, y0 + 1); c.quadraticCurveTo(cx - 9, y0 - 8, cx, y0 - 19);
+    c.quadraticCurveTo(cx + 9, y0 - 8, cx + 5, y0 + 1); c.fill();
+    c.fillStyle = '#fff8cb'; c.beginPath(); c.ellipse(cx, y0 - 6, 2, 6, 0, 0, TAU); c.fill();
+    c.restore();
+  }
 }
 
 // ------------------------------------------------------------- COCONUT CANNON
@@ -893,199 +964,219 @@ function ufoGun(c: C, cx: number, y0: number, t: number) {
 
 // ------------------------------------------------------------- RAINBOW
 function rainbowGun(c: C, cx: number, y0: number, t: number) {
-  grip(c, cx, y0 + 108, '#f9fafb', '#e5e7eb', 0.78);
-  guard(c, cx, y0 + 100, '#9ca3af');
-  // body with rainbow bands
-  const RB = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#60a5fa', '#a78bfa'];
-  c.save();
-  c.beginPath();
-  c.roundRect(cx - 18, y0 + 36, 36, 96, 12);
-  c.clip();
-  for (let i = 0; i < 6; i++) {
-    c.fillStyle = RB[(i + Math.floor(t * 4)) % 6];
-    c.fillRect(cx - 18 + i * 6, y0 + 36, 6, 96);
+  const bands = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#60a5fa', '#c084fc'];
+  rr(c, cx - 12, y0 + 109, 24, 49, 7, lin(c, cx - 12, cx + 12,
+    ['#454163', '#eeeaff', '#77738f', '#34304f']), '#fcf4ff', 1.6);
+  for (let i = 0; i < 4; i++) {
+    c.strokeStyle = bands[(i + 2) % 6]; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(cx - 9, y0 + 120 + i * 9); c.lineTo(cx + 9, y0 + 124 + i * 9); c.stroke();
   }
-  c.fillStyle = 'rgba(255,255,255,0.3)';
-  c.fillRect(cx - 12, y0 + 36, 4, 96);
-  c.restore();
-  c.beginPath();
-  c.roundRect(cx - 18, y0 + 36, 36, 96, 12);
-  c.strokeStyle = '#fff';
-  c.lineWidth = 2;
-  c.stroke();
-  // clouds
-  const cloud = (x: number, y: number, s: number) => {
-    c.fillStyle = '#ffffff';
-    c.beginPath();
-    c.arc(x, y, 7 * s, 0, TAU);
-    c.arc(x + 8 * s, y + 2 * s, 6 * s, 0, TAU);
-    c.arc(x - 8 * s, y + 2 * s, 6 * s, 0, TAU);
-    c.fill();
-  };
-  // arc
-  for (let i = 0; i < 6; i++) {
-    c.strokeStyle = RB[i];
-    c.lineWidth = 2.6;
-    c.beginPath();
-    c.arc(cx, y0 + 34, 26 - i * 2.6, Math.PI, TAU);
-    c.stroke();
+  rr(c, cx - 18, y0 + 151, 36, 8, 3, chrome(c, cx - 18, cx + 18), '#605b7e', 1);
+  for (const side of [-1, 1]) {
+    // Opalescent fins frame the glass prism rather than hiding its colors.
+    c.beginPath(); c.moveTo(cx + side * 18, y0 + 49);
+    c.lineTo(cx + side * 30, y0 + 34); c.lineTo(cx + side * 26, y0 + 103);
+    c.lineTo(cx + side * 18, y0 + 120); c.closePath();
+    c.fillStyle = lin(c, cx - 32, cx + 32, ['#9aa8c4', '#f8fafc', '#bdafe2', '#9aa8c4']);
+    c.fill(); c.strokeStyle = '#5c517b'; c.lineWidth = 1.5; c.stroke();
+    c.strokeStyle = bands[side === -1 ? 4 : 0]; c.lineWidth = 2.2;
+    c.beginPath(); c.moveTo(cx + side * 24, y0 + 46); c.lineTo(cx + side * 21, y0 + 104); c.stroke();
   }
-  cloud(cx - 24, y0 + 34, 0.8);
-  cloud(cx + 24, y0 + 34, 0.8);
-  // star emitter
-  c.save();
-  c.translate(cx, y0 + 6);
-  c.rotate(t * 2);
-  star(c, 0, 0, 8, '#fde047');
+  rr(c, cx - 19, y0 + 39, 38, 90, 10, '#393357', '#fff3ff', 2);
+  c.save(); c.beginPath(); c.roundRect(cx - 15, y0 + 43, 30, 82, 7); c.clip();
+  for (let i = 0; i < 6; i++) {
+    const g = c.createLinearGradient(cx - 15 + i * 5, 0, cx - 10 + i * 5, 0);
+    g.addColorStop(0, bands[i]); g.addColorStop(0.5, '#fff9ff'); g.addColorStop(1, bands[i]);
+    c.fillStyle = g; c.fillRect(cx - 15 + i * 5, y0 + 43, 5, 82);
+  }
+  c.fillStyle = 'rgba(255,255,255,0.42)';
+  c.beginPath(); c.moveTo(cx - 12 + Math.sin(t * 2) * 3, y0 + 43);
+  c.lineTo(cx - 7 + Math.sin(t * 2) * 3, y0 + 43);
+  c.lineTo(cx + 5 + Math.sin(t * 2) * 3, y0 + 125);
+  c.lineTo(cx, y0 + 125); c.closePath(); c.fill();
   c.restore();
-  glow(c, cx, y0 + 6, 3, '#ffffff', 14);
+  rr(c, cx - 21, y0 + 121, 42, 8, 3, chrome(c, cx - 21, cx + 21), '#66577c', 1.2);
+  rr(c, cx - 23, y0 + 36, 46, 8, 3, chrome(c, cx - 23, cx + 23), '#66577c', 1.2);
+  // Six nested, luminous refracted rays lead into a faceted muzzle prism.
+  for (let i = 0; i < 6; i++) {
+    c.strokeStyle = bands[i]; c.lineWidth = 2.2;
+    c.beginPath(); c.arc(cx, y0 + 28, 28 - i * 2.5, Math.PI * 1.13, Math.PI * 1.87); c.stroke();
+  }
+  c.save(); c.translate(cx, y0 + 14); c.rotate(t * 0.6);
+  c.shadowColor = '#f5d0fe'; c.shadowBlur = 16;
+  star(c, 0, 0, 13, '#f8f5ff', 6);
+  c.shadowBlur = 0; star(c, 0, 0, 7, '#fde68a', 6); c.restore();
+  for (const side of [-1, 1]) {
+    star(c, cx + side * 29, y0 + 33, 3.2, bands[side === -1 ? 4 : 0], 4);
+  }
 }
 
 // ------------------------------------------------------------- METEOR
 function meteorGun(c: C, cx: number, y0: number, t: number) {
-  grip(c, cx, y0 + 120, '#1c1917', '#44403c', 0.8);
-  guard(c, cx, y0 + 112);
-  // volcanic rock body with lava cracks
-  c.beginPath();
-  c.moveTo(cx - 22, y0 + 140);
-  c.lineTo(cx - 24, y0 + 60);
-  c.lineTo(cx - 16, y0 + 36);
-  c.lineTo(cx + 14, y0 + 32);
-  c.lineTo(cx + 24, y0 + 58);
-  c.lineTo(cx + 22, y0 + 140);
-  c.closePath();
-  c.fillStyle = lin(c, cx - 24, cx + 24, ['#0c0a09', '#44403c', '#292524', '#0c0a09']);
-  c.fill();
-  c.save();
-  c.clip();
-  const lv = 0.6 + 0.4 * Math.sin(t * 4);
-  c.shadowColor = '#f97316';
-  c.shadowBlur = 10 * lv;
-  c.strokeStyle = `rgba(251,146,60,${0.7 + 0.3 * lv})`;
-  c.lineWidth = 2;
+  const heat = 0.75 + 0.25 * Math.sin(t * 6);
+  rr(c, cx - 13, y0 + 110, 26, 53, 6, lin(c, cx - 13, cx + 13,
+    ['#15181e', '#66636a', '#302a30', '#111318']), '#a67754', 1.5);
   for (let i = 0; i < 4; i++) {
-    c.beginPath();
-    c.moveTo(cx - 24 + i * 14, y0 + 140);
-    c.lineTo(cx - 16 + i * 10, y0 + 110);
-    c.lineTo(cx - 20 + i * 12, y0 + 80);
-    c.lineTo(cx - 12 + i * 8, y0 + 46);
-    c.stroke();
+    c.strokeStyle = '#f08e49'; c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(cx - 8, y0 + 121 + i * 10); c.lineTo(cx + 8, y0 + 126 + i * 10); c.stroke();
   }
-  c.restore();
-  // molten core muzzle
+  // Forged iron brackets and heat exhausts make the launcher legible at thumbnail size.
+  for (const side of [-1, 1]) {
+    c.beginPath(); c.moveTo(cx + side * 16, y0 + 45);
+    c.lineTo(cx + side * 34, y0 + 59); c.lineTo(cx + side * 29, y0 + 123);
+    c.lineTo(cx + side * 18, y0 + 138); c.closePath();
+    c.fillStyle = lin(c, cx - 34, cx + 34, ['#282128', '#777077', '#221c22']);
+    c.fill(); c.strokeStyle = '#141014'; c.lineWidth = 2; c.stroke();
+    for (const yy of [65, 81, 97, 113]) {
+      rr(c, cx + side * 22 - 3, y0 + yy, 6, 8, 2,
+        `rgba(255,${140 + Math.round(40 * heat)},42,0.92)`, '#312027', 1);
+    }
+  }
   c.beginPath();
-  c.arc(cx, y0 + 18, 15, 0, TAU);
-  c.fillStyle = radial(c, cx, y0 + 18, 15, ['#fff7ed', '#fb923c', '#7c2d12']);
-  c.shadowColor = '#f97316';
-  c.shadowBlur = 20;
-  c.fill();
-  c.shadowBlur = 0;
-  // orbiting rocks
-  for (let i = 0; i < 3; i++) {
-    const a = t * 2 + (i / 3) * TAU;
-    c.fillStyle = '#57534e';
-    c.beginPath();
-    c.arc(cx + Math.cos(a) * 24, y0 + 18 + Math.sin(a) * 9, 3, 0, TAU);
-    c.fill();
+  c.moveTo(cx - 18, y0 + 130); c.lineTo(cx - 24, y0 + 91);
+  c.lineTo(cx - 21, y0 + 38); c.lineTo(cx - 11, y0 + 29);
+  c.lineTo(cx + 12, y0 + 29); c.lineTo(cx + 22, y0 + 40);
+  c.lineTo(cx + 24, y0 + 91); c.lineTo(cx + 18, y0 + 130);
+  c.closePath(); c.fillStyle = lin(c, cx - 24, cx + 24,
+    ['#161419', '#575057', '#29272b', '#171518']); c.fill();
+  c.strokeStyle = '#0d0b10'; c.lineWidth = 2.5; c.stroke();
+  // The glowing fissures follow the cracked basalt, not random vertical stripes.
+  c.save(); c.clip(); c.shadowColor = '#ff6a22'; c.shadowBlur = 9;
+  c.strokeStyle = '#f97316'; c.lineWidth = 3;
+  c.beginPath();
+  c.moveTo(cx - 17, y0 + 42); c.lineTo(cx - 6, y0 + 64); c.lineTo(cx - 12, y0 + 83);
+  c.lineTo(cx + 1, y0 + 95); c.lineTo(cx - 4, y0 + 124);
+  c.moveTo(cx + 14, y0 + 39); c.lineTo(cx + 4, y0 + 57); c.lineTo(cx + 10, y0 + 75);
+  c.lineTo(cx - 1, y0 + 95); c.moveTo(cx + 10, y0 + 75); c.lineTo(cx + 20, y0 + 102);
+  c.stroke(); c.strokeStyle = '#ffd17c'; c.lineWidth = 1; c.stroke(); c.restore();
+  for (const yy of [35, 126]) rr(c, cx - 25, y0 + yy, 50, 7, 3,
+    lin(c, cx - 25, cx + 25, ['#111017', '#9a9092', '#3a343b']), '#0d0b10', 1.5);
+  rr(c, cx - 17, y0 + 8, 34, 28, 5, lin(c, cx - 17, cx + 17,
+    ['#111017', '#665960', '#232027']), '#0c090d', 2);
+  c.fillStyle = '#1b1011'; c.beginPath(); c.ellipse(cx, y0 + 9, 15, 5, 0, 0, TAU); c.fill();
+  c.save(); c.shadowColor = '#ff6a22'; c.shadowBlur = 17;
+  c.fillStyle = radial(c, cx, y0 + 9, 10, ['#fff6c4', '#ff9e30', '#9a321a']);
+  c.beginPath(); c.ellipse(cx, y0 + 9, 10, 3, 0, 0, TAU); c.fill(); c.restore();
+  for (const side of [-1, 1]) {
+    c.fillStyle = '#31272a'; c.beginPath();
+    c.moveTo(cx + side * 20, y0 + 21); c.lineTo(cx + side * 30, y0 + 11);
+    c.lineTo(cx + side * 25, y0 + 40); c.closePath(); c.fill();
   }
-  if (Math.random() < 0.4) glow(c, cx + rand(-10, 10), y0 + rand(-4, 10), rand(1, 2), '#fdba74', 8);
 }
 
 // ------------------------------------------------------------- DIAMOND
 function diamondGun(c: C, cx: number, y0: number, t: number) {
-  grip(c, cx, y0 + 104, '#e5e7eb', '#9ca3af', 0.78);
-  guard(c, cx, y0 + 96, '#475569');
-  // platinum body
-  rr(c, cx - 14, y0 + 44, 28, 86, 6, chrome(c, cx - 14, cx + 14), '#334155');
-  // inset gems
-  const gem = (x: number, y: number, s: number, col: string) => {
-    c.beginPath();
-    c.moveTo(x, y - s);
-    c.lineTo(x + s * 0.8, y);
-    c.lineTo(x, y + s);
-    c.lineTo(x - s * 0.8, y);
-    c.closePath();
-    c.fillStyle = col;
-    c.fill();
-    c.strokeStyle = 'rgba(255,255,255,0.8)';
-    c.lineWidth = 0.8;
-    c.stroke();
-  };
-  gem(cx, y0 + 70, 6, '#67e8f9');
-  gem(cx - 6, y0 + 94, 4, '#f472b6');
-  gem(cx + 6, y0 + 94, 4, '#a78bfa');
-  gem(cx, y0 + 114, 5, '#4ade80');
-  // big diamond at muzzle
-  c.save();
-  c.translate(cx, y0 + 18);
-  c.beginPath();
-  c.moveTo(-16, -4);
-  c.lineTo(-9, -14);
-  c.lineTo(9, -14);
-  c.lineTo(16, -4);
-  c.lineTo(0, 22);
-  c.closePath();
-  const g = c.createLinearGradient(-16, -14, 16, 22);
-  g.addColorStop(0, '#ecfeff');
-  g.addColorStop(0.4, '#67e8f9');
-  g.addColorStop(0.7, '#e0f2fe');
-  g.addColorStop(1, '#0891b2');
-  c.fillStyle = g;
-  c.shadowColor = '#a5f3fc';
-  c.shadowBlur = 14;
-  c.fill();
-  c.shadowBlur = 0;
-  c.strokeStyle = 'rgba(255,255,255,0.9)';
-  c.lineWidth = 1;
-  c.beginPath();
-  c.moveTo(-16, -4);
-  c.lineTo(16, -4);
-  c.moveTo(-9, -14);
-  c.lineTo(-4, -4);
-  c.lineTo(0, 22);
-  c.lineTo(4, -4);
-  c.lineTo(9, -14);
-  c.stroke();
-  c.restore();
-  for (let i = 0; i < 3; i++) {
-    const a = Math.sin(t * 3 + i * 2.1);
-    if (a > 0.4) star(c, cx + [-14, 14, 4][i], y0 + [8, 24, -2][i], 5 * a, '#ffffff', 4);
+  rr(c, cx - 12, y0 + 107, 24, 54, 7, lin(c, cx - 12, cx + 12,
+    ['#14243f', '#507498', '#26395e', '#111c35']), '#c6e9f6', 1.7);
+  for (let i = 0; i < 4; i++) {
+    c.strokeStyle = 'rgba(206,247,255,0.6)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(cx - 9, y0 + 118 + i * 10); c.lineTo(cx + 8, y0 + 124 + i * 10); c.stroke();
   }
+  rr(c, cx - 17, y0 + 152, 34, 8, 3, chrome(c, cx - 17, cx + 17), '#415976', 1);
+  for (const side of [-1, 1]) {
+    c.beginPath(); c.moveTo(cx + side * 12, y0 + 38);
+    c.lineTo(cx + side * 27, y0 + 49); c.lineTo(cx + side * 24, y0 + 105);
+    c.lineTo(cx + side * 12, y0 + 132); c.closePath();
+    c.fillStyle = lin(c, cx - 29, cx + 29, ['#647a96', '#f7feff', '#9eb8ca', '#3f5577']);
+    c.fill(); c.strokeStyle = '#334766'; c.lineWidth = 1.6; c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,0.86)'; c.lineWidth = 1.3;
+    c.beginPath(); c.moveTo(cx + side * 25, y0 + 50);
+    c.lineTo(cx + side * 13, y0 + 96); c.lineTo(cx + side * 23, y0 + 104); c.stroke();
+  }
+  rr(c, cx - 16, y0 + 42, 32, 83, 5, lin(c, cx - 16, cx + 16,
+    ['#0f2948', '#568ab0', '#255280', '#112743']), '#eefaff', 1.6);
+  // Precision-cut inset gems with white facet lines and sapphire shadows.
+  for (const [xx, yy, size] of [[0, 63, 8], [-6, 89, 5], [7, 91, 5], [0, 111, 6]]) {
+    c.save(); c.translate(cx + xx, y0 + yy);
+    c.beginPath(); c.moveTo(0, -size); c.lineTo(size * 0.85, -size * 0.25);
+    c.lineTo(0, size); c.lineTo(-size * 0.85, -size * 0.25); c.closePath();
+    c.fillStyle = lin(c, -size, size, ['#2789be', '#f7ffff', '#59d8f6', '#0a6296']);
+    c.fill(); c.strokeStyle = '#e7fcff'; c.lineWidth = 0.9; c.stroke();
+    c.beginPath(); c.moveTo(0, -size); c.lineTo(0, size);
+    c.moveTo(-size * 0.85, -size * 0.25); c.lineTo(size * 0.85, -size * 0.25); c.stroke();
+    c.restore();
+  }
+  rr(c, cx - 21, y0 + 119, 42, 8, 2, chrome(c, cx - 21, cx + 21), '#425d73', 1);
+  // Crown-size faceted diamond emitter (its apex is the firing point).
+  c.save(); c.translate(cx, y0 + 17);
+  c.shadowColor = '#67e8f9'; c.shadowBlur = 19;
+  c.beginPath(); c.moveTo(0, -22); c.lineTo(13, -13); c.lineTo(19, -2);
+  c.lineTo(0, 23); c.lineTo(-19, -2); c.lineTo(-13, -13); c.closePath();
+  c.fillStyle = lin(c, -19, 19, ['#279dc5', '#dcfaff', '#ffffff', '#67c8e9', '#257aa8']);
+  c.fill(); c.shadowBlur = 0; c.strokeStyle = '#f0fdff'; c.lineWidth = 1.6; c.stroke();
+  c.fillStyle = 'rgba(255,255,255,0.63)';
+  c.beginPath(); c.moveTo(0, -22); c.lineTo(-6, -2); c.lineTo(0, 23);
+  c.lineTo(6, -2); c.closePath(); c.fill();
+  c.strokeStyle = '#518bb6'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(-19, -2); c.lineTo(19, -2);
+  c.moveTo(-13, -13); c.lineTo(-6, -2); c.lineTo(0, 23);
+  c.moveTo(13, -13); c.lineTo(6, -2); c.lineTo(0, 23); c.stroke();
+  c.restore();
+  if (Math.sin(t * 5) > 0) star(c, cx - 14, y0 + 8, 4, '#ffffff', 4);
+  if (Math.cos(t * 4) > 0) star(c, cx + 17, y0 + 34, 3, '#ffffff', 4);
 }
 
 // ------------------------------------------------------------- MOONBEAM
 function moonbeamGun(c: C, cx: number, y0: number, t: number) {
-  grip(c, cx, y0 + 110, '#1e1b4b', '#312e81', 0.78);
-  guard(c, cx, y0 + 102, '#0f0a2e');
-  // silver staff body
-  rr(c, cx - 7, y0 + 40, 14, 92, 6, chrome(c, cx - 7, cx + 7), '#312e81', 1.2);
-  for (let i = 0; i < 3; i++) star(c, cx, y0 + 60 + i * 24, 3, '#c4b5fd');
-  // crescent moon housing
-  c.save();
-  c.translate(cx, y0 + 20);
-  c.shadowColor = '#ddd6fe';
-  c.shadowBlur = 16;
-  c.beginPath();
-  c.arc(0, 0, 22, Math.PI * 0.15, Math.PI * 1.85);
-  c.arc(8, 0, 17, Math.PI * 1.75, Math.PI * 0.25, true);
+  // One continuous enchanted staff: NO pistol handle, trigger, magazine,
+  // wrapped gun grip or barrel. The pointed pommel is part of the same wand.
+  c.save(); c.shadowColor = '#a78bfa'; c.shadowBlur = 15;
+  c.beginPath(); c.moveTo(cx - 7, y0 + 33);
+  c.bezierCurveTo(cx - 10, y0 + 72, cx - 9, y0 + 123, cx - 6, y0 + 161);
+  c.quadraticCurveTo(cx - 5, y0 + 178, cx, y0 + 188);
+  c.quadraticCurveTo(cx + 5, y0 + 178, cx + 6, y0 + 161);
+  c.bezierCurveTo(cx + 9, y0 + 123, cx + 10, y0 + 72, cx + 7, y0 + 33);
   c.closePath();
-  c.fillStyle = lin(c, -22, 22, ['#a78bfa', '#f5f3ff', '#c4b5fd']);
-  c.fill();
+  c.fillStyle = lin(c, cx - 9, cx + 9,
+    ['#181033', '#493574', '#856bbb', '#4b347c', '#150e34']);
+  c.fill(); c.shadowBlur = 0; c.strokeStyle = '#d8b8f5'; c.lineWidth = 1.8; c.stroke();
   c.restore();
-  // orb
-  const p = 0.7 + 0.3 * Math.sin(t * 3);
-  c.beginPath();
-  c.arc(cx + 2, y0 + 20, 8, 0, TAU);
-  c.fillStyle = radial(c, cx + 2, y0 + 20, 8, ['#ffffff', '#ede9fe', '#a78bfa']);
-  c.shadowColor = '#ffffff';
-  c.shadowBlur = 18 * p;
-  c.fill();
-  c.shadowBlur = 0;
-  // tiny stars
-  for (let i = 0; i < 5; i++) {
-    const a = t * 0.8 + (i / 5) * TAU;
-    const tw = 0.5 + 0.5 * Math.sin(t * 5 + i);
-    star(c, cx + Math.cos(a) * 32, y0 + 20 + Math.sin(a) * 14, 2.5 * tw + 0.5, '#ffffff', 4);
+  // A silver-violet vine winds around the shaft, with tiny golden star maps.
+  c.strokeStyle = '#e6cfaa'; c.lineWidth = 1.4; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(cx - 6, y0 + 39);
+  c.bezierCurveTo(cx + 13, y0 + 49, cx - 13, y0 + 62, cx + 5, y0 + 75);
+  c.bezierCurveTo(cx + 14, y0 + 90, cx - 14, y0 + 106, cx + 5, y0 + 118);
+  c.bezierCurveTo(cx + 12, y0 + 134, cx - 8, y0 + 152, cx + 1, y0 + 175); c.stroke();
+  c.strokeStyle = 'rgba(245,232,209,0.74)'; c.lineWidth = 0.95;
+  c.beginPath(); c.moveTo(cx + 6, y0 + 45);
+  c.bezierCurveTo(cx - 10, y0 + 70, cx + 11, y0 + 103, cx - 4, y0 + 136); c.stroke();
+  for (const [x, yy, r] of [[-2, 52, 3.3], [4, 78, 2.5], [-3, 110, 3.6], [3, 144, 2.5], [0, 178, 2.6]]) {
+    star(c, cx + x, y0 + yy, r, '#fff1c3', 4);
+  }
+  // Central moonstone is an inlay, not an ergonomic gun grip.
+  c.beginPath(); c.ellipse(cx, y0 + 101, 5.2, 8, 0, 0, TAU);
+  c.fillStyle = radial(c, cx - 2, y0 + 97, 9, ['#ffffff', '#d9caff', '#7661b0']);
+  c.fill(); c.strokeStyle = '#efd9a3'; c.lineWidth = 1.5; c.stroke();
+  c.strokeStyle = 'rgba(252,238,190,0.71)'; c.lineWidth = 1;
+  for (const side of [-1, 1]) {
+    c.beginPath(); c.moveTo(cx + side * 3, y0 + 94);
+    c.quadraticCurveTo(cx + side * 9, y0 + 77, cx + side * 5, y0 + 60); c.stroke();
+  }
+  // Tip rests in an open crescent of filigree silver, cradling a living star.
+  const aura = c.createRadialGradient(cx, y0 + 10, 1, cx, y0 + 10, 50);
+  aura.addColorStop(0, 'rgba(255,249,229,0.56)');
+  aura.addColorStop(0.47, 'rgba(199,178,249,0.27)');
+  aura.addColorStop(1, 'rgba(150,109,230,0)');
+  c.fillStyle = aura; c.beginPath(); c.arc(cx, y0 + 10, 50, 0, TAU); c.fill();
+  for (const side of [-1, 1]) {
+    c.strokeStyle = '#f3e4fa'; c.lineWidth = 5; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(cx + side * 6, y0 + 37);
+    c.bezierCurveTo(cx + side * 27, y0 + 30, cx + side * 30, y0 + 6, cx + side * 15, y0 - 13);
+    c.stroke();
+    c.strokeStyle = '#bba1e6'; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(cx + side * 8, y0 + 35);
+    c.quadraticCurveTo(cx + side * 32, y0 + 15, cx + side * 15, y0 - 13); c.stroke();
+    star(c, cx + side * 15, y0 - 14, 4, '#fff4c9', 4);
+  }
+  c.save(); c.translate(cx, y0 + 9); c.rotate(t * 0.21);
+  c.shadowColor = '#e8dbff'; c.shadowBlur = 25;
+  star(c, 0, 0, 18, '#d6c3fa', 6);
+  c.shadowBlur = 0; star(c, 0, 0, 12, '#ffffff', 6);
+  star(c, 0, 0, 5.5, '#fff1c1', 6); c.restore();
+  for (let i = 0; i < 6; i++) {
+    const angle = t * 1.4 + i * TAU / 6, r = 32 + Math.sin(t * 2 + i) * 3;
+    star(c, cx + Math.cos(angle) * r, y0 + 9 + Math.sin(angle) * 25,
+      1.6 + (i % 2), i % 2 ? '#ffe6b2' : '#ffffff', 4);
   }
 }
 

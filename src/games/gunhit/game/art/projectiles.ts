@@ -1,19 +1,24 @@
 import type { ProjKind } from '../weapons';
 import { drawProjectileExtra } from './projectiles2';
+import { getGunEffect, isFixedClassicGun, supportsGunVariants, type GunEffect } from './gunVariants';
+import { drawClassicProjectile } from './classicProjectiles';
 
 const TAU = Math.PI * 2;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 // all projectiles: tip at y=0, base at y=len
-export function drawProjectile(c: CanvasRenderingContext2D, kind: ProjKind, len: number, t: number, age = 99) {
+export function drawProjectile(c: CanvasRenderingContext2D, kind: ProjKind, len: number, t: number, age = 99, embedded = false, effect: GunEffect = getGunEffect(kind)) {
   c.save();
+  if (supportsGunVariants(kind) && (isFixedClassicGun(kind) || effect === 'original')) {
+    drawClassicProjectile(c, kind, len, t);
+    c.restore();
+    return;
+  }
   switch (kind) {
     case 'pistol': round(c, len, 'normal'); break;
     case 'old': round(c, len, 'old'); break;
     case 'golden': round(c, len, 'gold'); break;
     case 'ak47': akRound(c, len); break;
-    case 'plasma': plasma(c, len, t); break;
-    case 'laser': laser(c, len, t); break;
     case 'cricket': cricket(c, len, t); break;
     case 'electro': electro(c, len); break;
     case 'nail': nail(c, len); break;
@@ -22,8 +27,7 @@ export function drawProjectile(c: CanvasRenderingContext2D, kind: ProjKind, len:
     case 'bazooka': rocket(c, len); break;
     case 'rpg': rpg(c, len); break;
     case 'freeze': shard(c, len, t); break;
-    case 'blackhole': voidOrb(c, len, t); break;
-    default: drawProjectileExtra(c, kind, len, t, age); break;
+    default: drawProjectileExtra(c, kind, len, t, age, embedded); break;
   }
   c.restore();
 }
@@ -94,21 +98,31 @@ function glowEllipse(c: CanvasRenderingContext2D, y: number, rx: number, ry: num
   c.fill();
 }
 
-function plasma(c: CanvasRenderingContext2D, len: number, t: number) {
-  const pulse = 0.75 + 0.25 * Math.sin(t * 12);
-  c.globalCompositeOperation = 'lighter';
-  glowEllipse(c, len * 0.45, 13, len * 0.65, '57,255,156', 0.55 * pulse);
-  c.shadowColor = '#39ff9c';
-  c.shadowBlur = 14;
-  c.fillStyle = '#1fe08a';
-  c.beginPath();
-  c.roundRect(-5.5, -1, 11, len * 0.92, 5.5);
-  c.fill();
+function plasma(c: CanvasRenderingContext2D, len: number, t: number, embedded: boolean) {
+  // A contained, swirling plasma orb rather than a featureless green capsule.
+  const y = embedded ? len * 0.5 : 12;
+  glowEllipse(c, y, 20, 25, '57,255,156', embedded ? 0.43 : 0.66);
+  c.save(); c.translate(0, y); c.rotate(t * 2.4);
+  c.shadowColor = '#56ffc0'; c.shadowBlur = 15;
+  const plasma = c.createRadialGradient(-4, -5, 1, 0, 0, 13);
+  plasma.addColorStop(0, '#ffffff'); plasma.addColorStop(0.32, '#b9ffe2');
+  plasma.addColorStop(0.7, '#24db94'); plasma.addColorStop(1, '#0e7259');
+  c.fillStyle = plasma; c.beginPath(); c.ellipse(0, 0, 12, 13, 0, 0, TAU); c.fill();
   c.shadowBlur = 0;
-  c.fillStyle = '#eafff4';
-  c.beginPath();
-  c.roundRect(-2.2, 2, 4.4, len * 0.82, 2.2);
-  c.fill();
+  c.strokeStyle = 'rgba(235,255,245,0.89)'; c.lineWidth = 1.5;
+  c.beginPath(); c.ellipse(0, 0, 15, 5, 0.33, -0.8, Math.PI * 1.5); c.stroke();
+  c.strokeStyle = 'rgba(80,255,181,0.86)'; c.lineWidth = 2;
+  c.beginPath(); c.ellipse(0, 0, 15, 5, -0.44, Math.PI * 0.3, Math.PI * 1.45); c.stroke();
+  c.fillStyle = '#edfff9';
+  for (const [x, yy, r] of [[-5, -3, 2.4], [5, 4, 1.6]]) {
+    c.beginPath(); c.arc(x, yy, r, 0, TAU); c.fill();
+  }
+  c.restore();
+  if (!embedded) {
+    for (const [x, yy, r] of [[-13, y + 13, 2], [12, y + 19, 1.6], [-5, len - 3, 1.4]]) {
+      c.fillStyle = '#aeffdd'; c.beginPath(); c.arc(x, yy, r, 0, TAU); c.fill();
+    }
+  }
 }
 
 function laser(c: CanvasRenderingContext2D, len: number, t: number) {
@@ -375,31 +389,24 @@ function shard(c: CanvasRenderingContext2D, len: number, t: number) {
   c.stroke();
 }
 
-function voidOrb(c: CanvasRenderingContext2D, len: number, t: number) {
-  c.save();
-  c.globalCompositeOperation = 'lighter';
-  glowEllipse(c, len * 0.45, 11, len * 0.6, '168,85,247', 0.6);
+function voidOrb(c: CanvasRenderingContext2D, len: number, t: number, embedded: boolean) {
+  // A small genuine singularity with a thin animated accretion disk. There
+  // is no giant opaque black disk applied to a treasure chest or rock face.
+  const y = embedded ? len * 0.5 : 10;
+  glowEllipse(c, y, 22, 20, '168,85,247', embedded ? 0.32 : 0.6);
+  c.save(); c.translate(0, y); c.rotate(t * 3.4);
+  const disk = c.createRadialGradient(0, 0, 2, 0, 0, 18);
+  disk.addColorStop(0, 'rgba(225,159,255,0)');
+  disk.addColorStop(0.38, 'rgba(255,204,144,0.87)');
+  disk.addColorStop(0.62, 'rgba(200,106,251,0.72)');
+  disk.addColorStop(1, 'rgba(121,40,185,0)');
+  c.fillStyle = disk; c.beginPath(); c.ellipse(0, 0, 19, 8, 0, 0, TAU); c.fill();
+  c.strokeStyle = '#fff0ca'; c.lineWidth = 1.5;
+  c.beginPath(); c.ellipse(0, 0, 14, 4.5, 0, -0.7, 1.9); c.stroke();
+  c.strokeStyle = '#b884fa'; c.lineWidth = 1.8;
+  c.beginPath(); c.ellipse(0, 0, 14, 4.5, 0, 2.3, 5.4); c.stroke();
   c.restore();
-  const y = 9;
-  c.save();
-  c.translate(0, y);
-  c.rotate(t * 5);
-  const g = c.createRadialGradient(0, 0, 4, 0, 0, 13);
-  g.addColorStop(0, 'rgba(255,170,80,1)');
-  g.addColorStop(0.4, 'rgba(200,90,255,0.9)');
-  g.addColorStop(1, 'rgba(120,40,220,0)');
-  c.fillStyle = g;
-  c.beginPath();
-  c.ellipse(0, 0, 13, 5, 0, 0, TAU);
-  c.fill();
-  c.restore();
-  c.fillStyle = '#000';
-  c.beginPath();
-  c.arc(0, y, 5.5, 0, TAU);
-  c.fill();
-  c.strokeStyle = 'rgba(230,200,255,0.9)';
-  c.lineWidth = 1;
-  c.beginPath();
-  c.arc(0, y, 6.3, 0, TAU);
-  c.stroke();
+  c.fillStyle = '#090519'; c.beginPath(); c.arc(0, y, 6, 0, TAU); c.fill();
+  c.strokeStyle = 'rgba(238,218,255,0.96)'; c.lineWidth = 1.5; c.stroke();
+  c.fillStyle = '#ffe2aa'; c.beginPath(); c.arc(-1.5, y - 6, 1.1, 0, TAU); c.fill();
 }

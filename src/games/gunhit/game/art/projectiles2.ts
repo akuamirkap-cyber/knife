@@ -4,6 +4,114 @@ import { TAU, rand, lin, radial } from './kit';
 import { drawProjectileExtra2 } from './projectiles3';
 
 type C = CanvasRenderingContext2D;
+export const SNOWBALL_RADIUS = 16; // Twice the former 8px snowball, before any stage size buff.
+
+/** A round, deep vortex medallion: its light is part of the shot, not a trailing stem. */
+function portalDisc(c: C, t: number) {
+  const blue = Math.floor(t * 0.7) % 2 === 0;
+  const rim = blue ? '#50bdff' : '#ffb053';
+  const counter = blue ? '#ffad54' : '#64d4ff';
+  c.save();
+  c.translate(0, 11);
+  c.scale(1, 1.18);
+  const halo = c.createRadialGradient(0, 0, 5, 0, 0, 23);
+  halo.addColorStop(0, blue ? 'rgba(56,189,248,0.3)' : 'rgba(251,146,60,0.3)');
+  halo.addColorStop(1, 'rgba(56,189,248,0)');
+  c.fillStyle = halo;
+  c.beginPath(); c.arc(0, 0, 23, 0, TAU); c.fill();
+
+  const depth = c.createRadialGradient(-3, -4, 1, 0, 0, 12.5);
+  depth.addColorStop(0, '#405894');
+  depth.addColorStop(0.32, '#162750');
+  depth.addColorStop(0.72, '#07132e');
+  depth.addColorStop(1, '#06101c');
+  c.fillStyle = depth;
+  c.beginPath(); c.arc(0, 0, 11.2, 0, TAU); c.fill();
+
+  // The swirl is INSIDE the rim, so the shot reads as a tiny portal at any angle.
+  c.save();
+  c.beginPath(); c.arc(0, 0, 9.3, 0, TAU); c.clip();
+  c.rotate(t * 2.4);
+  for (let i = 0; i < 3; i++) {
+    c.rotate(TAU / 3);
+    c.strokeStyle = i === 1 ? 'rgba(255,176,91,0.73)' : 'rgba(122,224,255,0.78)';
+    c.lineWidth = i === 1 ? 1.4 : 1.7;
+    c.lineCap = 'round';
+    c.beginPath(); c.arc(1.5, 0, 6.4, -0.8, 1.65); c.stroke();
+  }
+  c.restore();
+  c.fillStyle = '#e7f8ff';
+  c.beginPath(); c.arc(-1, -1, 1.7, 0, TAU); c.fill();
+
+  c.shadowColor = rim;
+  c.shadowBlur = 12;
+  c.lineWidth = 3.3;
+  c.strokeStyle = rim;
+  c.beginPath(); c.arc(0, 0, 12.3, 0, TAU); c.stroke();
+  c.shadowBlur = 0;
+  c.lineWidth = 1;
+  c.strokeStyle = 'rgba(226,249,255,0.9)';
+  c.beginPath(); c.arc(0, 0, 10.4, -2.7, -0.75); c.stroke();
+  c.strokeStyle = counter;
+  c.lineWidth = 2.8;
+  c.lineCap = 'round';
+  c.beginPath(); c.arc(0, 0, 12.3, t * 2.4, t * 2.4 + 0.95); c.stroke();
+  c.beginPath(); c.arc(0, 0, 12.3, t * 2.4 + Math.PI, t * 2.4 + Math.PI + 0.52); c.stroke();
+  c.restore();
+}
+
+/** Snow, not a second ball on a stick: one softly shaded 32px sphere. */
+function snowSphere(c: C, y: number, embedded: boolean) {
+  const r = SNOWBALL_RADIUS;
+  c.save();
+  if (!embedded) { c.shadowColor = 'rgba(168,226,255,0.75)'; c.shadowBlur = 9; }
+  const snow = c.createRadialGradient(-r * 0.35, y - r * 0.38, 1, 0, y, r * 1.12);
+  snow.addColorStop(0, '#ffffff');
+  snow.addColorStop(0.37, '#fbfeff');
+  snow.addColorStop(0.74, '#eef7fa');
+  snow.addColorStop(1, '#d3e5eb');
+  c.fillStyle = snow;
+  c.beginPath(); c.arc(0, y, r, 0, TAU); c.fill();
+  c.shadowBlur = 0;
+  c.strokeStyle = embedded ? 'rgba(167,194,203,0.7)' : 'rgba(155,189,201,0.7)';
+  c.lineWidth = embedded ? 1.4 : 1.1; c.stroke();
+  c.clip();
+  c.fillStyle = 'rgba(255,255,255,0.85)';
+  c.beginPath(); c.ellipse(-5.5, y - 5, 4.3, 2.1, -0.5, 0, TAU); c.fill();
+  c.strokeStyle = 'rgba(171,198,208,0.3)'; c.lineWidth = 1.2;
+  c.beginPath(); c.arc(3, y + 3, 6.5, 0.15, 1.85); c.stroke();
+  c.beginPath(); c.arc(-6, y + 3, 3, 2.6, 4.5); c.stroke();
+  for (const [x, dy, size] of [[-7, 5, 1.3], [4, -5, 1.2], [7, 6, 1.1], [-1, 8, 0.8]]) {
+    c.fillStyle = 'rgba(170,200,208,0.43)';
+    c.beginPath(); c.arc(x, y + dy, size, 0, TAU); c.fill();
+  }
+  c.restore();
+}
+
+function snowballShot(c: C, embedded: boolean) {
+  const r = SNOWBALL_RADIUS;
+  if (!embedded) { snowSphere(c, r, false); return; }
+  // y=0 is the surface. Only the outer hemisphere survives impact; the
+  // flattened snow crust and tiny fractures make its entry feel physical.
+  c.save();
+  c.beginPath(); c.rect(-r - 3, 0, 2 * (r + 3), r + 5); c.clip();
+  snowSphere(c, 0, true);
+  c.restore();
+  const slush = c.createLinearGradient(0, -1, 0, 5);
+  slush.addColorStop(0, '#ffffff'); slush.addColorStop(1, '#e3f0f3');
+  c.fillStyle = slush;
+  c.beginPath(); c.ellipse(0, 1.5, r + 1, 2.8, 0, 0, TAU); c.fill();
+  // Subtle packed-snow creases, not the dark angular facets of cracked ice.
+  c.strokeStyle = 'rgba(171,199,207,0.5)'; c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(-9, 5); c.quadraticCurveTo(-5, 6, -3, 9);
+  c.moveTo(8, 5); c.quadraticCurveTo(4, 6, 3, 10);
+  c.stroke();
+  c.fillStyle = '#ffffff';
+  for (const [x, y, size] of [[-12, 4, 1.7], [11, 5, 2], [0, 14, 1.1], [-6, 12, 1.2]]) {
+    c.beginPath(); c.arc(x, y, size, 0, TAU); c.fill();
+  }
+}
 
 function glowE(c: C, y: number, rx: number, ry: number, rgb: string, a: number) {
   c.save();
@@ -35,7 +143,7 @@ function bullet(c: C, len: number, w: number, tip: string[], body: string[], rim
   c.fillRect(-w / 2 - 1.2, len - 3, w + 2.4, 3);
 }
 
-export function drawProjectileExtra(c: C, kind: ProjKind, len: number, t: number, age: number) {
+export function drawProjectileExtra(c: C, kind: ProjKind, len: number, t: number, age: number, embedded = false) {
   if ((kind as string) === 'slingshot' && len < 999) {
     drawProjectileExtra2(c, kind, len, t, age);
     return;
@@ -137,44 +245,43 @@ export function drawProjectileExtra(c: C, kind: ProjKind, len: number, t: number
     }
     case 'flamethrower':
     case 'dragon': {
-      const isD = kind === 'dragon';
-      glowE(c, len * 0.4, 12, len * 0.6, '255,120,30', 0.6);
-      const fl = 1 + 0.1 * Math.sin(t * 30);
-      c.save();
-      c.globalCompositeOperation = 'lighter';
-      c.beginPath();
-      c.moveTo(0, -2);
-      c.bezierCurveTo(8 * fl, len * 0.2, 7, len * 0.7, 0, len * fl);
-      c.bezierCurveTo(-7, len * 0.7, -8 * fl, len * 0.2, 0, -2);
-      const g = c.createLinearGradient(0, 0, 0, len);
-      g.addColorStop(0, '#fffbe0');
-      g.addColorStop(0.3, '#fbbf24');
-      g.addColorStop(0.7, '#f97316');
-      g.addColorStop(1, 'rgba(220,38,38,0)');
-      c.fillStyle = g;
-      c.fill();
-      c.beginPath();
-      c.ellipse(0, len * 0.25, 2.5, len * 0.2, 0, 0, TAU);
-      c.fillStyle = '#ffffff';
-      c.fill();
-      c.restore();
-      if (isD) {
-        // tiny dragon horns + eyes on the fireball
-        c.fillStyle = '#fef3c7';
-        c.beginPath();
-        c.moveTo(-4, 6);
-        c.lineTo(-7, -2);
-        c.lineTo(-2, 4);
-        c.moveTo(4, 6);
-        c.lineTo(7, -2);
-        c.lineTo(2, 4);
-        c.fill();
-        c.fillStyle = '#7f1d1d';
-        c.beginPath();
-        c.arc(-2.2, 9, 1.2, 0, TAU);
-        c.arc(2.2, 9, 1.2, 0, TAU);
-        c.fill();
+      const isDragon = kind === 'dragon';
+      glowE(c, len * 0.38, isDragon ? 21 : 12, len * 0.75, '255,120,30', 0.68);
+      const flicker = Math.sin(t * 24) * 2;
+      c.save(); c.globalCompositeOperation = 'lighter';
+      const outer = c.createLinearGradient(0, 0, 0, len + 16);
+      outer.addColorStop(0, '#fffbd4'); outer.addColorStop(0.27, '#ffb839');
+      outer.addColorStop(0.6, '#ef5b26'); outer.addColorStop(1, 'rgba(185,28,28,0)');
+      c.fillStyle = outer;
+      c.beginPath(); c.moveTo(0, -6);
+      c.bezierCurveTo(12, 6, 8, len * 0.44, 6, len * 0.55);
+      c.quadraticCurveTo(13, len * 0.57, 7, len + 12);
+      c.quadraticCurveTo(3, len * 0.75, 1, len * 0.74);
+      c.quadraticCurveTo(-4, len + 14, -7, len + 7);
+      c.quadraticCurveTo(-5, len * 0.65, -8, len * 0.57);
+      c.bezierCurveTo(-13, len * 0.38, -11, 8, 0, -6);
+      c.closePath(); c.fill();
+      const core = c.createLinearGradient(0, 0, 0, len);
+      core.addColorStop(0, '#ffffff'); core.addColorStop(0.4, '#fff5c0');
+      core.addColorStop(1, 'rgba(255,183,53,0)');
+      c.fillStyle = core;
+      c.beginPath(); c.moveTo(0, -3);
+      c.bezierCurveTo(5, 3, 4 + flicker * 0.3, len * 0.4, 1, len * 0.6);
+      c.quadraticCurveTo(-5, len * 0.41, -5, 7);
+      c.closePath(); c.fill();
+      if (isDragon) {
+        for (const side of [-1, 1]) {
+          c.fillStyle = 'rgba(255,156,44,0.64)'; c.beginPath();
+          c.moveTo(side * 6, 11);
+          c.quadraticCurveTo(side * 18, len * 0.33, side * (13 + flicker), len * 0.7);
+          c.quadraticCurveTo(side * 12, len * 0.36, side * 5, 20); c.closePath(); c.fill();
+        }
+        c.fillStyle = '#ffe9a3';
+        for (const [x, y, size] of [[-11, len * 0.42, 1.6], [13, len * 0.7, 1.8]]) {
+          c.beginPath(); c.arc(x, y, size, 0, TAU); c.fill();
+        }
       }
+      c.restore();
       break;
     }
     case 'disc': {
@@ -229,52 +336,35 @@ export function drawProjectileExtra(c: C, kind: ProjKind, len: number, t: number
       break;
     }
     case 'banana': {
-      c.beginPath();
-      c.moveTo(-1, 0);
-      c.bezierCurveTo(9, len * 0.25, 9, len * 0.7, 1, len);
-      c.lineTo(-4, len - 2);
-      c.bezierCurveTo(2, len * 0.65, 2, len * 0.3, -4, 3);
+      // Only the peeled, cream-colored flesh leaves the launcher. The outer
+      // yellow skin remains there and folds shut again for the next shot.
+      c.save(); c.shadowColor = '#ffe5a3'; c.shadowBlur = embedded ? 0 : 7;
+      c.beginPath(); c.moveTo(0, -2);
+      c.bezierCurveTo(-7, 4, -6, len * 0.28, -3, len * 0.51);
+      c.quadraticCurveTo(2, len * 0.81, 7, len + 1);
+      c.quadraticCurveTo(12, len + 2, 11, len - 5);
+      c.bezierCurveTo(4, len * 0.66, 3, len * 0.25, 3, 2);
       c.closePath();
-      c.fillStyle = lin(c, -4, 9, ['#ca8a04', '#fde047', '#facc15']);
-      c.fill();
-      c.strokeStyle = '#854d0e';
-      c.lineWidth = 1;
-      c.stroke();
-      c.fillStyle = '#3f2a0a';
-      c.fillRect(-3, -1, 3, 4);
-      c.fillStyle = '#78350f';
-      c.beginPath();
-      c.arc(4, len * 0.5, 1, 0, TAU);
-      c.arc(2.5, len * 0.75, 0.8, 0, TAU);
-      c.fill();
-      break;
+      c.fillStyle = lin(c, -7, 12, ['#d5b86b', '#fff0ba', '#fffdf1', '#f6da90']);
+      c.fill(); c.shadowBlur = 0; c.strokeStyle = '#dabf78'; c.lineWidth = 0.9; c.stroke();
+      c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 1.3;
+      c.beginPath(); c.moveTo(-2, 7);
+      c.bezierCurveTo(-4, len * 0.4, 1, len * 0.75, 7, len - 5); c.stroke();
+      c.fillStyle = '#bb9b5a';
+      for (const [x, k] of [[1, 0.39], [3, 0.53], [5, 0.67]]) {
+        c.beginPath(); c.ellipse(x, len * k, 0.95, 1.5, -0.15, 0, TAU); c.fill();
+      }
+      if (embedded) {
+        // Surface at 50% of the length: the rest remains visibly OUTSIDE.
+        const y = len * 0.5;
+        c.fillStyle = 'rgba(255,243,199,0.9)';
+        c.beginPath(); c.ellipse(2, y, 9, 2.8, -0.15, 0, TAU); c.fill();
+      }
+      c.restore(); break;
     }
-    case 'portal': {
-      const blue = Math.floor(t * 0.7) % 2 === 0;
-      const rgb = blue ? '59,130,246' : '251,146,60';
-      glowE(c, len * 0.4, 12, len * 0.6, rgb, 0.6);
-      c.save();
-      c.translate(0, 8);
-      c.beginPath();
-      c.ellipse(0, 0, 7, 9, 0, 0, TAU);
-      c.fillStyle = '#0b1020';
-      c.fill();
-      c.strokeStyle = `rgb(${rgb})`;
-      c.lineWidth = 2.5;
-      c.shadowColor = `rgb(${rgb})`;
-      c.shadowBlur = 10;
-      c.stroke();
-      c.rotate(t * 6);
-      c.strokeStyle = 'rgba(255,255,255,0.7)';
-      c.lineWidth = 1;
-      c.beginPath();
-      c.arc(0, 0, 4, 0, Math.PI * 1.3);
-      c.stroke();
-      c.restore();
-      c.fillStyle = `rgba(${rgb},0.8)`;
-      c.fillRect(-1.5, 17, 3, len - 18);
+    case 'portal':
+      portalDisc(c, t);
       break;
-    }
     case 'magnet': {
       c.save();
       c.lineCap = 'butt';
@@ -395,40 +485,28 @@ export function drawProjectileExtra(c: C, kind: ProjKind, len: number, t: number
       break;
     }
     case 'soaker': {
-      glowE(c, len * 0.4, 8, len * 0.5, '96,165,250', 0.4);
-      c.beginPath();
-      c.moveTo(0, -2);
-      c.bezierCurveTo(6, len * 0.2, 6, len * 0.55, 0, len * 0.7);
-      c.bezierCurveTo(-6, len * 0.55, -6, len * 0.2, 0, -2);
-      c.fillStyle = radial(c, 0, len * 0.3, 8, ['#ffffff', '#93c5fd', '#2563eb']);
-      c.fill();
-      c.fillStyle = 'rgba(147,197,253,0.8)';
-      for (let i = 0; i < 3; i++) {
-        c.beginPath();
-        c.arc(Math.sin(t * 10 + i) * 2, len * 0.78 + i * 4, 1.6 - i * 0.3, 0, TAU);
-        c.fill();
-      }
+      // A translucent bead with a moving-looking reflection, not a blue
+      // energy round capped by a smaller ball like a tadpole's head and stem.
+      const water = c.createRadialGradient(-2.8, 3, 0, 0, 9, 10);
+      water.addColorStop(0, 'rgba(255,255,255,0.98)');
+      water.addColorStop(0.28, 'rgba(215,252,255,0.94)');
+      water.addColorStop(0.67, 'rgba(69,199,235,0.76)');
+      water.addColorStop(1, 'rgba(14,129,195,0.42)');
+      c.shadowColor = '#5bd7f5'; c.shadowBlur = 8;
+      c.fillStyle = water;
+      c.beginPath(); c.ellipse(0, 9, 7.3, 9, -0.12, 0, TAU); c.fill();
+      c.shadowBlur = 0;
+      c.strokeStyle = 'rgba(218,250,255,0.84)'; c.lineWidth = 1.2;
+      c.beginPath(); c.ellipse(0, 9, 6.7, 8.2, -0.12, -2.8, 0.55); c.stroke();
+      c.fillStyle = 'rgba(255,255,255,0.88)';
+      c.beginPath(); c.ellipse(-2.8, 4.7, 1.4, 2.9, -0.35, 0, TAU); c.fill();
+      c.strokeStyle = 'rgba(231,253,255,0.75)'; c.lineWidth = 0.9;
+      c.beginPath(); c.arc(1.5, 10, 3.9, 0.1, 1.75); c.stroke();
       break;
     }
-    case 'snowball': {
-      const r = Math.min(8, len * 0.38);
-      c.beginPath();
-      c.arc(0, r, r, 0, TAU);
-      c.fillStyle = radial(c, 0, r, r, ['#ffffff', '#f0f9ff', '#bae6fd']);
-      c.fill();
-      c.fillStyle = 'rgba(186,230,253,0.8)';
-      c.beginPath();
-      c.arc(2, r + 3, 1.5, 0, TAU);
-      c.arc(-3, r - 2, 1.2, 0, TAU);
-      c.fill();
-      if (len > r * 2 + 4) {
-        c.beginPath();
-        c.arc(0, r * 2 + (len - r * 2) / 2, Math.min(r * 1.1, (len - r * 2) / 2 + 1), 0, TAU);
-        c.fillStyle = radial(c, 0, r * 2 + 6, r, ['#ffffff', '#e0f2fe', '#bae6fd']);
-        c.fill();
-      }
+    case 'snowball':
+      snowballShot(c, embedded);
       break;
-    }
     case 'pirate': {
       const r = Math.min(8, len * 0.4);
       c.beginPath();
@@ -446,55 +524,47 @@ export function drawProjectileExtra(c: C, kind: ProjKind, len: number, t: number
       break;
     }
     case 'chicken': {
-      // body (rubber chicken, head first)
+      // Twice the original chick's width AND almost twice its length. Its
+      // actual 12px collision half-width matches the oversized rubber body.
       c.save();
-      c.fillStyle = lin(c, -6, 6, ['#ca8a04', '#fde047', '#eab308']);
-      c.beginPath();
-      c.ellipse(0, len * 0.68, 6, len * 0.3, 0, 0, TAU);
-      c.fill();
-      c.fillRect(-2.2, 8, 4.4, len * 0.45);
-      c.beginPath();
-      c.arc(0, 6, 5, 0, TAU);
-      c.fill();
-      c.strokeStyle = '#a16207';
-      c.lineWidth = 1;
-      c.stroke();
-      // comb
-      c.fillStyle = '#ef4444';
-      c.beginPath();
-      c.arc(-2.5, 2, 2, 0, TAU);
-      c.arc(0, 0.5, 2, 0, TAU);
-      c.arc(2.5, 2, 2, 0, TAU);
-      c.fill();
-      // beak
-      c.fillStyle = '#f97316';
-      c.beginPath();
-      c.moveTo(-2, 9);
-      c.lineTo(2, 9);
-      c.lineTo(0, 13);
-      c.fill();
-      // X eyes
-      c.strokeStyle = '#111';
-      c.lineWidth = 0.9;
-      for (const s of [-1, 1]) {
-        c.beginPath();
-        c.moveTo(s * 2.2 - 1, 4.5);
-        c.lineTo(s * 2.2 + 1, 6.5);
-        c.moveTo(s * 2.2 + 1, 4.5);
-        c.lineTo(s * 2.2 - 1, 6.5);
-        c.stroke();
+      const wobble = embedded ? 0 : Math.sin(t * 19) * 1.1;
+      c.strokeStyle = '#b76616'; c.lineWidth = 2.5;
+      for (const side of [-1, 1]) {
+        c.beginPath(); c.moveTo(side * 6, len * 0.83);
+        c.lineTo(side * (7 + wobble), len + 3);
+        c.lineTo(side * 13, len + 6); c.stroke();
       }
-      // feet
-      c.strokeStyle = '#f97316';
-      c.lineWidth = 1.5;
-      c.beginPath();
-      c.moveTo(-2, len * 0.95);
-      c.lineTo(-4, len + 2);
-      c.moveTo(2, len * 0.95);
-      c.lineTo(4, len + 2);
-      c.stroke();
-      c.restore();
-      break;
+      c.fillStyle = '#ebaa27'; c.beginPath();
+      c.moveTo(5, len * 0.65); c.quadraticCurveTo(18, len * 0.77, 17, len * 0.46);
+      c.quadraticCurveTo(22, len * 0.84, 10, len * 0.92); c.fill();
+      c.beginPath(); c.ellipse(0, len * 0.63, 12, len * 0.35, 0, 0, TAU);
+      c.fillStyle = lin(c, -13, 13, ['#c48c22', '#ffdf5c', '#fff4a3', '#e5ad30']);
+      c.fill(); c.strokeStyle = '#a36517'; c.lineWidth = 1.3; c.stroke();
+      c.fillStyle = 'rgba(255,255,226,0.72)';
+      c.beginPath(); c.ellipse(-4, len * 0.51, 2.3, len * 0.22, 0, 0, TAU); c.fill();
+      for (const side of [-1, 1]) {
+        c.fillStyle = '#f7c244'; c.beginPath();
+        c.ellipse(side * 10, len * 0.57, 6, 13, side * 0.29, 0, TAU); c.fill();
+        c.strokeStyle = '#ac701b'; c.lineWidth = 1; c.stroke();
+        c.strokeStyle = 'rgba(255,250,206,0.84)';
+        c.beginPath(); c.moveTo(side * 8, len * 0.48);
+        c.quadraticCurveTo(side * 14, len * 0.6, side * 8, len * 0.69); c.stroke();
+      }
+      c.fillStyle = '#ffe469'; c.beginPath(); c.ellipse(0, 13, 10, 14, 0, 0, TAU); c.fill();
+      c.strokeStyle = '#a36517'; c.lineWidth = 1; c.stroke();
+      c.fillStyle = '#e13d31';
+      for (let i = -1; i <= 1; i++) {
+        c.beginPath(); c.arc(i * 4.8, 0 - (i === 0 ? 3 : 0), 4, 0, TAU); c.fill();
+      }
+      c.fillStyle = '#ef7c24'; c.beginPath();
+      c.moveTo(-5, 9); c.lineTo(5, 9); c.lineTo(0, -5); c.closePath(); c.fill();
+      c.strokeStyle = '#b65315'; c.lineWidth = 1; c.stroke();
+      c.fillStyle = '#38251c';
+      for (const side of [-1, 1]) {
+        c.beginPath(); c.arc(side * 5, 14, 1.7, 0, TAU); c.fill();
+      }
+      c.fillStyle = '#ed6251'; c.beginPath(); c.ellipse(10, 24, 2.3, 4, 0, 0, TAU); c.fill();
+      c.restore(); break;
     }
     case 'card': {
       // CARD 1.8X BIGGER!
@@ -718,7 +788,7 @@ export function drawProjectileExtra(c: C, kind: ProjKind, len: number, t: number
       break;
     }
     default: {
-      drawProjectileExtra2(c, kind, len, t, age);
+      drawProjectileExtra2(c, kind, len, t, age, embedded);
     }
   }
 }

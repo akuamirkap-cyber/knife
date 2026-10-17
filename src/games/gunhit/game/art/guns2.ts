@@ -1,6 +1,7 @@
 import { TAU, rand, lin, vlin, steel, chrome, wood, rr, grip, guard, glow, star, radial, gunState } from './kit';
 
 type C = CanvasRenderingContext2D;
+export const SNOWBALL_MAG_SIZE = 5;
 
 // ------------------------------------------------------------- KETAPEL PRO (animated draw / release)
 const easeInOut = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
@@ -488,16 +489,24 @@ export function soaker(c: C, cx: number, y0: number, t: number) {
 }
 
 // ------------------------------------------------------------- SNOWBALL CANNON
-export function snowball(c: C, cx: number, y0: number, t: number) {
+export function snowball(c: C, cx: number, y0: number, t: number, loaded = SNOWBALL_MAG_SIZE) {
   grip(c, cx, y0 + 118, '#bae6fd', '#38bdf8', 0.8);
   guard(c, cx, y0 + 110, '#0c4a6e');
-  // hopper with snowballs
-  rr(c, cx - 46, y0 + 70, 26, 50, 6, 'rgba(186,230,253,0.35)', '#0369a1', 2);
-  for (let i = 0; i < 3; i++) {
-    c.beginPath();
-    c.arc(cx - 33, y0 + 112 - i * 15, 7, 0, TAU);
-    c.fillStyle = radial(c, cx - 33, y0 + 112 - i * 15, 7, ['#ffffff', '#e0f2fe', '#93c5fd']);
-    c.fill();
+  // Five visible chambers: each snowball disappears after a shot, then the
+  // hopper refills together when the magazine's reload animation finishes.
+  rr(c, cx - 47, y0 + 41, 28, 80, 7, 'rgba(8,47,73,0.82)', '#38bdf8', 2);
+  c.fillStyle = 'rgba(191,239,255,0.18)';
+  c.fillRect(cx - 43, y0 + 45, 3, 71);
+  for (let i = 0; i < SNOWBALL_MAG_SIZE; i++) {
+    const bx = cx - 33, by = y0 + 51 + i * 14.5;
+    c.beginPath(); c.arc(bx, by, 6.5, 0, TAU);
+    c.fillStyle = '#0b3047'; c.fill();
+    c.strokeStyle = 'rgba(148,221,248,0.52)'; c.lineWidth = 1; c.stroke();
+    if (i >= loaded) continue;
+    c.beginPath(); c.arc(bx, by, 5.9, 0, TAU);
+    c.fillStyle = radial(c, bx, by, 6, ['#ffffff', '#f3fbff', '#c7e8f5']); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.85)';
+    c.beginPath(); c.arc(bx - 1.7, by - 2, 1.1, 0, TAU); c.fill();
   }
   rr(c, cx - 22, y0 + 90, 8, 8, 2, '#0369a1');
   // tube
@@ -735,157 +744,179 @@ export function drawBoomerang(c: C, x: number, y: number, s: number) {
 
 // ------------------------------------------------------------- MERIAM BAMBU
 export function bamboo(c: C, cx: number, y0: number, t: number) {
-  // fire stick (penyulut)
-  c.save();
-  c.translate(cx + 30, y0 + 180);
-  c.rotate(-0.5);
-  rr(c, -3, -46, 6, 60, 2, wood(c, -3, 3));
-  const f = 0.8 + 0.2 * Math.sin(t * 25);
-  c.globalCompositeOperation = 'lighter';
-  c.fillStyle = `rgba(255,140,30,${0.8 * f})`;
-  c.beginPath();
-  c.ellipse(0, -50, 4, 8 * f, 0, 0, TAU);
-  c.fill();
-  c.fillStyle = `rgba(255,230,120,${f})`;
-  c.beginPath();
-  c.ellipse(0, -48, 2, 4 * f, 0, 0, TAU);
-  c.fill();
-  c.restore();
-  // bamboo tube
-  rr(c, cx - 17, y0 + 2, 34, 196, 6, lin(c, cx - 17, cx + 17, ['#3f6212', '#a3c94a', '#84a83a', '#365314']), '#1a2e05');
-  // nodes
-  for (let i = 1; i < 5; i++) {
-    const ny = y0 + i * 44;
-    rr(c, cx - 18, ny - 3, 36, 6, 3, lin(c, cx - 18, cx + 18, ['#365314', '#d9e8a8', '#4d7c0f']));
-    c.fillStyle = 'rgba(0,0,0,0.15)';
-    c.fillRect(cx - 17, ny + 3, 34, 3);
+  // A real, hollow bamboo culm: warm green-gold fibres, swollen nodes,
+  // rattan lashings and a burnt firing rim. The side wick supplies the bang.
+  const pulse = 0.65 + 0.35 * Math.sin(t * 13);
+  c.beginPath(); c.moveTo(cx - 15, y0 + 7);
+  c.lineTo(cx + 15, y0 + 7); c.lineTo(cx + 21, y0 + 190);
+  c.quadraticCurveTo(cx + 1, y0 + 206, cx - 20, y0 + 192);
+  c.closePath();
+  c.fillStyle = lin(c, cx - 22, cx + 22,
+    ['#284910', '#628c21', '#d5e875', '#83a33a', '#2f4c16']);
+  c.fill(); c.strokeStyle = '#20370f'; c.lineWidth = 2.5; c.stroke();
+  // Hard glossy enamel highlights and age marks follow the grain.
+  c.strokeStyle = 'rgba(243,255,188,0.63)'; c.lineWidth = 2.3;
+  c.beginPath(); c.moveTo(cx - 9, y0 + 12);
+  c.quadraticCurveTo(cx - 14, y0 + 89, cx - 9, y0 + 182); c.stroke();
+  c.strokeStyle = 'rgba(48,84,15,0.51)'; c.lineWidth = 1.1;
+  for (const dx of [-13, -3, 6, 14]) {
+    c.beginPath(); c.moveTo(cx + dx, y0 + 13);
+    c.quadraticCurveTo(cx + dx + 2, y0 + 90, cx + dx + 2, y0 + 187); c.stroke();
   }
-  // fiber streaks
-  c.strokeStyle = 'rgba(255,255,255,0.18)';
-  c.lineWidth = 1;
-  for (let i = 0; i < 4; i++) {
-    c.beginPath();
-    c.moveTo(cx - 10 + i * 6, y0 + 8);
-    c.lineTo(cx - 10 + i * 6, y0 + 190);
-    c.stroke();
+  for (const [i, by] of [41, 85, 130, 175].entries()) {
+    const swell = i % 2 ? 2 : 0;
+    rr(c, cx - 21 - swell, y0 + by - 4, 42 + swell * 2, 9, 4,
+      lin(c, cx - 22, cx + 22, ['#41651a', '#dbec82', '#819d31', '#395813']), '#33521a', 1.4);
+    c.fillStyle = 'rgba(251,255,193,0.6)';
+    c.fillRect(cx - 16, y0 + by - 1, 25, 1.4);
+    c.strokeStyle = 'rgba(43,63,17,0.45)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(cx - 18, y0 + by + 8);
+    c.quadraticCurveTo(cx - 5, y0 + by + 5, cx + 16, y0 + by + 8); c.stroke();
   }
-  // fire hole
-  c.beginPath();
-  c.ellipse(cx + 8, y0 + 168, 4.5, 3, 0, 0, TAU);
-  c.fillStyle = '#1a0a00';
-  c.fill();
-  glow(c, cx + 8, y0 + 168, 2, `rgba(255,120,30,${0.6 + 0.4 * Math.sin(t * 9)})`, 10);
-  // rope bindings
-  c.strokeStyle = '#a16207';
-  c.lineWidth = 2;
-  for (const by of [y0 + 70, y0 + 150]) {
-    for (let i = 0; i < 3; i++) {
-      c.beginPath();
-      c.moveTo(cx - 17, by + i * 3);
-      c.lineTo(cx + 17, by + 2 + i * 3);
-      c.stroke();
+  // Two crossed rattan belts prevent the hollow cannon from splitting.
+  for (const by of [66, 150]) {
+    rr(c, cx - 23, y0 + by, 46, 15, 4,
+      lin(c, cx - 23, cx + 23, ['#5f3516', '#c68e4d', '#eac184', '#7a481e']), '#41280f', 1.4);
+    c.strokeStyle = '#5e371b'; c.lineWidth = 1.25;
+    for (let i = 0; i < 6; i++) {
+      c.beginPath(); c.moveTo(cx - 21 + i * 8, y0 + by + 2);
+      c.lineTo(cx - 15 + i * 8, y0 + by + 13); c.stroke();
     }
+    c.fillStyle = '#ffdd8f'; c.beginPath(); c.arc(cx + 18, y0 + by + 7, 2, 0, TAU); c.fill();
   }
-  // merah putih ribbon
-  c.save();
-  c.translate(cx - 17, y0 + 72);
-  const wv = Math.sin(t * 4) * 3;
-  c.fillStyle = '#dc2626';
-  c.beginPath();
-  c.moveTo(0, 0);
-  c.quadraticCurveTo(-14, 6 + wv, -24, 2 + wv);
-  c.lineTo(-24, 8 + wv);
-  c.quadraticCurveTo(-14, 12 + wv, 0, 6);
-  c.fill();
-  c.fillStyle = '#ffffff';
-  c.beginPath();
-  c.moveTo(0, 6);
-  c.quadraticCurveTo(-14, 12 + wv, -24, 8 + wv);
-  c.lineTo(-24, 14 + wv);
-  c.quadraticCurveTo(-14, 18 + wv, 0, 12);
-  c.fill();
-  c.restore();
-  // mouth
-  c.beginPath();
-  c.ellipse(cx, y0 + 2, 15, 4, 0, 0, TAU);
-  c.fillStyle = '#1a0a00';
-  c.fill();
-  c.strokeStyle = '#a3c94a';
-  c.lineWidth = 2;
-  c.stroke();
+  // Carved red/gold firecracker crest instead of a generic gun badge.
+  c.fillStyle = '#a52b21'; c.beginPath(); c.roundRect(cx - 10, y0 + 102, 20, 24, 3); c.fill();
+  c.strokeStyle = '#f7ce68'; c.lineWidth = 1.8; c.stroke();
+  c.fillStyle = '#ffe7a2'; star(c, cx, y0 + 114, 7, '#ffe7a2', 8);
+  rr(c, cx - 23, y0 + 189, 46, 10, 4,
+    lin(c, cx - 23, cx + 23, ['#244415', '#99b947', '#456e1d']), '#1d3910', 1.5);
+  // Charring is confined to the rim, never a black circle on the target.
+  const rim = c.createLinearGradient(cx - 19, y0 - 2, cx + 19, y0 + 14);
+  rim.addColorStop(0, '#2e4518'); rim.addColorStop(0.45, '#f3de8d');
+  rim.addColorStop(0.77, '#557624'); rim.addColorStop(1, '#253716');
+  c.fillStyle = rim; c.beginPath();
+  c.moveTo(cx - 23, y0 - 1); c.lineTo(cx + 23, y0 - 1);
+  c.lineTo(cx + 18, y0 + 16); c.lineTo(cx - 18, y0 + 16); c.closePath(); c.fill();
+  c.strokeStyle = '#243616'; c.lineWidth = 2; c.stroke();
+  c.fillStyle = '#261f12'; c.beginPath(); c.ellipse(cx, y0, 20, 5, 0, 0, TAU); c.fill();
+  c.strokeStyle = '#f0df94'; c.lineWidth = 2; c.stroke();
+  c.fillStyle = 'rgba(255,203,93,0.36)'; c.beginPath();
+  c.ellipse(cx, y0 + 1, 11, 2.4, 0, 0, TAU); c.fill();
+  // Red-white Festival ribbon tied around the centre binding.
+  const sway = Math.sin(t * 3) * 3;
+  c.fillStyle = '#e53935'; c.beginPath(); c.moveTo(cx - 22, y0 + 69);
+  c.quadraticCurveTo(cx - 34, y0 + 72 + sway, cx - 44, y0 + 68 + sway);
+  c.lineTo(cx - 40, y0 + 78 + sway);
+  c.quadraticCurveTo(cx - 31, y0 + 78 + sway, cx - 22, y0 + 76); c.fill();
+  c.fillStyle = '#ffffff'; c.beginPath(); c.moveTo(cx - 22, y0 + 76);
+  c.quadraticCurveTo(cx - 31, y0 + 78 + sway, cx - 40, y0 + 78 + sway);
+  c.lineTo(cx - 37, y0 + 84 + sway);
+  c.quadraticCurveTo(cx - 29, y0 + 83 + sway, cx - 22, y0 + 82); c.fill();
+  // Side touchhole, fuse, and the separate glowing ignition stick.
+  c.fillStyle = '#311d0a'; c.beginPath();
+  c.ellipse(cx + 20, y0 + 168, 5, 4, 0, 0, TAU); c.fill();
+  c.strokeStyle = '#c8ac79'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(cx + 21, y0 + 168);
+  c.quadraticCurveTo(cx + 35, y0 + 163, cx + 40, y0 + 153); c.stroke();
+  c.save(); c.translate(cx + 46, y0 + 172); c.rotate(-0.36);
+  rr(c, -3, -58, 7, 72, 3, wood(c, -4, 4), '#603a19', 1);
+  c.strokeStyle = '#ecd8b0'; c.lineWidth = 0.8;
+  for (let i = 0; i < 4; i++) {
+    c.beginPath(); c.moveTo(-3, -30 + i * 6); c.lineTo(4, -28 + i * 6); c.stroke();
+  }
+  c.fillStyle = '#3e3128'; c.fillRect(-4, -61, 9, 6);
+  c.save(); c.shadowColor = '#ffac2b'; c.shadowBlur = 19;
+  c.fillStyle = '#ff8c27'; c.beginPath();
+  c.moveTo(-5, -60); c.quadraticCurveTo(-8, -72, Math.sin(t * 18) * 2, -84);
+  c.quadraticCurveTo(9, -71, 5, -60); c.fill();
+  c.fillStyle = '#fff7be'; c.beginPath(); c.ellipse(0, -65, 2.4, 6 * pulse, 0, 0, TAU); c.fill();
+  c.restore(); c.restore();
+  glow(c, cx + 20, y0 + 168, 2.5 * pulse, '#ffab46', 10);
 }
 
 // ------------------------------------------------------------- BANANA GUN
+/** The peel opens at the shot, then folds shut by the next 0.2s shot/reload. */
+export function bananaPeelOpen(sinceShot: number): number {
+  if (sinceShot < 0 || sinceShot >= 0.2) return 0;
+  return sinceShot < 0.065 ? sinceShot / 0.065 : (0.2 - sinceShot) / 0.135;
+}
+
+/** A shot empties the visible fruit; flesh grows back as the peel closes. */
+export function bananaFleshFill(sinceShot: number): number {
+  if (sinceShot < 0 || sinceShot >= 0.2) return 1;
+  return Math.max(0, Math.min(1, (sinceShot - 0.06) / 0.14));
+}
+
 export function banana(c: C, cx: number, y0: number, t: number) {
-  // peel flaps (grip)
-  c.save();
-  c.translate(cx + 14, y0 + 112);
-  const sway = Math.sin(t * 3) * 0.05;
-  for (const [ang, len] of [[0.5 + sway, 62], [0.95 - sway, 54], [0.15 + sway, 46]] as const) {
-    c.save();
-    c.rotate(ang);
-    c.beginPath();
-    c.moveTo(-6, 0);
-    c.quadraticCurveTo(-9, len * 0.6, 0, len);
-    c.quadraticCurveTo(9, len * 0.6, 6, 0);
-    c.closePath();
-    c.fillStyle = lin(c, -8, 8, ['#ca8a04', '#fde047', '#eab308']);
-    c.fill();
-    c.strokeStyle = '#854d0e';
-    c.lineWidth = 1.5;
-    c.stroke();
-    c.fillStyle = '#fef9c3';
-    c.beginPath();
-    c.ellipse(0, len * 0.45, 3, len * 0.3, 0, 0, TAU);
-    c.fill();
-    c.restore();
+  const open = bananaPeelOpen(gunState.sinceShot);
+  const flesh = bananaFleshFill(gunState.sinceShot);
+  // The curved fruit IS the launcher. No generic grip, barrel or googly eye.
+  c.beginPath(); c.moveTo(cx - 4, y0 + 9);
+  c.bezierCurveTo(cx - 26, y0 + 58, cx - 15, y0 + 123, cx + 32, y0 + 158);
+  c.quadraticCurveTo(cx + 42, y0 + 161, cx + 42, y0 + 145);
+  c.bezierCurveTo(cx + 11, y0 + 113, cx + 4, y0 + 64, cx + 9, y0 + 7);
+  c.closePath();
+  c.fillStyle = lin(c, cx - 26, cx + 40,
+    ['#855017', '#e9ab18', '#fff094', '#ffcf27', '#c3830b']);
+  c.fill(); c.strokeStyle = '#633b10'; c.lineWidth = 2.6; c.stroke();
+  // Tapered chocolate-brown tip of a ripe banana.
+  c.fillStyle = '#4b2d19'; c.beginPath();
+  c.moveTo(cx + 32, y0 + 149); c.quadraticCurveTo(cx + 37, y0 + 160, cx + 42, y0 + 159);
+  c.quadraticCurveTo(cx + 46, y0 + 160, cx + 45, y0 + 148); c.closePath(); c.fill();
+  c.strokeStyle = 'rgba(255,248,165,0.82)'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(cx - 15, y0 + 43);
+  c.bezierCurveTo(cx - 25, y0 + 112, cx + 10, y0 + 149, cx + 28, y0 + 152); c.stroke();
+  c.strokeStyle = 'rgba(122,75,18,0.6)'; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(cx + 5, y0 + 29);
+  c.bezierCurveTo(cx - 3, y0 + 84, cx + 15, y0 + 129, cx + 36, y0 + 145); c.stroke();
+  c.fillStyle = 'rgba(112,64,13,0.58)';
+  for (const [x, y, r] of [[-16, 63, 2.2], [-11, 88, 1.5], [0, 116, 2], [17, 137, 1.8], [9, 51, 1.6]]) {
+    c.beginPath(); c.ellipse(cx + x, y0 + y, r, r * 0.67, 0.35, 0, TAU); c.fill();
+  }
+  // The flesh visibly LEAVES with the shot. An empty brown cavity appears
+  // between the opened skins, then cream refills from the bottom during the
+  // closing peel. The actual launched projectile contains NO yellow skin.
+  c.beginPath(); c.moveTo(cx - 4, y0 + 4);
+  c.bezierCurveTo(cx - 11, y0 + 28, cx - 8, y0 + 79, cx, y0 + 106);
+  c.quadraticCurveTo(cx + 9, y0 + 68, cx + 6, y0 + 5); c.closePath();
+  c.save(); c.clip();
+  c.fillStyle = '#6c421d'; c.fillRect(cx - 12, y0 + 2, 24, 106);
+  c.fillStyle = lin(c, cx - 7, cx + 9, ['#f4d688', '#fffce8', '#f6e4a6']);
+  c.fillRect(cx - 12, y0 + 4 + (1 - flesh) * 102, 24, 102 * flesh);
+  if (flesh > 0.3) {
+    c.globalAlpha = flesh * 0.7;
+    c.fillStyle = '#fffefa';
+    c.beginPath(); c.ellipse(cx - 2, y0 + 36, 1.6, 24, 0.08, 0, TAU); c.fill();
   }
   c.restore();
-  // banana body (curved)
-  c.beginPath();
-  c.moveTo(cx - 7, y0 + 6);
-  c.bezierCurveTo(cx - 14, y0 + 60, cx - 6, y0 + 110, cx + 26, y0 + 132);
-  c.lineTo(cx + 34, y0 + 118);
-  c.bezierCurveTo(cx + 8, y0 + 98, cx + 8, y0 + 58, cx + 7, y0 + 6);
-  c.closePath();
-  c.fillStyle = lin(c, cx - 14, cx + 20, ['#a16207', '#fde047', '#facc15', '#ca8a04']);
-  c.fill();
-  c.strokeStyle = '#713f12';
-  c.lineWidth = 2;
-  c.stroke();
-  // ridge line + spots
-  c.strokeStyle = 'rgba(133,77,14,0.5)';
-  c.lineWidth = 1.2;
-  c.beginPath();
-  c.moveTo(cx, y0 + 10);
-  c.bezierCurveTo(cx - 4, y0 + 60, cx + 2, y0 + 100, cx + 30, y0 + 124);
-  c.stroke();
-  c.fillStyle = '#78350f';
-  for (const [sx, sy] of [[-4, 40], [2, 70], [-2, 92], [10, 110]]) {
-    c.beginPath();
-    c.ellipse(cx + sx, y0 + sy, 1.8, 1.2, 0.4, 0, TAU);
-    c.fill();
+  c.beginPath(); c.moveTo(cx - 4, y0 + 4);
+  c.bezierCurveTo(cx - 11, y0 + 28, cx - 8, y0 + 79, cx, y0 + 106);
+  c.quadraticCurveTo(cx + 9, y0 + 68, cx + 6, y0 + 5); c.closePath();
+  c.strokeStyle = flesh > 0.5 ? '#e2c482' : '#8e5c23';
+  c.lineWidth = 1; c.stroke();
+  // Hinge the two peels at the neck: opening launches the flesh, closing
+  // reloads it. The animation follows shot time, not the scene clock.
+  for (const side of [-1, 1]) {
+    c.save(); c.translate(cx + side * 8, y0 + 44); c.rotate(side * open * 0.82);
+    c.beginPath(); c.moveTo(0, 33);
+    c.bezierCurveTo(side * 11, 11, side * 11, -27, side * 4, -39);
+    c.quadraticCurveTo(side * -4, -15, side * -5, 25); c.closePath();
+    c.fillStyle = lin(c, -11, 11, side < 0
+      ? ['#ad7419', '#facc15', '#ffeb69', '#e8ae20']
+      : ['#e8ae20', '#fff29a', '#facc15', '#ad7419']);
+    c.fill(); c.strokeStyle = '#8d6015'; c.lineWidth = 1.5; c.stroke();
+    c.strokeStyle = 'rgba(255,249,186,0.9)'; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(side * 2, 20);
+    c.quadraticCurveTo(side * 7, -8, side * 3, -31); c.stroke();
+    c.fillStyle = '#74471a'; c.beginPath(); c.ellipse(side * 4, -38, 2.2, 3, 0, 0, TAU); c.fill();
+    c.restore();
   }
-  // trigger
-  rr(c, cx + 14, y0 + 96, 6, 12, 2, '#713f12');
-  // stem tip (muzzle)
-  rr(c, cx - 4, y0 - 4, 8, 12, 2, lin(c, cx - 4, cx + 4, ['#3f2a0a', '#78573a', '#3f2a0a']));
-  c.beginPath();
-  c.ellipse(cx, y0 - 4, 3.5, 1.5, 0, 0, TAU);
-  c.fillStyle = '#1c1206';
-  c.fill();
-  // googly eye
-  c.beginPath();
-  c.arc(cx + 1, y0 + 46, 5, 0, TAU);
-  c.fillStyle = '#fff';
-  c.fill();
-  c.strokeStyle = '#111';
-  c.lineWidth = 1;
-  c.stroke();
-  c.beginPath();
-  c.arc(cx + 1 + Math.sin(t * 2) * 1.5, y0 + 47, 2.3, 0, TAU);
-  c.fillStyle = '#111';
-  c.fill();
+  // Small organic stem/nozzle, not a metal firing tube.
+  c.fillStyle = '#5d4020'; c.beginPath(); c.roundRect(cx - 4, y0 - 7, 8, 12, 2); c.fill();
+  c.fillStyle = '#fbefbf'; c.beginPath(); c.ellipse(cx, y0 + 1, 3.4, 2, 0, 0, TAU); c.fill();
+  const glowY = y0 + 35 + (t * 3 % 1) * 37;
+  c.fillStyle = `rgba(255,253,210,${0.4 + 0.2 * Math.sin(t * 6)})`;
+  c.beginPath(); c.arc(cx - 1, glowY, 1.6, 0, TAU); c.fill();
 }
 
 // ------------------------------------------------------------- BUBBLE GUN
@@ -1019,73 +1050,79 @@ export function harpoon(c: C, cx: number, y0: number, ready: boolean) {
 
 // ------------------------------------------------------------- RUBBER CHICKEN
 export function chickenGun(c: C, cx: number, y0: number, t: number, ready: boolean) {
-  grip(c, cx, y0 + 118, '#dc2626', '#f87171', 0.8);
-  guard(c, cx, y0 + 110, '#7f1d1d');
-  // plunger
-  rr(c, cx - 4, y0 + 142, 8, 36, 2, '#9ca3af');
-  rr(c, cx - 12, y0 + 174, 24, 10, 4, '#ef4444', '#7f1d1d');
-  // tube with stripes
-  c.save();
-  c.beginPath();
-  c.roundRect(cx - 17, y0 + 30, 34, 116, 6);
-  c.clip();
-  c.fillStyle = '#facc15';
-  c.fillRect(cx - 17, y0 + 30, 34, 116);
-  c.fillStyle = '#ef4444';
-  for (let i = -2; i < 10; i++) {
-    c.beginPath();
-    c.moveTo(cx - 17, y0 + 30 + i * 18);
-    c.lineTo(cx + 17, y0 + 18 + i * 18);
-    c.lineTo(cx + 17, y0 + 27 + i * 18);
-    c.lineTo(cx - 17, y0 + 39 + i * 18);
-    c.fill();
+  // Inflatable chicken launcher: a squeezable rubber hen perches on its own
+  // red pump. It compresses and springs back when a chick squeaks away.
+  const shot = gunState.sinceShot;
+  const squish = shot < 0.24 ? Math.sin(Math.PI * Math.max(0, shot) / 0.24) * 0.16 : 0;
+  // Pump, air tube and fleshy hand-held base, not an unrelated striped gun.
+  c.strokeStyle = '#8e3123'; c.lineWidth = 7; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(cx + 13, y0 + 102);
+  c.quadraticCurveTo(cx + 35, y0 + 98, cx + 30, y0 + 128); c.stroke();
+  c.strokeStyle = '#ffbd6b'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(cx + 14, y0 + 101);
+  c.quadraticCurveTo(cx + 30, y0 + 102, cx + 30, y0 + 122); c.stroke();
+  rr(c, cx - 14, y0 + 104, 28, 68, 11,
+    lin(c, cx - 14, cx + 14, ['#9a3225', '#f96942', '#cf3a2e', '#8a2e23']), '#692416', 2);
+  for (let i = 0; i < 4; i++) {
+    c.strokeStyle = 'rgba(255,217,147,0.74)'; c.lineWidth = 1.7;
+    c.beginPath(); c.moveTo(cx - 10, y0 + 121 + i * 10);
+    c.quadraticCurveTo(cx, y0 + 125 + i * 10, cx + 10, y0 + 121 + i * 10); c.stroke();
   }
-  c.fillStyle = 'rgba(255,255,255,0.3)';
-  c.fillRect(cx - 12, y0 + 30, 4, 116);
+  rr(c, cx - 20, y0 + 167, 40, 10, 5, '#a62e28', '#642018', 1.8);
+  rr(c, cx - 24, y0 + 90, 48, 20, 9,
+    lin(c, cx - 24, cx + 24, ['#d44c23', '#ffe082', '#e7782b', '#ae3029']), '#92330f', 2);
+  c.save(); c.translate(cx, y0 + 48 + Math.sin(t * 6) * 0.6);
+  c.scale(1 + squish, 1 - squish);
+  // Broad chicken-shaped inflatable body and proud tail.
+  c.fillStyle = '#f9c13f'; c.beginPath(); c.moveTo(9, 27);
+  c.quadraticCurveTo(28, 19, 30, -8);
+  c.quadraticCurveTo(39, 12, 33, 35);
+  c.quadraticCurveTo(21, 47, 10, 37); c.closePath(); c.fill();
+  c.strokeStyle = '#ab6419'; c.lineWidth = 1.5; c.stroke();
+  const rubber = c.createLinearGradient(-25, 0, 25, 0);
+  rubber.addColorStop(0, '#bc842a'); rubber.addColorStop(0.28, '#facc45');
+  rubber.addColorStop(0.58, '#fff492'); rubber.addColorStop(1, '#e6a622');
+  c.fillStyle = rubber; c.beginPath(); c.ellipse(0, 17, 23, 40, 0, 0, TAU);
+  c.fill(); c.strokeStyle = '#a76418'; c.lineWidth = 1.7; c.stroke();
+  c.fillStyle = 'rgba(255,255,213,0.65)';
+  c.beginPath(); c.ellipse(-7, 13, 6, 25, -0.16, 0, TAU); c.fill();
+  // Plump swept-back wings with embossed feather grooves.
+  for (const side of [-1, 1]) {
+    c.fillStyle = side < 0 ? '#ffe583' : '#e5a52b';
+    c.beginPath(); c.moveTo(side * 15, -2);
+    c.quadraticCurveTo(side * 34, 7, side * 26, 30);
+    c.quadraticCurveTo(side * 15, 33, side * 12, 20); c.closePath(); c.fill();
+    c.strokeStyle = '#a76818'; c.lineWidth = 1.5; c.stroke();
+    c.strokeStyle = 'rgba(255,255,225,0.62)'; c.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      c.beginPath(); c.moveTo(side * 17, i * 5 + 7);
+      c.quadraticCurveTo(side * 23, i * 5 + 9, side * 26, i * 5 + 13); c.stroke();
+    }
+  }
+  // The large face, red comb and orange squeaky beak identify this as a hen.
+  c.beginPath(); c.ellipse(0, -27, 19, 20, 0, 0, TAU);
+  c.fillStyle = radial(c, -6, -33, 32, ['#fff8c2', '#ffe46b', '#e9ad28']);
+  c.fill(); c.strokeStyle = '#a76418'; c.lineWidth = 1.6; c.stroke();
+  c.fillStyle = '#e74538';
+  for (let i = -1; i <= 1; i++) {
+    c.beginPath(); c.arc(i * 7, -46 - (i === 0 ? 5 : 0), 6, 0, TAU); c.fill();
+  }
+  c.fillStyle = '#fce6bd';
+  for (const side of [-1, 1]) {
+    c.beginPath(); c.ellipse(side * 9, -38, 4, 2.5, 0.2, 0, TAU); c.fill();
+    c.fillStyle = '#322020'; c.beginPath(); c.ellipse(side * 8.5, -31, 2.8, 3.4, 0, 0, TAU); c.fill();
+    c.fillStyle = '#fffefa'; c.beginPath(); c.arc(side * 9.4, -32, 0.9, 0, TAU); c.fill();
+    c.fillStyle = '#fce6bd';
+  }
+  c.fillStyle = '#f47b24'; c.beginPath();
+  c.moveTo(-9, -21); c.quadraticCurveTo(0, -26, 9, -21);
+  c.lineTo(0, -10); c.closePath(); c.fill();
+  c.strokeStyle = '#b84b14'; c.lineWidth = 1.3; c.stroke();
+  c.fillStyle = '#ed5c39'; c.beginPath(); c.ellipse(11, -17, 3.4, 5, 0.2, 0, TAU); c.fill();
+  // Moulded squeaker valve at the top is the actual muzzle.
+  c.fillStyle = '#fffbe3'; c.beginPath(); c.ellipse(0, -49, 3, 1.5, 0, 0, TAU); c.fill();
   c.restore();
-  c.beginPath();
-  c.roundRect(cx - 17, y0 + 30, 34, 116, 6);
-  c.strokeStyle = '#7c2d12';
-  c.lineWidth = 2;
-  c.stroke();
-  rr(c, cx - 20, y0 + 24, 40, 10, 4, '#7c2d12');
-  // chicken head popping out
-  if (ready) {
-    const bob = Math.sin(t * 8) * 1.5;
-    c.save();
-    c.translate(cx, y0 + 18 + bob);
-    rr(c, -6, -2, 12, 14, 4, '#fde047', '#a16207', 1.2);
-    c.beginPath();
-    c.ellipse(0, -8, 9, 10, 0, 0, TAU);
-    c.fillStyle = radial(c, 0, -8, 10, ['#fef9c3', '#fde047', '#eab308']);
-    c.fill();
-    c.strokeStyle = '#a16207';
-    c.stroke();
-    c.fillStyle = '#ef4444';
-    for (let i = -1; i <= 1; i++) {
-      c.beginPath();
-      c.arc(i * 3.5, -18 - (i === 0 ? 2 : 0), 3, 0, TAU);
-      c.fill();
-    }
-    c.fillStyle = '#f97316';
-    c.beginPath();
-    c.moveTo(-3, -4);
-    c.lineTo(3, -4);
-    c.lineTo(0, 3);
-    c.closePath();
-    c.fill();
-    c.strokeStyle = '#111';
-    c.lineWidth = 1.3;
-    for (const s of [-1, 1]) {
-      c.beginPath();
-      c.moveTo(s * 5 - 2, -12);
-      c.lineTo(s * 5 + 2, -8);
-      c.moveTo(s * 5 + 2, -12);
-      c.lineTo(s * 5 - 2, -8);
-      c.stroke();
-    }
-    c.restore();
-  }
+  if (!ready || shot < 0.18) glow(c, cx, y0 - 8, 2.5, '#fff0ae', 8);
 }
 
 // ------------------------------------------------------------- CONFETTI CANNON

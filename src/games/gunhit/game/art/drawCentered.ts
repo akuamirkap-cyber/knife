@@ -1,4 +1,5 @@
 import type { WeaponId } from '../weapons';
+import type { GunVariant } from './gunVariants';
 import { drawGun } from './guns';
 import { getGunMetrics } from './metrics';
 
@@ -12,8 +13,9 @@ export function drawGunCentered(
   t = 0,
   flash = 0,
   ready = true,
+  variant?: GunVariant,
 ) {
-  const m = getGunMetrics(id);
+  const m = getGunMetrics(id, variant);
   // Offsetting by (-centerOffsetX, -centerOffsetY) shifts the true visual center directly to (0, 0)!
-  drawGun(c, id, -m.centerOffsetX, -m.centerOffsetY, t, flash, ready);
+  drawGun(c, id, -m.centerOffsetX, -m.centerOffsetY, t, flash, ready, undefined, variant);
 }

@@ -1,7 +1,7 @@
 import type { WeaponId } from '../weapons';
 import { TAU, rand, lin, vlin, steel, chrome, brass, rr, grip, guard, glow, jag, star, radial, gunState } from './kit';
 import {
-  slingshot, blowgun, shotgun, soaker, snowball, sniper, flamethrower, bamboo, banana,
+  slingshot, blowgun, shotgun, soaker, snowball, SNOWBALL_MAG_SIZE, sniper, flamethrower, bamboo, banana,
   bubbleGun, harpoon, chickenGun, confettiGun, seedGun,
 } from './guns2';
 import { drawGunExtra2, FLASH2, FLASH3 } from './guns4';
@@ -682,84 +682,153 @@ function glitchGun(c: C, cx: number, y0: number, t: number) {
 }
 
 // ------------------------------------------------------------- DRAGON BREATH
+export function dragonFlameSurge(sinceShot: number): number {
+  return sinceShot >= 0 && sinceShot < 0.22
+    ? Math.sin(Math.PI * sinceShot / 0.22) : 0;
+}
+
 function dragon(c: C, cx: number, y0: number, t: number) {
-  grip(c, cx, y0 + 120, '#3f1d0b', '#7c2d12', 0.8);
-  guard(c, cx, y0 + 112, '#1c0a00');
-  // wings
-  for (const s of [-1, 1]) {
-    c.save();
-    c.translate(cx + s * 14, y0 + 70);
-    c.rotate(s * (0.2 + Math.sin(t * 4) * 0.08));
-    c.beginPath();
-    c.moveTo(0, 0);
-    c.quadraticCurveTo(s * 30, -10, s * 34, 16);
-    c.quadraticCurveTo(s * 24, 12, s * 20, 22);
-    c.quadraticCurveTo(s * 12, 16, s * 6, 26);
-    c.closePath();
-    c.fillStyle = lin(c, 0, s * 34, ['#7f1d1d', '#b91c1c']);
-    c.fill();
-    c.strokeStyle = '#450a0a';
-    c.lineWidth = 1.5;
-    c.stroke();
+  // A living dragon wraps the barrel; its tail forms the grip and its mouth
+  // sits right on the muzzle. Wings have articulated ribs and scalloped skin.
+  const blast = dragonFlameSurge(gunState.sinceShot);
+  c.lineCap = 'round';
+  c.strokeStyle = '#40141c'; c.lineWidth = 11;
+  c.beginPath(); c.moveTo(cx + 8, y0 + 112);
+  c.bezierCurveTo(cx + 30, y0 + 135, cx + 34, y0 + 153, cx + 12, y0 + 167); c.stroke();
+  c.strokeStyle = '#d95b32'; c.lineWidth = 3;
+  c.beginPath(); c.moveTo(cx + 17, y0 + 126);
+  c.bezierCurveTo(cx + 31, y0 + 144, cx + 26, y0 + 157, cx + 13, y0 + 165); c.stroke();
+  c.fillStyle = '#eaa363'; c.beginPath();
+  c.moveTo(cx + 12, y0 + 167); c.lineTo(cx + 3, y0 + 172);
+  c.lineTo(cx + 15, y0 + 157); c.closePath(); c.fill();
+
+  for (const side of [-1, 1]) {
+    c.save(); c.translate(cx + side * 12, y0 + 68); c.scale(side, 1);
+    c.rotate(Math.sin(t * 3.2) * 0.055);
+    c.beginPath(); c.moveTo(0, 14);
+    c.quadraticCurveTo(20, -27, 60, -41);
+    c.lineTo(51, -4);
+    c.quadraticCurveTo(69, 12, 62, 43);
+    c.quadraticCurveTo(48, 32, 39, 54);
+    c.quadraticCurveTo(27, 38, 17, 52);
+    c.quadraticCurveTo(9, 29, 0, 14); c.closePath();
+    const membrane = c.createLinearGradient(8, -42, 54, 54);
+    membrane.addColorStop(0, '#ef7a4e');
+    membrane.addColorStop(0.36, '#ad2d32');
+    membrane.addColorStop(1, '#431536');
+    c.fillStyle = membrane; c.fill();
+    c.strokeStyle = '#38101d'; c.lineWidth = 3; c.stroke();
+    c.strokeStyle = 'rgba(255,192,112,0.75)'; c.lineWidth = 2;
+    for (const [xx, yy] of [[60, -41], [51, -4], [62, 43], [39, 54], [17, 52]]) {
+      c.beginPath(); c.moveTo(1, 14);
+      c.quadraticCurveTo(xx * 0.4, yy * 0.36, xx, yy); c.stroke();
+    }
+    // Small illuminated scales between the wing bones catch the firelight.
+    c.fillStyle = 'rgba(255,185,113,0.39)';
+    for (const [xx, yy] of [[22, -1], [38, -13], [29, 22], [46, 17], [50, 36]]) {
+      c.beginPath(); c.moveTo(xx - 4, yy);
+      c.quadraticCurveTo(xx + 1, yy - 6, xx + 5, yy);
+      c.quadraticCurveTo(xx + 1, yy + 3, xx - 4, yy); c.fill();
+    }
+    c.fillStyle = '#eeb67a';
+    for (const [xx, yy] of [[60, -41], [62, 43]]) {
+      c.beginPath(); c.moveTo(xx, yy); c.lineTo(xx + 5, yy - 4);
+      c.lineTo(xx - 4, yy + 6); c.closePath(); c.fill();
+    }
     c.restore();
   }
-  // body scales
-  rr(c, cx - 15, y0 + 40, 30, 96, [10, 10, 6, 6], lin(c, cx - 15, cx + 15, ['#450a0a', '#dc2626', '#991b1b', '#450a0a']), '#1c0505');
-  c.fillStyle = 'rgba(251,191,36,0.6)';
-  for (let r = 0; r < 7; r++) {
-    for (let k = 0; k < 3; k++) {
-      c.beginPath();
-      c.arc(cx - 8 + k * 8 + (r % 2) * 4, y0 + 52 + r * 12, 3.5, 0, Math.PI);
-      c.fill();
+
+  rr(c, cx - 16, y0 + 52, 32, 106, 13,
+    lin(c, cx - 17, cx + 17, ['#471224', '#c53c37', '#94242e', '#351021']), '#3b1018', 2.5);
+  // Layered, pointed scales and a bright segmented underbelly.
+  for (let row = 0; row < 8; row++) {
+    const yy = y0 + 61 + row * 12;
+    c.fillStyle = row % 2 ? '#e8754c' : '#db5a37';
+    c.beginPath(); c.moveTo(cx - 10, yy);
+    c.quadraticCurveTo(cx, yy + 2, cx + 10, yy);
+    c.lineTo(cx + 7, yy + 8); c.quadraticCurveTo(cx, yy + 13, cx - 7, yy + 8);
+    c.closePath(); c.fill();
+    c.strokeStyle = '#85302c'; c.lineWidth = 0.9; c.stroke();
+    for (const side of [-1, 1]) {
+      c.fillStyle = '#71202b'; c.beginPath();
+      c.moveTo(cx + side * 12, yy - 1);
+      c.lineTo(cx + side * 19, yy + 3);
+      c.lineTo(cx + side * 12, yy + 8); c.closePath(); c.fill();
     }
   }
-  // head (pointing up, jaw open)
-  c.save();
-  c.translate(cx, y0 + 34);
-  // horns
-  for (const s of [-1, 1]) {
-    c.beginPath();
-    c.moveTo(s * 8, -6);
-    c.quadraticCurveTo(s * 20, 0, s * 22, 14);
-    c.lineTo(s * 12, 2);
-    c.closePath();
-    c.fillStyle = '#fef3c7';
-    c.fill();
+  // Crest spines connect the neck to the armored crown.
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      c.fillStyle = '#e9a673'; c.beginPath();
+      c.moveTo(cx + side * 13, y0 + 50 + i * 15);
+      c.lineTo(cx + side * (20 + (2 - i) * 2), y0 + 42 + i * 15);
+      c.lineTo(cx + side * 15, y0 + 57 + i * 15); c.closePath(); c.fill();
+    }
+  }
+
+  c.save(); c.translate(cx, y0 + 24);
+  // A separate lower jaw keeps the blazing mouth visibly open.
+  c.beginPath(); c.moveTo(-11, 2); c.quadraticCurveTo(0, 10, 11, 2);
+  c.lineTo(7, 23); c.quadraticCurveTo(0, 29, -7, 23); c.closePath();
+  c.fillStyle = '#792333'; c.fill(); c.strokeStyle = '#350e19'; c.lineWidth = 2; c.stroke();
+  c.save(); c.shadowColor = '#ff9e36'; c.shadowBlur = 15;
+  c.fillStyle = radial(c, 0, -3, 16, ['#fffce0', '#ffc352', '#ee5b24', '#6d1722']);
+  c.beginPath(); c.ellipse(0, -3, 7, 12, 0, 0, TAU); c.fill(); c.restore();
+  for (const side of [-1, 1]) {
+    c.fillStyle = '#ffdab0'; c.beginPath();
+    c.moveTo(side * 5, 0); c.lineTo(side * 3, 9); c.lineTo(side * 8, 3);
+    c.closePath(); c.fill();
   }
   c.beginPath();
-  c.moveTo(-14, 8);
-  c.lineTo(-11, -20);
-  c.lineTo(-6, -32);
-  c.lineTo(-2, -24);
-  c.lineTo(2, -24);
-  c.lineTo(6, -32);
-  c.lineTo(11, -20);
-  c.lineTo(14, 8);
-  c.closePath();
-  c.fillStyle = lin(c, -14, 14, ['#7f1d1d', '#ef4444', '#991b1b']);
-  c.fill();
-  c.strokeStyle = '#1c0505';
-  c.lineWidth = 1.5;
-  c.stroke();
-  // mouth glow
-  const f = 0.7 + 0.3 * Math.sin(t * 20);
-  c.beginPath();
-  c.ellipse(0, -24, 4, 6, 0, 0, TAU);
-  c.fillStyle = `rgba(255,${150 + f * 80},40,1)`;
-  c.fill();
-  // teeth
-  c.fillStyle = '#fff';
-  for (const s of [-1, 1]) {
-    c.beginPath();
-    c.moveTo(s * 4, -28);
-    c.lineTo(s * 2.5, -22);
-    c.lineTo(s * 5, -22);
-    c.fill();
+  c.moveTo(-15, 6); c.lineTo(-12, -14); c.lineTo(-8, -20);
+  c.lineTo(-5, -17); c.lineTo(0, -25); c.lineTo(5, -17);
+  c.lineTo(8, -20); c.lineTo(12, -14); c.lineTo(15, 6);
+  c.quadraticCurveTo(0, 12, -15, 6); c.closePath();
+  c.fillStyle = lin(c, -16, 16, ['#742036', '#ee6d49', '#b73335', '#64152a']);
+  c.fill(); c.strokeStyle = '#390d19'; c.lineWidth = 2; c.stroke();
+  for (const side of [-1, 1]) {
+    c.fillStyle = '#f2c391'; c.beginPath();
+    c.moveTo(side * 8, -17); c.quadraticCurveTo(side * 22, -21, side * 25, -35);
+    c.quadraticCurveTo(side * 19, -28, side * 12, -27); c.closePath(); c.fill();
+    c.fillStyle = '#fceca8'; c.beginPath();
+    c.ellipse(side * 8, -6, 3.1, 1.9, side * 0.22, 0, TAU); c.fill();
+    c.fillStyle = '#3c1519'; c.beginPath(); c.arc(side * 8, -6, 1, 0, TAU); c.fill();
+    c.fillStyle = '#45111b'; c.beginPath(); c.arc(side * 3.2, -18, 1.2, 0, TAU); c.fill();
   }
-  // eyes
-  for (const s of [-1, 1]) glow(c, s * 7, -4, 2.5, '#fde047', 10);
+  // Raised snout, nostrils and cheek ridges give the head a reptilian face
+  // rather than a flat rectangular red mask; the open lower jaw stays visible.
+  c.fillStyle = lin(c, -12, 12, ['#7e2330', '#ed8055', '#be3837', '#71202b']);
+  c.beginPath(); c.moveTo(-10, -2);
+  c.quadraticCurveTo(0, -5, 10, -2);
+  c.lineTo(7, 8); c.quadraticCurveTo(0, 13, -7, 8); c.closePath(); c.fill();
+  c.strokeStyle = '#5a1728'; c.lineWidth = 1.2; c.stroke();
+  c.fillStyle = '#45141f';
+  for (const side of [-1, 1]) {
+    c.beginPath(); c.ellipse(side * 4.5, 5, 1.4, 2, side * 0.23, 0, TAU); c.fill();
+    c.strokeStyle = 'rgba(255,210,142,0.88)'; c.lineWidth = 1.1;
+    c.beginPath(); c.moveTo(side * 11, -3);
+    c.quadraticCurveTo(side * 13, 2, side * 7, 8); c.stroke();
+  }
   c.restore();
-  if (Math.random() < 0.5) glow(c, cx + rand(-2, 2), y0 + rand(0, 6), rand(1, 2.5), '#fb923c', 8);
+  // Fire breath surges BEYOND the horns after firing, then settles back to a
+  // short living tongue. It follows shot time, never changes hitboxes/ammo.
+  const flicker = Math.sin(t * 17) * 3;
+  c.save(); c.shadowColor = '#f97316'; c.shadowBlur = 14 + blast * 13;
+  c.fillStyle = '#df4529'; c.beginPath(); c.moveTo(cx - 7, y0 + 4);
+  c.quadraticCurveTo(cx - 17 - blast * 14, y0 - 8,
+    cx + flicker * 0.5, y0 - 19 - blast * 47);
+  c.quadraticCurveTo(cx + 16 + blast * 14, y0 - 6, cx + 7, y0 + 4);
+  c.closePath(); c.fill();
+  c.fillStyle = '#ffae39'; c.beginPath(); c.moveTo(cx - 5, y0 + 3);
+  c.quadraticCurveTo(cx - 10 - blast * 7, y0 - 6,
+    cx + flicker * 0.4, y0 - 16 - blast * 33);
+  c.quadraticCurveTo(cx + 11 + blast * 7, y0 - 5, cx + 5, y0 + 3);
+  c.closePath(); c.fill();
+  c.fillStyle = '#fff3bf'; c.beginPath(); c.moveTo(cx - 2.5, y0 + 2);
+  c.quadraticCurveTo(cx - 3 - blast * 3, y0 - 3,
+    cx + flicker * 0.2, y0 - 10 - blast * 19);
+  c.quadraticCurveTo(cx + 4 + blast * 3, y0 - 3, cx + 2.5, y0 + 2);
+  c.closePath(); c.fill(); c.restore();
 }
 
 // ------------------------------------------------------------- GRAVITY
@@ -812,13 +881,13 @@ function gravityGun(c: C, cx: number, y0: number, t: number) {
 }
 
 // ================================================================ dispatch
-export function drawGunExtra(c: C, id: WeaponId, cx: number, y0: number, t: number, ready: boolean) {
+export function drawGunExtra(c: C, id: WeaponId, cx: number, y0: number, t: number, ready: boolean, snowLoaded = SNOWBALL_MAG_SIZE) {
   switch (id) {
     case 'slingshot': slingshot(c, cx, y0, ready); break;
     case 'blowgun': blowgun(c, cx, y0); break;
     case 'shotgun': shotgun(c, cx, y0, ready); break;
     case 'soaker': soaker(c, cx, y0, t); break;
-    case 'snowball': snowball(c, cx, y0, t); break;
+    case 'snowball': snowball(c, cx, y0, t, snowLoaded); break;
     case 'sniper': sniper(c, cx, y0); break;
     case 'flamethrower': flamethrower(c, cx, y0, t); break;
     case 'disc': discGun(c, cx, y0, t, ready); break;

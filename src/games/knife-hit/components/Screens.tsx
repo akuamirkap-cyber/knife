@@ -6,6 +6,7 @@ import { RARITY_STYLE, ShinyWeapon, WeaponArt, type Rarity, type WeaponDef } fro
 import { ACHIEVEMENTS, MILESTONES, type Stats } from "../achievements";
 import { sfx, vibrate } from "../sfx";
 import { SunburstToggle } from "../sunburstState";
+import { useSlideActive } from "../../shared/SlideActivity";
 
 const STAGE = 6;
 const BOSS = "CHEESE";
@@ -111,10 +112,12 @@ export function StageScreen({
   bossId?: BossId; mode?: "boss" | "normal";
   level?: number; coins?: number; initialStuck?: number[];
 }) {
+  const active = useSlideActive();
   const wrapRef = useRef<HTMLDivElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const bumpRef = useRef<HTMLDivElement>(null);
   const rot = useRef(Math.random() * 360);
+  const patternTime = useRef(0);
   const breakRot = useRef(0);
   const boss = getBoss(bossId);
   const isNormal = mode === "normal";
@@ -130,9 +133,12 @@ export function StageScreen({
   stuckRef.current = stuck;
 
   useEffect(() => {
-    let raf = 0, last = performance.now(), t = 0;
+    if (!active) return;
+    let raf = 0, last = performance.now();
     const loop = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      patternTime.current += dt;
+      const t = patternTime.current;
       let speed: number;
       switch (pattern) {
         case "steady": speed = base + Math.sin(t * 0.9) * 18; break;
@@ -153,7 +159,7 @@ export function StageScreen({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [base, pattern]);
+  }, [base, pattern, active]);
 
   const throwKnife = () => {
     if (throwing || broken || crashed || stuckRef.current.length >= need) return;
@@ -354,6 +360,7 @@ type BoxState = "drop" | "ready" | "charging" | "open";
 const TAPS = 3;
 
 export function BoxScreen({ weapon, onDone, bossName = BOSS, level, score }: { weapon: WeaponDef; onDone: () => void; bossName?: string; level?: number; score?: number }) {
+  const active = useSlideActive();
   const wrapRef = useRef<HTMLDivElement>(null);
   const punchRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<BoxState>("drop");
@@ -362,11 +369,12 @@ export function BoxScreen({ weapon, onDone, bossName = BOSS, level, score }: { w
   const rayColor = RARITY_RGB[weapon.rarity];
 
   useEffect(() => {
+    if (!active || state !== 'drop') return;
     sfx.whoosh();
     const a = setTimeout(() => { sfx.thud(); vibrate(12); shakeEl(wrapRef.current, 3, 220); }, 560);
     const b = setTimeout(() => setState("ready"), 1000);
     return () => { clearTimeout(a); clearTimeout(b); };
-  }, []);
+  }, [active, state]);
 
   const tap = () => {
     if (state !== "ready") return;
@@ -512,21 +520,24 @@ export function BoxScreen({ weapon, onDone, bossName = BOSS, level, score }: { w
 /* ---------------- CONTINUE? ---------------- */
 const COUNT = 10;
 export function ContinueScreen({ weapon, onWatchAd, onTimeout }: { weapon: WeaponDef; onWatchAd: () => void; onTimeout: () => void }) {
+  const active = useSlideActive();
   const [n, setN] = useState(COUNT);
   const [showSkip, setShowSkip] = useState(false);
 
   useEffect(() => {
+    if (!active) return;
     if (n <= 0) { onTimeout(); return; }
     if (n < COUNT) sfx.tick(n <= 3);
     if (n <= 3) vibrate(8);
     const t = setTimeout(() => setN((v) => v - 1), 1000);
     return () => clearTimeout(t);
-  }, [n, onTimeout]);
+  }, [n, onTimeout, active]);
 
   useEffect(() => {
+    if (!active) return;
     const t = setTimeout(() => setShowSkip(true), 2500);
     return () => clearTimeout(t);
-  }, []);
+  }, [active]);
 
   const R = 112, C = 2 * Math.PI * R;
   const urgent = n <= 3;
@@ -587,12 +598,13 @@ export function ContinueScreen({ weapon, onWatchAd, onTimeout }: { weapon: Weapo
 /* ---------------- FAKE AD ---------------- */
 const AD_LEN = 5;
 export function AdScreen({ onDone }: { onDone: () => void }) {
+  const active = useSlideActive();
   const [t, setT] = useState(AD_LEN);
   useEffect(() => {
-    if (t <= 0) return;
+    if (!active || t <= 0) return;
     const id = setTimeout(() => setT((v) => v - 1), 1000);
     return () => clearTimeout(id);
-  }, [t]);
+  }, [t, active]);
   return (
     <div className="fade-in absolute inset-0 z-30 flex flex-col overflow-hidden bg-gradient-to-br from-fuchsia-600 via-purple-700 to-indigo-900">
       <div className="absolute left-1/2 top-[45%] h-0 w-0 opacity-60"><GodRays size={600} color="255,200,255" intensity={0.6} /></div>
@@ -619,6 +631,7 @@ export function AdScreen({ onDone }: { onDone: () => void }) {
 
 /* ---------------- REWARD POPUP — PREMIUM v2, teks besar semua ---------------- */
 export function RewardScreen({ weapon, equipped, onEquip, onClose, onReplay, bossId = "cheese", bossName = BOSS, level, score }: { weapon: WeaponDef; equipped: boolean; onEquip: () => void; onClose: () => void; onReplay: () => void; bossId?: BossId; bossName?: string; level?: number; score?: number }) {
+  const active = useSlideActive();
   const [revealed, setRevealed] = useState(false);
   const [equipFx, setEquipFx] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -626,6 +639,7 @@ export function RewardScreen({ weapon, equipped, onEquip, onClose, onReplay, bos
   const ray = RARITY_RGB[weapon.rarity];
 
   useEffect(() => {
+    if (!active || revealed) return;
     sfx.whoosh();
     const t = setTimeout(() => {
       setRevealed(true);
@@ -634,7 +648,7 @@ export function RewardScreen({ weapon, equipped, onEquip, onClose, onReplay, bos
       shakeEl(wrapRef.current, 3, 250);
     }, 900);
     return () => clearTimeout(t);
-  }, []);
+  }, [active, revealed]);
 
   const equip = useCallback(() => {
     if (equipped) return;

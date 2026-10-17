@@ -3,6 +3,7 @@ import {
   CATALOG, Game, GAME_H, GAME_W, RARITY_COLOR, RARITY_LABEL, BY_ID,
   type BuffId, type HudInfo, type Rarity, type StageId, type TreasureBuff,
 } from './game/engine';
+import { useSlideActive } from '../shared/SlideActivity';
 
 const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
 
@@ -40,6 +41,9 @@ const BUFFS: { id: BuffId; icon: string; title: string; desc: string; color: str
 ];
 
 export default function App({ onExit }: { onExit?: () => void } = {}) {
+  const active = useSlideActive();
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
   const [hud, setHud] = useState<HudInfo | null>(null);
@@ -52,14 +56,16 @@ export default function App({ onExit }: { onExit?: () => void } = {}) {
   useEffect(() => {
     const g = new Game(canvasRef.current!, setHud);
     gameRef.current = g;
+    g.setActive(activeRef.current);
     g.pushHud();
     const kd = (e: KeyboardEvent) => {
+      if (!activeRef.current) return;
       if (e.code === 'Space') { e.preventDefault(); if (g.state === 'playing') g.setFiring(true); }
       if (e.key.toLowerCase() === 'r') g.reload();
       if (e.key.toLowerCase() === 'q') setPickerOpen((v) => !v);
       if (e.key === 'Enter' && g.state !== 'playing') g.start();
     };
-    const ku = (e: KeyboardEvent) => { if (e.code === 'Space') g.setFiring(false); };
+    const ku = (e: KeyboardEvent) => { if (activeRef.current && e.code === 'Space') g.setFiring(false); };
     const up = () => g.setFiring(false);
     window.addEventListener('keydown', kd);
     window.addEventListener('keyup', ku);
@@ -73,6 +79,8 @@ export default function App({ onExit }: { onExit?: () => void } = {}) {
       window.removeEventListener('blur', up);
     };
   }, []);
+
+  useEffect(() => { gameRef.current?.setActive(active); }, [active]);
 
   const g = gameRef.current;
   const state = hud?.state ?? 'menu';
