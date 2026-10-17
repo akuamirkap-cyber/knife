@@ -11,6 +11,8 @@ export default function ScaledFrame({ baseWidth, baseHeight, children }: ScaledF
   const [scale, setScale] = useState<number | null>(null);
 
   useLayoutEffect(() => {
+    let retry = 0;
+    let raf = 0;
     const updateScale = () => {
       if (!containerRef.current) return;
       const { clientWidth, clientHeight } = containerRef.current;
@@ -18,6 +20,12 @@ export default function ScaledFrame({ baseWidth, baseHeight, children }: ScaledF
         // Uniform fit: strictly fit both width and height with small 2px safety margin so no edges touch or get clipped
         const s = Math.min((clientWidth - 2) / baseWidth, (clientHeight - 2) / baseHeight);
         setScale(Math.max(0.05, s));
+        retry = 0;
+      } else if (retry < 60) {
+        // Kontainer sempat 0-size (transisi display:none / layout belum siap).
+        // Jangan biarkan slide blank (opacity 0 selamanya) — coba lagi tiap frame.
+        retry += 1;
+        raf = requestAnimationFrame(updateScale);
       }
     };
 
@@ -26,6 +34,7 @@ export default function ScaledFrame({ baseWidth, baseHeight, children }: ScaledF
     if (containerRef.current) observer.observe(containerRef.current);
     window.addEventListener('resize', updateScale);
     return () => {
+      cancelAnimationFrame(raf);
       observer.disconnect();
       window.removeEventListener('resize', updateScale);
     };

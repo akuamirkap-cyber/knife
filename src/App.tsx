@@ -81,7 +81,7 @@ export default function App() {
       themeColor: 'text-emerald-400',
       borderColor: 'border-emerald-500/40 hover:border-emerald-400/80 shadow-emerald-950/40',
       render: () => (
-        <ScaledFrame baseWidth={380} baseHeight={880}>
+        <ScaledFrame baseWidth={420} baseHeight={920}>
           <KnifeHitGame key={keys.knife} onExit={fullscreenId === 'knife' ? () => setFullscreenId(null) : undefined} />
         </ScaledFrame>
       ),

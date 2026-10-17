@@ -40,19 +40,27 @@ test('proyektil bos menghadap arah gerak (ke pemain), tidak berputar', () => {
   assert.ok(!src.includes('bp.rot += s * 4'), 'proyektil bos tidak boleh berputar di jalan');
 });
 
-test('kepala bos terkunci tegak: init 0, update memaksa 0, render mengabaikan this.rot', () => {
+test('bos berputar pelan konstan: mulai tegak, update memutar pelan, render memakai this.rot', () => {
   const src = read('src/games/gunhit/game/Game.ts');
   assert.ok(
     src.includes('this.rot = this.level.boss ? 0 : rand(0, TAU)'),
     'boss harus mulai pada sudut 0 (tegak)'
   );
   assert.ok(
-    src.includes('if (this.level.boss) this.rot = 0;'),
-    'update harus memaksa this.rot = 0 untuk bos setiap frame'
+    src.includes('if (this.level.boss) this.rot += 0.5 * s * slowF * aimF;'),
+    'bos harus berputar pelan & konstan (muter, tidak diem, tidak liar)'
   );
   assert.ok(
-    src.includes('c.rotate(this.level.boss ? 0 : this.rot)'),
-    'render harus mengunci sudut lapisan target ke 0 untuk bos'
+    src.includes("if (this.level.mode !== 'treasure') c.rotate(this.rot);"),
+    'render harus memutar lapisan target memakai this.rot (bos ikut berputar)'
+  );
+  assert.ok(
+    !src.includes('this.rot = 0;'),
+    'bos tidak boleh dikunci diam (this.rot = 0)'
+  );
+  assert.ok(
+    src.includes('c.translate(Math.sin(bt * 0.53) * 3.2, Math.sin(bt * 1.15) * 3.8);'),
+    'bos punya gerak idle melayang (terlihat hidup)'
   );
 });
 
@@ -153,8 +161,8 @@ function renderProbe(events: string[], ctx: CanvasRenderingContext2D, levelN: nu
   return events;
 }
 
-test('render: lapisan wajah bos TIDAK berputar walau this.rot non-nol', () => {
-  const ADV = 1.234; // sudut adverarial yang tidak boleh sampai ke kanvas
+test('render: lapisan wajah bos ikut berputar (this.rot sampai ke kanvas) + goyangan idle', () => {
+  const ADV = 1.234; // sudut papan bos yang HARUS sampai ke kanvas
   const r1 = recorder();
   const boss = renderProbe(r1.events, r1.ctx, 5, ADV);
   assert.ok(
@@ -162,8 +170,12 @@ test('render: lapisan wajah bos TIDAK berputar walau this.rot non-nol', () => {
     'wajah bos harus digambar'
   );
   assert.ok(
-    !boss.some((e) => e.startsWith('rotate(') && e.includes(ADV.toFixed(3))),
-    `bos tidak boleh menerima rotate(${ADV}) — muter!`
+    boss.some((e) => e === `rotate(${ADV.toFixed(3)})`),
+    `rotasi papan bos harus sampai ke kanvas — bos harus muter (rotate(${ADV}))`
+  );
+  assert.ok(
+    boss.some((e) => e.startsWith('rotate(') && e !== `rotate(${ADV.toFixed(3)})`),
+    'bos punya goyangan idle tambahan (terlihat hidup)'
   );
   // kontrol: target biasa (non-boss) tetap memutar lapisan target
   const r2 = recorder();

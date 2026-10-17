@@ -2117,8 +2117,9 @@ export class Game {
       const f0 = this.slowF;
       const slowF = this.slowT > 0 ? f0 + (1 - f0) * Math.max(0, (0.3 - this.slowT) / 0.3) : 1;
       const aimF = this.aiming ? 0.28 : 1;
-      // Papan target biasa berputar; bos TIDAK PERNAH berputar (angle terkunci).
-      if (this.level.boss) this.rot = 0;
+      // Bos berputar PELAN dan konstan (kelihatan hidup/muter, tidak kaku diem),
+      // bukan putaran liar mengikuti pola. Target biasa tetap pakai pola.
+      if (this.level.boss) this.rot += 0.5 * s * slowF * aimF;
       else this.rot += v * s * slowF * aimF;
       this.slowT = Math.max(0, this.slowT - s);
     }
@@ -3002,10 +3003,20 @@ export class Game {
         c.fillStyle = 'rgba(0,0,0,0.35)';
         c.fill();
       }
+      // Idle "hidup" untuk bos: melayang pelan, napas, dan goyangan lembut —
+      // bos TIDAK diem, tapi juga TIDAK muter/membalik. Transform visual murni;
+      // this.rot tetap terkunci 0 untuk fisika proyektil & bidikan.
+      if (this.level.boss) {
+        const bt = this.time;
+        c.translate(Math.sin(bt * 0.53) * 3.2, Math.sin(bt * 1.15) * 3.8);
+        c.rotate(Math.sin(bt * 0.66 + 1.0) * 0.085);
+        const breath = 1 + Math.sin(bt * 1.35) * 0.014;
+        c.scale(breath, breath);
+      }
       if (this.rock) drawRockDiamond(c, R, this.time, this.diamondPing);
-      // Lapisan target berputar untuk buah/benda biasa. Untuk bos sudut
-      // dikunci 0 — kepala bos tidak akan pernah muter.
-      if (this.level.mode !== 'treasure') c.rotate(this.level.boss ? 0 : this.rot);
+      // Lapisan target berputar — bos juga berputar pelan (this.rot di update),
+      // bukan terkunci diam. Kecepatan boss konstan agar tidak muter liar.
+      if (this.level.mode !== 'treasure') c.rotate(this.rot);
       for (const it of this.items) {
         if (it.type === 'bullet' || it.type === 'old') {
           c.save();
