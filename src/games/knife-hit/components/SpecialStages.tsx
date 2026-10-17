@@ -742,7 +742,7 @@ export function TreasureStageScreen({
                   <Coin size={c.size} />
                 </span>
               ) : (
-                <span key={c.id} className="coin-pop absolute block" style={{ left: -15, top: -15, "--dx": `${c.dx}px`, "--dy": `${c.dy}px` } as CSSVars}>
+                <span key={c.id} className="coin-fly absolute block" style={{ left: -15, top: -15, "--dx": `${c.dx}px`, "--dy": `${c.dy}px` } as CSSVars}>
                   <Coin size={c.size} />
                 </span>
               ),

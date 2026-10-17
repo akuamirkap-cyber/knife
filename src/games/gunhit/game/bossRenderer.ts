@@ -41,24 +41,27 @@ export function renderBossHead(c: CanvasRenderingContext2D, type: BossType, R: n
     c.restore();
 
     // 2. Add lush neon cartoon villain outline following the character contour
-    c.save();
-    c.shadowColor = glowColor;
-    c.shadowBlur = 14;
-    c.strokeStyle = glowColor;
-    c.lineWidth = 3.5;
-    c.beginPath();
-    for (let deg = 0; deg <= 360; deg += 4) {
-      const rad = (deg * Math.PI) / 180;
-      const idx = deg % 360;
-      const r = (asset.radii[idx] || 0.72) * pad * 1.01;
-      const x = Math.cos(rad) * r;
-      const y = Math.sin(rad) * r;
-      if (deg === 0) c.moveTo(x, y);
-      else c.lineTo(x, y);
+    // (Dark Knight tampil polos: glow outline dihilangkan sesuai permintaan.)
+    if (type !== 'knight') {
+      c.save();
+      c.shadowColor = glowColor;
+      c.shadowBlur = 14;
+      c.strokeStyle = glowColor;
+      c.lineWidth = 3.5;
+      c.beginPath();
+      for (let deg = 0; deg <= 360; deg += 4) {
+        const rad = (deg * Math.PI) / 180;
+        const idx = deg % 360;
+        const r = (asset.radii[idx] || 0.72) * pad * 1.01;
+        const x = Math.cos(rad) * r;
+        const y = Math.sin(rad) * r;
+        if (deg === 0) c.moveTo(x, y);
+        else c.lineTo(x, y);
+      }
+      c.closePath();
+      c.stroke();
+      c.restore();
     }
-    c.closePath();
-    c.stroke();
-    c.restore();
 
     c.restore();
     return;

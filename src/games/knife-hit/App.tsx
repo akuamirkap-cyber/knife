@@ -313,7 +313,9 @@ export default function App({ onExit }: { onExit?: () => void }) {
     return p >= a.target;
   }).length, [save.stats, save.unlockedWeapons.length]);
 
-  const inGame = phase !== "menu" && phase !== "challenges";
+  // Layar reward adalah popup penuh dengan tombol tutupnya sendiri — HUD global
+  // (armory/🏆/koin) disembunyikan di sana karena menimpa "Main lagi" dan tombol ✕.
+  const inGame = phase !== "menu" && phase !== "challenges" && phase !== "reward";
   const pct = completionPct(save.completed);
   const bossCount = bossesDefeated(save.completed);
 
@@ -331,7 +333,7 @@ export default function App({ onExit }: { onExit?: () => void }) {
           <span>Pilih Game Lain</span>
         </button>
       )}
-      <div className="relative h-full w-full overflow-hidden bg-[radial-gradient(ellipse_at_50%_38%,#21454e_0%,#13292f_45%,#0a1519_100%)]">
+      <div className="relative min-h-0 w-full flex-1 overflow-hidden bg-[radial-gradient(ellipse_at_50%_38%,#21454e_0%,#13292f_45%,#0a1519_100%)]">
         <div className="pointer-events-none absolute inset-0 z-40 rounded-[30px] shadow-[inset_0_0_80px_rgba(0,0,0,.55)]" />
 
         {/* Global Sunburst Mode Toggle (Baru FX Lab / Lama) */}
@@ -514,7 +516,9 @@ export default function App({ onExit }: { onExit?: () => void }) {
         )}
       </div>
 
-      <div className="flex max-w-[420px] flex-wrap items-center justify-center gap-1.5">
+      {/* Chrome slide (navigasi fase) — tinggi tetap DI LUAR kanvas game 760px,
+          supaya stage seperti kotak hadiah & reward tidak terpotong di bawah. */}
+      <div className="flex h-[120px] w-full max-w-[420px] shrink-0 flex-wrap content-start items-center justify-center gap-1.5 overflow-y-auto px-1">
         <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
           Lv {currentLevel} · {pct}% · 👑{bossCount}/20
         </span>

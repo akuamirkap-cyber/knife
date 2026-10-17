@@ -58,7 +58,7 @@ test('star upgrades pause the game until chosen and affect either type of stage'
   assert.equal(game.choosingBuff, false);
   assert.equal(game.treasureBuff, 'double');
   assert.equal((game as unknown as { twinGuns: boolean }).twinGuns, true);
-  assert.deepEqual((game as unknown as { gunOffsets: number[] }).gunOffsets, [-46, 46]);
+  assert.deepEqual((game as unknown as { gunOffsets: number[] }).gunOffsets, [-30, 30]);
 
   // The same selectable pair is available on normal/rock stages too.
   Object.assign(game, { level: makeLevel(3), choosingBuff: true, twinGuns: false });
@@ -150,10 +150,10 @@ test('every dual-gun stage fires, flashes and charges at both real muzzles', () 
       sink: { push: () => {}, light: (x: number) => lights.push(x) },
     });
     game.shoot();
-    assert.deepEqual(game.projs.map(p => p.x).sort((a, b) => a - b), [164, 256]);
-    assert.deepEqual(game.projs.map(p => p.originX).sort((a, b) => a - b), [164, 256]);
-    assert.deepEqual(lights.slice(0, 2), [164, 256], `muzzle flashes on level ${levelNumber}`);
-    assert.deepEqual(game.particles.filter(p => p.kind === 'ring').map(p => p.x), [164, 256]);
+    assert.deepEqual(game.projs.map(p => p.x).sort((a, b) => a - b), [180, 240]);
+    assert.deepEqual(game.projs.map(p => p.originX).sort((a, b) => a - b), [180, 240]);
+    assert.deepEqual(lights.slice(0, 2), [180, 240], `muzzle flashes on level ${levelNumber}`);
+    assert.deepEqual(game.particles.filter(p => p.kind === 'ring').map(p => p.x), [180, 240]);
     assert.ok(!game.particles.some(p => p.x === 210 && p.kind === 'ring'), 'no phantom middle muzzle');
   }
 });

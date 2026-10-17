@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { useSunburstMode, type SunburstMode } from "../sunburstState";
 
 type CSSVars = React.CSSProperties & Record<string, string | number>;
@@ -404,13 +404,26 @@ export function Dust({ count = 22 }: { count?: number }) {
 }
 
 export function LetterPop({ text, delay = 0, step = 0.04, className = "" }: { text: string; delay?: number; step?: number; className?: string }) {
+  // Huruf dibungkus per kata (nowrap) dan spasi antar kata dibiarkan di luar grup —
+  // baris hanya boleh patah di spasi, tidak di tengah kata
+  // (tanpa ini "SPROUTY DEFEATED!" bisa jadi "…DEFEATED / !").
+  const words = text.split(" ");
+  let k = 0;
   return (
     <span className={className}>
-      {text.split("").map((ch, i) =>
-        ch === " " ? <span key={i}>&nbsp;</span> : (
-          <span key={i} className="letter-pop" style={{ animationDelay: `${delay + i * step}s` }}>{ch}</span>
-        )
-      )}
+      {words.map((word, w) => (
+        <Fragment key={w}>
+          {w > 0 ? " " : null}
+          <span style={{ whiteSpace: "nowrap" }}>
+            {word.split("").map((ch, i) => {
+              const idx = k++;
+              return (
+                <span key={i} className="letter-pop" style={{ animationDelay: `${delay + idx * step}s` }}>{ch}</span>
+              );
+            })}
+          </span>
+        </Fragment>
+      ))}
     </span>
   );
 }

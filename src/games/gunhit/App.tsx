@@ -13,7 +13,7 @@ import Arsenal from './components/Arsenal';
 import QuestModal from './components/QuestModal';
 import LeaderboardModal from './components/LeaderboardModal';
 import { BossDefeatedModal } from './components/BossDefeatedModal';
-import { BonusStageModal } from './components/BonusStageModal';
+import { BossGiftBoxModal } from './components/BossGiftBoxModal';
 import StarBuffModal from './components/StarBuffModal';
 
 type Screen = 'menu' | 'playing' | 'over';
@@ -82,7 +82,7 @@ export default function App({ onExit }: { onExit?: () => void }) {
     coins: number;
   } | null>(null);
   const [bonusStageOpen, setBonusStageOpen] = useState(false);
-  const [bonusAfterBoss, setBonusAfterBoss] = useState(5);
+  const [bonusAfterBoss, setBonusAfterBoss] = useState<{ stage: number; bossName: string }>({ stage: 5, bossName: 'BOSS' });
   const [starBuffOpen, setStarBuffOpen] = useState(false);
   const [starBuffTreasure, setStarBuffTreasure] = useState(false);
 
@@ -286,16 +286,22 @@ export default function App({ onExit }: { onExit?: () => void }) {
   };
 
   const handleContinueAfterBoss = () => {
-    setBonusAfterBoss(bossDefeatedData?.level ?? 5);
+    setBonusAfterBoss({ stage: bossDefeatedData?.level ?? 5, bossName: bossDefeatedData?.name ?? 'BOSS' });
     setBossDefeatedData(null);
-    // Keep the existing boss reward, then play the treasure round next.
+    // Bonus stage: kotak hadiah ala Knife Boss 100 Lv (senjata baru + koin).
     setBonusStageOpen(true);
   };
 
-  const handleBonusFinished = (bonusCoins: number) => {
+  const handleGiftBoxClaim = (bonusCoins: number, weaponId: WeaponId, equip: boolean) => {
     depositCoins(bonusCoins);
     const current = questStateRef.current;
     saveQuests({ ...current, totalCoinsCollected: current.totalCoinsCollected + bonusCoins });
+    // Catat senjata hasil kotak hadiah ke koleksi.
+    try {
+      const owned: string[] = JSON.parse(localStorage.getItem(LS.owned) || '[]');
+      if (!owned.includes(weaponId)) localStorage.setItem(LS.owned, JSON.stringify([...owned, weaponId]));
+    } catch { /* simpan koleksi bersifat opsional */ }
+    if (equip) chooseWeapon(weaponId);
     setBonusStageOpen(false);
     gameRef.current?.continueAfterBoss();
   };
@@ -552,11 +558,13 @@ export default function App({ onExit }: { onExit?: () => void }) {
           />
         )}
 
-        {/* HALAMAN BONUS REWARD STAGE YANG SERU & REWARDING BANGET! */}
+        {/* BONUS STAGE: KOTAK HADIAH ala Knife Boss 100 Lv — efek kotak + senjata baru Gun Hit */}
         {bonusStageOpen && (
-          <BonusStageModal
-            currentStage={bonusAfterBoss}
-            onClaimAndContinue={handleBonusFinished}
+          <BossGiftBoxModal
+            bossName={bonusAfterBoss.bossName}
+            stage={bonusAfterBoss.stage}
+            currentWeaponId={weapon}
+            onClaim={handleGiftBoxClaim}
           />
         )}
 
