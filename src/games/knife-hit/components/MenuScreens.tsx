@@ -5,7 +5,6 @@ import { Dust, GodRays, SparkleField } from "./Effects";
 import { WeaponArt } from "../weapons";
 import { MAX_LEVEL, STAGE_META, getStage } from "../stages";
 import { sfx } from "../sfx";
-import { SunburstToggle } from "../sunburstState";
 
 /* ================= MAIN MENU — poles ringan ================= */
 export function MainMenuScreen({
@@ -98,7 +97,6 @@ export function MainMenuScreen({
           <WeaponArt id={equippedWeaponId} className="h-7 w-[64px]" />
           <span className="flex items-center gap-1 text-[12px] font-black tracking-[0.18em] text-emerald-300"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />READY</span>
         </div>
-        <SunburstToggle size="sm" />
       </div>
 
       <div className="absolute inset-x-0 bottom-[100px] flex flex-col items-center gap-2">

@@ -28,7 +28,7 @@ const CX = W / 2;
 const CY = 255;
 const SPECIAL_CY = 282; // Give the full-size Diamond Breaker rock room below the HUD.
 const ROCK_RADIUS = 166; // ~80% of the 420px screen, as on Diamond Breaker's 480px screen.
-const TWIN_SPACING = 46;
+const TWIN_SPACING = 30; // dual lebih rapat: 60px antar laras (dulu 92px)
 const SINGLE_BARREL = [0] as const;
 const TWIN_BARRELS = [-TWIN_SPACING, TWIN_SPACING] as const;
 const CLASSIC_COIN_RADIUS = 13.5 * 1.2; // compact original coin, enlarged only 20%
@@ -163,16 +163,20 @@ export function makeLevel(n: number): LevelCfg {
     pattern = pick(pool);
   }
   const ammo = Math.min(5 + Math.floor(n * 0.5), 13) + (boss ? 2 : 0);
-  const old = n < 2 ? 0 : Math.min(1 + Math.floor((n - 2) / 3), 5);
+  const bossIdx = Math.floor(n / 5) - 1;
+  const style: Style = boss ? BOSS_STYLES[Math.max(0, bossIdx) % BOSS_STYLES.length] : WORLD_STYLES[world % WORLD_STYLES.length];
+  // Boss DARK KNIGHT tampil bersih: tanpa duri jebakan & penghalang (peluru berkarat).
+  const cleanKnight = boss && style === 'knight';
+  const old = cleanKnight ? 0 : n < 2 ? 0 : Math.min(1 + Math.floor((n - 2) / 3), 5);
   // Boss selalu memiliki duri mematikan yang DILARANG DITEMBAK!
-  const spikes = boss
+  const spikes = cleanKnight
+    ? 0
+    : boss
     ? Math.min(5, 2 + Math.floor(n / 5)) // 2 sampai 5 duri jebakan mematikan di kepala boss!
     : n < 4
     ? 0
     : Math.min(1 + Math.floor((n - 4) / 4), 4);
   const coins = (Math.random() < 0.65 ? 1 : 0) + (Math.random() < 0.3 ? 1 : 0);
-  const bossIdx = Math.floor(n / 5) - 1;
-  const style: Style = boss ? BOSS_STYLES[Math.max(0, bossIdx) % BOSS_STYLES.length] : WORLD_STYLES[world % WORLD_STYLES.length];
   // Level 3 = Diamond Breaker rock, 4 = coin bonus, 5 = boss, 6 = treasure.
   // Afterwards treasure follows each boss; bonus recurs every ten levels.
   const mode: LevelMode = boss ? 'classic'
@@ -627,7 +631,8 @@ export class Game {
     this.snowLoaded = Math.min(SNOWBALL_MAG_SIZE, this.ammoLeft);
     this.stuck = 0;
     this.combo = 0;
-    this.rot = rand(0, TAU);
+    // Boss (kepala bos) tampil tegak dan TIDAK berputar seperti papan target biasa.
+    this.rot = this.level.boss ? 0 : rand(0, TAU);
     this.levelTime = 0;
     this.state = 'intro';
     this.introT = 0;
@@ -682,7 +687,9 @@ export class Game {
     place('old', this.level.old, 0.4);
     place('coin', this.level.coins, 0.32);
     // Berlian / Diamond tertancap di arena yang butuh 2x tembakan baru jatuh!
-    if (this.level.n >= 2 && Math.random() < 0.6) {
+    // (Dark Knight: penghalang berlian juga dihilangkan.)
+    const cleanKnight = this.level.boss && this.level.style === 'knight';
+    if (!cleanKnight && this.level.n >= 2 && Math.random() < 0.6) {
       place('diamond_chest', 1, 0.42);
     }
   }
@@ -2110,7 +2117,10 @@ export class Game {
       const f0 = this.slowF;
       const slowF = this.slowT > 0 ? f0 + (1 - f0) * Math.max(0, (0.3 - this.slowT) / 0.3) : 1;
       const aimF = this.aiming ? 0.28 : 1;
-      this.rot += v * s * slowF * aimF;
+      // Bos berputar PELAN dan konstan (kelihatan hidup/muter, tidak kaku diem),
+      // bukan putaran liar mengikuti pola. Target biasa tetap pakai pola.
+      if (this.level.boss) this.rot += 0.5 * s * slowF * aimF;
+      else this.rot += v * s * slowF * aimF;
       this.slowT = Math.max(0, this.slowT - s);
     }
     if (this.aiming) {
@@ -2251,19 +2261,40 @@ export class Game {
       const bp = this.bossProjs[i];
       bp.x += bp.vx * s;
       bp.y += bp.vy * s;
-      bp.rot += s * 4;
+      // Ujung proyektil selalu menghadap arah geraknya (ke arah pemain),
+      // tidak berputar-putar di jalan.
+      bp.rot = Math.atan2(bp.vy, bp.vx) - Math.PI / 2;
 
-      // Particle trail
-      if (Math.random() < 0.6) {
+      // Api/jejak menyala mengekor di EKOR peluru (sisi berlawanan arah
+      // gerak), bukan menempel di badan peluru.
+      const spdH = Math.hypot(bp.vx, bp.vy) || 1;
+      const dirx = bp.vx / spdH, diry = bp.vy / spdH;
+      const tailX = bp.x - dirx * 44;
+      const tailY = bp.y - diry * 44;
+      if (Math.random() < 0.85) {
         this.particles.push({
-          x: bp.x + rand(-3, 3),
-          y: bp.y + rand(-3, 3),
-          vx: rand(-20, 20),
-          vy: rand(-30, 30),
-          life: 0.25,
-          max: 0.25,
-          size: rand(2.5, 4.5),
+          x: tailX + rand(-7, 7),
+          y: tailY + rand(-7, 7),
+          vx: -dirx * rand(30, 90) + rand(-25, 25),
+          vy: -diry * rand(30, 90) + rand(-25, 25),
+          life: 0.32,
+          max: 0.32,
+          size: rand(3, 5.5),
           color: bp.type === 'oni' ? '239,68,68' : bp.type === 'knight' ? '56,189,248' : bp.type === 'cyborg' ? '34,211,238' : '234,179,8',
+          kind: 'glow',
+          rot: 0,
+          vr: 0,
+          g: 0,
+        });
+        this.particles.push({
+          x: tailX + rand(-5, 5),
+          y: tailY + rand(-5, 5),
+          vx: -dirx * rand(40, 110) + rand(-18, 18),
+          vy: -diry * rand(40, 110) + rand(-18, 18),
+          life: 0.22,
+          max: 0.22,
+          size: rand(4, 7.5),
+          color: pick(['255,200,80', '255,120,30', '255,60,20']),
           kind: 'glow',
           rot: 0,
           vr: 0,
@@ -2965,13 +2996,26 @@ export class Game {
       c.scale(sc, sc);
       // Ordinary round targets keep their drop shadow. The special rock and
       // treasure chest must NOT sit on a large black disk as chunks fall away.
-      if (!isSpecial(this.level.mode)) {
+      // Dark Knight juga tampil tanpa lingkaran hitam di belakangnya.
+      if (!isSpecial(this.level.mode) && !(this.level.boss && this.level.style === 'knight')) {
         c.beginPath();
         c.arc(0, 10, R + 6, 0, TAU);
         c.fillStyle = 'rgba(0,0,0,0.35)';
         c.fill();
       }
+      // Idle "hidup" untuk bos: melayang pelan, napas, dan goyangan lembut —
+      // bos TIDAK diem, tapi juga TIDAK muter/membalik. Transform visual murni;
+      // this.rot tetap terkunci 0 untuk fisika proyektil & bidikan.
+      if (this.level.boss) {
+        const bt = this.time;
+        c.translate(Math.sin(bt * 0.53) * 3.2, Math.sin(bt * 1.15) * 3.8);
+        c.rotate(Math.sin(bt * 0.66 + 1.0) * 0.085);
+        const breath = 1 + Math.sin(bt * 1.35) * 0.014;
+        c.scale(breath, breath);
+      }
       if (this.rock) drawRockDiamond(c, R, this.time, this.diamondPing);
+      // Lapisan target berputar — bos juga berputar pelan (this.rot di update),
+      // bukan terkunci diam. Kecepatan boss konstan agar tidak muter liar.
       if (this.level.mode !== 'treasure') c.rotate(this.rot);
       for (const it of this.items) {
         if (it.type === 'bullet' || it.type === 'old') {
@@ -3335,6 +3379,38 @@ export class Game {
       c.translate(bp.x, bp.y);
       c.scale(2.8, 2.8); // DIBESARIN ~3X!
       c.rotate(bp.rot);
+
+      // Api mengekor di EKOR peluru (lokal -Y = berlawanan arah gerak).
+      {
+        const flick = 1 + Math.sin(this.time * 26 + bp.x * 0.06) * 0.22;
+        const len = 30 * flick;
+        c.save();
+        c.shadowColor = '#f97316';
+        c.shadowBlur = 12;
+        const fg = c.createLinearGradient(0, -13, 0, -13 - len);
+        fg.addColorStop(0, 'rgba(255,255,255,0.95)');
+        fg.addColorStop(0.35, 'rgba(255,196,60,0.9)');
+        fg.addColorStop(0.75, 'rgba(255,96,24,0.55)');
+        fg.addColorStop(1, 'rgba(255,60,20,0)');
+        c.fillStyle = fg;
+        c.beginPath();
+        c.moveTo(-7, -12);
+        c.quadraticCurveTo(-8.5 * flick, -13 - len * 0.55, 0, -13 - len);
+        c.quadraticCurveTo(8.5 * flick, -13 - len * 0.55, 7, -12);
+        c.closePath();
+        c.fill();
+        const cg = c.createLinearGradient(0, -12, 0, -12 - len * 0.62);
+        cg.addColorStop(0, 'rgba(255,255,240,0.95)');
+        cg.addColorStop(1, 'rgba(255,220,120,0)');
+        c.fillStyle = cg;
+        c.beginPath();
+        c.moveTo(-3.5, -12);
+        c.quadraticCurveTo(-4, -12 - len * 0.38, 0, -12 - len * 0.62);
+        c.quadraticCurveTo(4, -12 - len * 0.38, 3.5, -12);
+        c.closePath();
+        c.fill();
+        c.restore();
+      }
 
       if (bp.type === 'oni') {
         // Giant Demon Fireball

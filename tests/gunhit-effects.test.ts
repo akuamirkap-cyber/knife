@@ -283,9 +283,9 @@ test('both barrels own their muzzle rings, glow and projectiles in rock and trea
     const game = probe(stage, 'plasma');
     Object.assign(game, { twinGuns: true });
     game.shoot();
-    assert.deepEqual(game.projs.map(p => p.x), [164, 256]);
-    assert.deepEqual(game.particles.filter(p => p.kind === 'ring').map(p => p.x), [164, 256]);
-    assert.deepEqual(game.lights.map(l => l.x), [164, 256]);
+    assert.deepEqual(game.projs.map(p => p.x), [180, 240]);
+    assert.deepEqual(game.particles.filter(p => p.kind === 'ring').map(p => p.x), [180, 240]);
+    assert.deepEqual(game.lights.map(l => l.x), [180, 240]);
     assert.equal(game.ammoLeft, 11);
   }
 
@@ -293,7 +293,7 @@ test('both barrels own their muzzle rings, glow and projectiles in rock and trea
   Object.assign(pistol, { twinGuns: true });
   pistol.shoot();
   const casings = pistol.particles.filter(p => p.kind === 'shell');
-  assert.deepEqual(casings.map(p => p.x), [148, 272], 'mirrored guns eject outward');
+  assert.deepEqual(casings.map(p => p.x), [164, 256], 'mirrored guns eject outward');
 });
 
 test('special-stage explosions keep the weapon’s normal impact burst', () => {
@@ -371,19 +371,19 @@ test('treasure hits use normal weapon impacts at each lane and embed rounds in t
   const game = probe(6, 'plasma');
   let hits = 0;
   Object.assign(game, { chest: { hit: () => { hits++; } }, treasureBuff: 'double', twinGuns: true });
-  for (const x of [164, 256]) assert.equal(game.stepSpecialProjectile({ x, y: 362, vx: 0, vy: -1700 }).res, 'hit');
+  for (const x of [180, 240]) assert.equal(game.stepSpecialProjectile({ x, y: 362, vx: 0, vy: -1700 }).res, 'hit');
   assert.equal(hits, 2);
-  assert.deepEqual(game.chestBullets.map(b => b.x), [-46, 46]);
+  assert.deepEqual(game.chestBullets.map(b => b.x), [-30, 30]);
   assert.equal(game.coins, 0, 'coins must wait for the shower to land before being credited');
   assert.ok((game as unknown as { treasureCoins: { value: number }[] }).treasureCoins.reduce((n, c) => n + c.value, 0) >= 2);
-  assert.ok(game.lights.some(l => l.x === 164));
-  assert.ok(game.lights.some(l => l.x === 256));
-  assert.ok(game.particles.some(p => p.x === 164 && p.kind === 'shock'));
-  assert.ok(game.particles.some(p => p.x === 256 && p.kind === 'shock'));
+  assert.ok(game.lights.some(l => l.x === 180));
+  assert.ok(game.lights.some(l => l.x === 240));
+  assert.ok(game.particles.some(p => p.x === 180 && p.kind === 'shock'));
+  assert.ok(game.particles.some(p => p.x === 240 && p.kind === 'shock'));
 
-  game.stepSpecialProjectile({ x: 164, y: 362, vx: 0, vy: -1700 });
+  game.stepSpecialProjectile({ x: 180, y: 362, vx: 0, vy: -1700 });
   assert.equal(hits, 3);
-  assert.deepEqual(game.chestBullets.map(b => b.x), [46, -46]);
+  assert.deepEqual(game.chestBullets.map(b => b.x), [30, -30]);
   assert.equal(game.flyers.filter(f => f.kind === 'bullet').length, 1, 'a repeat hit dislodges only the previous round');
 });
 

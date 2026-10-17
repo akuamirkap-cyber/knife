@@ -1,3 +1,7 @@
 node_modules
 dist
 .env
+
+# scratch / test artifacts
+scratch-*.mjs
+scratch-shots*/

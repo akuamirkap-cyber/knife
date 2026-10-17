@@ -131,6 +131,341 @@ html, body, #root {
 }
 .chest-hit { animation: chest-hit .22s ease-out; }
 
+/* ---------- Knife Hit: rays & particles ---------- */
+@keyframes rays-in {
+  0% { transform: scale(.1) rotate(-60deg); opacity: 0; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+.rays-in { animation: rays-in .9s cubic-bezier(.2,.9,.3,1.15) both; }
+
+@keyframes shockwave {
+  0% { transform: translate(-50%,-50%) scale(.05); opacity: 1; border-width: 22px; }
+  100% { transform: translate(-50%,-50%) scale(1); opacity: 0; border-width: 1px; }
+}
+.shockwave { animation: shockwave .8s cubic-bezier(.1,.7,.3,1) both; }
+
+@keyframes burst {
+  0% { transform: translate(-50%,-50%) translate(0,0) scale(.4) rotate(0); opacity: 1; }
+  20% { transform: translate(-50%,-50%) translate(calc(var(--dx)*.35), calc(var(--dy)*.35)) scale(1.2) rotate(60deg); opacity: 1; }
+  100% { transform: translate(-50%,-50%) translate(var(--dx), var(--dy)) scale(0) rotate(240deg); opacity: 0; }
+}
+.burst { animation: burst .9s cubic-bezier(.1,.8,.3,1) both; }
+
+@keyframes confetti {
+  0% { transform: translate(0,0) rotate(0) rotateX(0); opacity: 1; }
+  35% { transform: translate(var(--dx), var(--dy)) rotate(calc(var(--rot)*.4)) rotateX(360deg); opacity: 1; }
+  100% { transform: translate(calc(var(--dx)*1.35), calc(var(--dy) + 460px)) rotate(var(--rot)) rotateX(1080deg); opacity: 0; }
+}
+.confetti { animation: confetti 2.2s cubic-bezier(.15,.6,.4,1) both; }
+
+/* flash layar putih saat kotak hadiah dibuka — HARUS punya opacity via keyframes,
+   kalau tidak overlay bg-white-nya menutupi layar permanen */
+@keyframes flash {
+  0% { opacity: 0; }
+  12% { opacity: .95; }
+  100% { opacity: 0; }
+}
+.flash { animation: flash .7s ease-out both; }
+
+@keyframes white-flash {
+  0% { opacity: .85; }
+  100% { opacity: 0; }
+}
+.white-flash { animation: white-flash .22s ease-out both; }
+
+@keyframes twinkle {
+  0%,100% { transform: scale(0) rotate(0); opacity: 0; }
+  50% { transform: scale(1) rotate(90deg); opacity: 1; }
+}
+.twinkle { animation: twinkle 1.8s ease-in-out infinite both; }
+
+@keyframes dust {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  15% { opacity: var(--o); }
+  85% { opacity: var(--o); }
+  100% { transform: translateY(-760px) translateX(var(--sx)); opacity: 0; }
+}
+.dust { animation: dust linear infinite both; }
+
+@keyframes score-pop {
+  0% { transform: translate(-50%,0) scale(.4); opacity: 0; }
+  25% { transform: translate(-50%,-14px) scale(1.25); opacity: 1; }
+  100% { transform: translate(-50%,-60px) scale(1); opacity: 0; }
+}
+.score-pop { animation: score-pop .8s ease-out both; }
+
+@keyframes piece-fly {
+  0% { transform: translate(0,0) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; }
+}
+.piece-fly { animation: piece-fly 1s cubic-bezier(.15,.6,.4,1) both; }
+
+/* ---------- Knife Hit: gift box (kotak hadiah) ---------- */
+@keyframes drop-in {
+  0% { transform: translateY(-520px) scale(.85); }
+  55% { transform: translateY(0) scale(1.15,.8); }
+  70% { transform: translateY(-36px) scale(.94,1.07); }
+  85% { transform: translateY(0) scale(1.05,.95); }
+  93% { transform: translateY(-6px) scale(.99,1.01); }
+  100% { transform: translateY(0) scale(1); }
+}
+.drop-in { animation: drop-in 1s cubic-bezier(.4,.1,.5,1) both; }
+
+@keyframes idle-bob {
+  0%,100% { transform: translateY(0) rotate(0) scale(1); }
+  50% { transform: translateY(-8px) rotate(-1.5deg) scale(1.02); }
+}
+.idle-bob { animation: idle-bob 1.4s ease-in-out infinite; }
+
+@keyframes wobble {
+  0%,100% { transform: rotate(0) translateY(0); }
+  25% { transform: rotate(-2.5deg) translateY(-2px); }
+  75% { transform: rotate(2.5deg) translateY(-2px); }
+}
+.wobble { animation: wobble .6s ease-in-out infinite; }
+
+/* getar halus + glow saat pengisian, tidak lebay */
+@keyframes violent {
+  0%,100% { transform: translate(0,0) rotate(0) scale(1.04); filter: brightness(1); }
+  25% { transform: translate(-2px,-2px) rotate(-3deg) scale(1.06); filter: brightness(1.15); }
+  50% { transform: translate(2px,-1px) rotate(3deg) scale(1.07); filter: brightness(1.2); }
+  75% { transform: translate(-1px,1px) rotate(-2deg) scale(1.06); filter: brightness(1.15); }
+}
+.violent { animation: violent .3s ease-in-out infinite; }
+
+@keyframes lid-fly {
+  0% { transform: translate(0,0) rotate(0); opacity: 1; }
+  100% { transform: translate(170px,-460px) rotate(300deg); opacity: 0; }
+}
+.lid-fly { animation: lid-fly 1s cubic-bezier(.15,.8,.4,1) both; }
+
+@keyframes box-sink {
+  0% { transform: translateY(0) scale(1.15,.85); opacity: 1; }
+  15% { transform: translateY(0) scale(.95,1.05); }
+  30% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(120px) scale(.85); opacity: 0; }
+}
+.box-sink { animation: box-sink 1.6s ease-in both; }
+
+@keyframes seam-pulse {
+  0%,100% { filter: brightness(1); }
+  50% { filter: brightness(1.5); }
+}
+.seam-pulse { animation: seam-pulse .35s ease-in-out infinite; }
+
+/* ---------- Knife Hit: weapon reveal ---------- */
+@keyframes weapon-rise {
+  0% { transform: translateY(100px) scale(.15) rotate(-60deg); opacity: 0; }
+  45% { transform: translateY(-90px) scale(1.25) rotate(340deg); opacity: 1; }
+  70% { transform: translateY(-50px) scale(.95) rotate(322deg); }
+  85% { transform: translateY(-62px) scale(1.03) rotate(326deg); }
+  100% { transform: translateY(-58px) scale(1) rotate(325deg); opacity: 1; }
+}
+.weapon-rise { animation: weapon-rise 1.5s cubic-bezier(.2,.9,.3,1) both; }
+
+@keyframes float {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.float { animation: float 2.4s ease-in-out infinite; }
+
+@keyframes heartbeat {
+  0%,100% { transform: scale(1); }
+  15% { transform: scale(1.1); }
+  30% { transform: scale(.98); }
+  45% { transform: scale(1.06); }
+}
+.heartbeat { animation: heartbeat 1s ease-in-out infinite; }
+
+@keyframes reveal-pop {
+  0% { transform: scale(1.5); filter: brightness(4) saturate(0); }
+  40% { transform: scale(.92); filter: brightness(1.6); }
+  70% { transform: scale(1.05); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+.reveal-pop { animation: reveal-pop .8s cubic-bezier(.3,.8,.4,1) both; }
+
+@keyframes equip-spin {
+  0% { transform: rotate(0) scale(1); }
+  40% { transform: rotate(200deg) scale(1.35); }
+  75% { transform: rotate(370deg) scale(.92); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+.equip-spin { animation: equip-spin .9s cubic-bezier(.3,.8,.4,1) both; }
+
+/* ---------- Knife Hit: UI ---------- */
+@keyframes fade-up {
+  from { transform: translateY(18px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.fade-up { animation: fade-up .5s ease-out both; }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fade-in { animation: fade-in .4s ease-out both; }
+
+@keyframes letter-pop {
+  0% { transform: translateY(24px) scale(0) rotate(-20deg); opacity: 0; }
+  60% { transform: translateY(-6px) scale(1.3) rotate(6deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+}
+.letter-pop { display: inline-block; animation: letter-pop .45s cubic-bezier(.3,.8,.4,1.3) both; }
+
+@keyframes count-pulse {
+  0% { transform: scale(1.6); opacity: .3; filter: blur(3px); }
+  45% { transform: scale(.92); opacity: 1; filter: blur(0); }
+  100% { transform: scale(1); }
+}
+.count-pulse { animation: count-pulse .45s ease-out both; }
+
+@keyframes btn-breathe {
+  0%,100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+.btn-breathe { animation: btn-breathe 1.2s ease-in-out infinite; }
+
+@keyframes tap-hint {
+  0%,100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-6px) scale(1.08); }
+}
+.tap-hint { animation: tap-hint .7s ease-in-out infinite; }
+
+@keyframes ring-ping {
+  0% { transform: scale(.6); opacity: .9; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+.ring-ping { animation: ring-ping 1.2s ease-out infinite; }
+
+@keyframes card-in {
+  0% { transform: translateY(14px) scale(.96); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.card-in { animation: card-in .45s cubic-bezier(.2,.8,.3,1.1) both; }
+
+@keyframes glow-breathe {
+  0%,100% { opacity: .55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+.glow-breathe { animation: glow-breathe 2.4s ease-in-out infinite; }
+
+@keyframes progress-shine {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.35); }
+  100% { filter: brightness(1); }
+}
+.progress-shine { animation: progress-shine 1.8s ease-in-out infinite; }
+
+@keyframes title-float {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.title-float { animation: title-float 3s ease-in-out infinite; }
+
+@keyframes shimmer-x {
+  0% { transform: translateX(-120%) skewX(-18deg); }
+  60%,100% { transform: translateX(320%) skewX(-18deg); }
+}
+.shimmer-x { animation: shimmer-x 2.8s ease-in-out infinite; }
+
+@keyframes border-flow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.anim-border-flow { background-size: 220% 220%; animation: border-flow 5s ease infinite; }
+
+@keyframes podium-spin { to { transform: rotate(360deg); } }
+.podium-spin { animation: podium-spin 24s linear infinite; }
+
+.premium-panel {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.14), transparent 55%),
+    linear-gradient(180deg, #276b74 0%, #1c585f 38%, #123b42 100%);
+  box-shadow: 0 24px 60px rgba(0,0,0,.55), inset 0 2px 0 rgba(255,255,255,.22), inset 0 -12px 28px rgba(0,0,0,.28);
+}
+.glass-row { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(6px); }
+
+/* ---------- Knife Hit: bonus & treasure stages ---------- */
+@keyframes coin-blink {
+  0%,100% { filter: brightness(1); }
+  50% { filter: brightness(1.55); }
+}
+.coin-blink { animation: coin-blink 1.1s ease-in-out infinite; }
+
+@keyframes coin-shine-move {
+  0% { transform: translateX(-140%) skewX(-20deg); }
+  60%,100% { transform: translateX(240%) skewX(-20deg); }
+}
+.coin-shine-move { animation: coin-shine-move 1.8s ease-in-out infinite; }
+
+/* koin terbang ke arah --dx/--dy (nama sengaja coin-fly: .coin-pop sudah dipakai
+   Rifle Rock untuk denyut angka koin) */
+@keyframes coin-fly {
+  0% { transform: translate(0,0) scale(.3); opacity: 0; }
+  18% { transform: translate(calc(var(--dx)*.35), calc(var(--dy)*.35)) scale(1.25); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 1; }
+}
+.coin-fly { animation: coin-fly .55s cubic-bezier(.2,.8,.3,1.2) both; }
+
+@keyframes coin-collect {
+  0% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 1; }
+  100% { transform: translate(var(--cx), var(--cy)) scale(.35); opacity: .9; }
+}
+.coin-collect { animation: coin-collect .6s cubic-bezier(.4,.1,.5,1) both; }
+
+@keyframes bullet-fly {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(var(--travel)) scale(1); opacity: 1; }
+}
+.bullet-fly { animation: bullet-fly .19s linear both; }
+
+@keyframes muzzle {
+  0% { transform: scale(.4); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.muzzle { animation: muzzle .18s ease-out both; }
+
+@keyframes chest-open {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.12,.9); }
+  100% { transform: scale(1.06); }
+}
+.chest-open { animation: chest-open .5s cubic-bezier(.3,.8,.4,1.3) both; }
+
+@keyframes chest-glow-pulse {
+  0%,100% { opacity: .5; }
+  50% { opacity: 1; }
+}
+.chest-glow-pulse { animation: chest-glow-pulse 1.8s ease-in-out infinite; }
+
+@keyframes dmg-pop {
+  0% { transform: translate(-50%,0) scale(.5); opacity: 0; }
+  25% { transform: translate(-50%,-16px) scale(1.2); opacity: 1; }
+  100% { transform: translate(-50%,-52px) scale(1); opacity: 0; }
+}
+.dmg-pop { animation: dmg-pop .7s ease-out both; }
+
+@keyframes star-twinkle {
+  0%,100% { transform: scale(1) rotate(-8deg); filter: brightness(1); }
+  50% { transform: scale(1.18) rotate(8deg); filter: brightness(1.5); }
+}
+.star-twinkle { animation: star-twinkle .8s ease-in-out infinite; }
+
+@keyframes star-trail {
+  0% { transform: scale(.5); opacity: .9; }
+  100% { transform: scale(1.8) translateX(-26px); opacity: 0; }
+}
+.star-trail { animation: star-trail .7s ease-out infinite; }
+
+@keyframes buff-flash {
+  0% { opacity: 0; }
+  20% { opacity: .8; }
+  100% { opacity: 0; }
+}
+.buff-flash { animation: buff-flash .6s ease-out both; }
+
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 

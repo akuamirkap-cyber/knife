@@ -313,7 +313,9 @@ export default function App({ onExit }: { onExit?: () => void }) {
     return p >= a.target;
   }).length, [save.stats, save.unlockedWeapons.length]);
 
-  const inGame = phase !== "menu" && phase !== "challenges";
+  // Layar reward adalah popup penuh dengan tombol tutupnya sendiri — HUD global
+  // (armory/🏆/koin) disembunyikan di sana karena menimpa "Main lagi" dan tombol ✕.
+  const inGame = phase !== "menu" && phase !== "challenges" && phase !== "reward";
   const pct = completionPct(save.completed);
   const bossCount = bossesDefeated(save.completed);
 
@@ -331,22 +333,11 @@ export default function App({ onExit }: { onExit?: () => void }) {
           <span>Pilih Game Lain</span>
         </button>
       )}
-      <div className="relative h-full w-full overflow-hidden bg-[radial-gradient(ellipse_at_50%_38%,#21454e_0%,#13292f_45%,#0a1519_100%)]">
+      <div className="relative min-h-0 w-full flex-1 overflow-hidden bg-[radial-gradient(ellipse_at_50%_38%,#21454e_0%,#13292f_45%,#0a1519_100%)]">
         <div className="pointer-events-none absolute inset-0 z-40 rounded-[30px] shadow-[inset_0_0_80px_rgba(0,0,0,.55)]" />
 
-        {/* Global Sunburst Mode Toggle (Baru FX Lab / Lama) */}
-        <div className="absolute top-3 right-3 z-40 pointer-events-auto">
-          <SunburstToggle
-            size="sm"
-            onToggled={(m) => {
-              showToast(
-                m === "new"
-                  ? "✨ Sunburst Baru (FX Lab) Aktif!"
-                  : "⚡ Sunburst Lama (God Rays) Aktif!"
-              );
-            }}
-          />
-        </div>
+        {/* Global Sunburst Mode Toggle (Baru FX Lab / Lama) — berada di chrome bar
+            bawah (layout alur), tidak pernah menutup HUD/PLAY/konten game. */}
 
         {inGame && (
           <>
@@ -508,13 +499,15 @@ export default function App({ onExit }: { onExit?: () => void }) {
         )}
 
         {toast && (
-          <div className="pop-in absolute left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-2xl border border-amber-300/40 bg-black/85 px-5 py-3 text-center text-[15px] font-bold text-amber-200 shadow-2xl">
+          <div className="pop-in absolute left-1/2 top-[86px] z-50 -translate-x-1/2 whitespace-nowrap rounded-2xl border border-amber-300/40 bg-black/85 px-5 py-3 text-center text-[15px] font-bold text-amber-200 shadow-2xl">
             {toast}
           </div>
         )}
       </div>
 
-      <div className="flex max-w-[420px] flex-wrap items-center justify-center gap-1.5">
+      {/* Chrome slide (navigasi fase) — tinggi tetap DI LUAR kanvas game 760px,
+          supaya stage seperti kotak hadiah & reward tidak terpotong di bawah. */}
+      <div className="flex h-[120px] w-full max-w-[420px] shrink-0 flex-wrap content-start items-center justify-center gap-1.5 overflow-y-auto px-1">
         <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
           Lv {currentLevel} · {pct}% · 👑{bossCount}/20
         </span>
@@ -540,6 +533,16 @@ export default function App({ onExit }: { onExit?: () => void }) {
         <button onClick={() => { const m = !muted; audio.setMuted(m); setMuted(m); }} className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 hover:bg-white/20">
           {muted ? "🔇 Off" : "🔊 On"}
         </button>
+        <SunburstToggle
+          size="sm"
+          onToggled={(m) => {
+            showToast(
+              m === "new"
+                ? "✨ Sunburst Baru (FX Lab) Aktif!"
+                : "⚡ Sunburst Lama (God Rays) Aktif!"
+            );
+          }}
+        />
         <button onClick={() => { reset(); setCurrentLevel(1); setOverlay(null); go("menu"); showToast("Save direset!"); }} className="rounded-full bg-red-500/20 px-3 py-1 text-xs font-semibold text-red-200 hover:bg-red-500/40">↺ Reset</button>
       </div>
     </div>

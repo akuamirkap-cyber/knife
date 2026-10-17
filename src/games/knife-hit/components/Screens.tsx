@@ -411,11 +411,6 @@ export function BoxScreen({ weapon, onDone, bossName = BOSS, level, score }: { w
       <Hud score={score ?? 46} dim level={level} />
       <div className={`absolute inset-0 transition-colors duration-700 ${isOpen ? "bg-black/20" : "bg-black/45"}`} />
 
-      {/* Sunburst Toggle in BoxScreen */}
-      <div className="absolute top-3 right-3 z-30 pointer-events-auto">
-        <SunburstToggle size="xs" />
-      </div>
-
       <div className="absolute inset-x-0 top-[96px] text-center">
         {!showInfo ? (
           <div className={`transition-all duration-300 ${isOpen ? "scale-75 opacity-0" : ""}`}>
@@ -666,7 +661,7 @@ export function RewardScreen({ weapon, equipped, onEquip, onClose, onReplay, bos
       </div>
       <div className="fade-in absolute inset-0 bg-black/70 backdrop-blur-[3px]" />
 
-      <div className="panel-in absolute left-1/2 top-[104px] w-[92%] max-w-[350px]">
+      <div className="panel-in absolute inset-x-0 top-[80px] mx-auto w-[92%] max-w-[350px]">
         {/* animated rarity frame */}
         <div className="anim-border-flow rounded-[28px] p-[3px] shadow-[0_24px_70px_rgba(0,0,0,.6)]" style={{ backgroundImage: `linear-gradient(135deg, ${st.color}, #ffffff88, ${st.color}, #0b1e22)` }}>
           <div className="premium-panel relative overflow-hidden rounded-[25px] px-4 pb-4 pt-4 text-center">
@@ -691,7 +686,7 @@ export function RewardScreen({ weapon, equipped, onEquip, onClose, onReplay, bos
             </h2>
 
             {/* weapon stage */}
-            <div className="relative mx-auto mt-1 h-[196px] w-full max-w-[300px]">
+            <div className="relative mx-auto mt-1 h-[180px] w-full max-w-[300px]">
               {/* podium */}
               <div className="absolute bottom-[8px] left-1/2 h-[30px] w-[240px] -translate-x-1/2 rounded-[50%] bg-gradient-to-b from-[#bff0ff] via-[#4d9db3] to-[#17454f] shadow-[0_12px_28px_rgba(0,0,0,.55)]" />
               <div className="absolute bottom-[2px] left-1/2 h-[12px] w-[260px] -translate-x-1/2 rounded-[50%] bg-black/50 blur-[4px]" />
