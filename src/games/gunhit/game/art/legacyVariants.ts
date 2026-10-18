@@ -1,5 +1,6 @@
-import { TAU, rand, lin, rr, grip, guard, glow, star, radial, chrome, wood, gunState } from './kit';
+import { TAU, rand, lin, rr, grip, guard, glow, star, radial, chrome, steel, wood, gunState } from './kit';
 import { shotPulse } from './commonGunMotion';
+import { drawPlasmaGrip, drawVoidGrip } from './gripSystem';
 import type { VariantWeapon } from './gunVariants';
 
 // Pre-overhaul renderers are preserved from git HEAD (c0769f5).
@@ -20,6 +21,213 @@ function jagged(c: C, x0: number, y0: number, x1: number, y1: number, amp: numbe
 const gold = (c: C, x0: number, x1: number) =>
   lin(c, x0, x1, ['#7a5800', '#ffe680', '#d9a825', '#7a5800']);
 
+function originalCricket(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
+  const pulse = 0.6 + 0.4 * Math.sin(t * 7);
+  // tiny grip
+  c.beginPath();
+  c.moveTo(cx + 3, y0 + 40);
+  c.lineTo(cx + 3, y0 + 60);
+  c.lineTo(cx + 24, y0 + 74);
+  c.lineTo(cx + 31, y0 + 62);
+  c.lineTo(cx + 14, y0 + 40);
+  c.closePath();
+  c.fillStyle = lin(c, cx, cx + 30, ['#1b1d22', '#3d424b']);
+  c.fill();
+  c.strokeStyle = '#08090b';
+  c.lineWidth = 1.5;
+  c.stroke();
+  c.beginPath();
+  c.arc(cx + 10, y0 + 42, 7, -Math.PI * 0.5, Math.PI * 0.5);
+  c.strokeStyle = '#2a2e35';
+  c.lineWidth = 2.5;
+  c.stroke();
+  // body
+  c.beginPath();
+  c.roundRect(cx - 11, y0 + 12, 22, 34, [4, 4, 8, 8]);
+  c.fillStyle = chrome(c, cx - 11, cx + 11);
+  c.fill();
+  c.strokeStyle = '#2a2e35';
+  c.lineWidth = 1.5;
+  c.stroke();
+  // ridges
+  c.strokeStyle = 'rgba(0,0,0,0.45)';
+  c.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    c.beginPath();
+    c.moveTo(cx - 11, y0 + 20 + i * 6);
+    c.lineTo(cx - 6, y0 + 20 + i * 6);
+    c.moveTo(cx + 6, y0 + 20 + i * 6);
+    c.lineTo(cx + 11, y0 + 20 + i * 6);
+    c.stroke();
+  }
+  // hammer
+  c.fillStyle = chrome(c, cx - 4, cx + 4);
+  c.beginPath();
+  c.roundRect(cx - 4, y0 + 44, 8, 8, 2);
+  c.fill();
+  // bulb emitter
+  c.beginPath();
+  c.arc(cx, y0 + 7, 10, 0, TAU);
+  c.fillStyle = chrome(c, cx - 10, cx + 10);
+  c.fill();
+  c.strokeStyle = '#2a2e35';
+  c.stroke();
+  c.beginPath();
+  c.arc(cx, y0 + 7, 6.5, 0, TAU);
+  c.fillStyle = '#0d1a2b';
+  c.fill();
+  glowDot(c, cx, y0 + 7, 3.5 * pulse + 1, '#7cc8ff', 16);
+  c.beginPath();
+  c.arc(cx, y0 + 7, 8.5, 0, TAU);
+  c.strokeStyle = 'rgba(124,200,255,0.6)';
+  c.lineWidth = 1;
+  c.stroke();
+}
+
+function originalElectro(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
+  angledGrip(c, cx, y0 + 108, '#1f2a33', '#3b4d5c', 0.85);
+  triggerGuard(c, cx, y0 + 100);
+  c.beginPath();
+  c.roundRect(cx - 18, y0 + 40, 36, 92, 8);
+  c.fillStyle = lin(c, cx - 18, cx + 18, ['#0f161d', '#465a6b', '#2b3a47', '#0f161d']);
+  c.fill();
+  c.strokeStyle = '#05080b';
+  c.lineWidth = 2;
+  c.stroke();
+  // glass tube
+  c.beginPath();
+  c.roundRect(cx - 9, y0 + 50, 18, 72, 9);
+  c.fillStyle = '#061520';
+  c.fill();
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  c.shadowColor = '#5ad1ff';
+  c.shadowBlur = 8;
+  c.strokeStyle = '#9be8ff';
+  c.lineWidth = 1.4;
+  for (let i = 0; i < 2; i++) jagged(c, cx, y0 + 54, cx + rand(-4, 4), y0 + 118, 4, 7);
+  c.restore();
+  c.fillStyle = 'rgba(255,255,255,0.15)';
+  c.fillRect(cx - 6, y0 + 54, 2, 64);
+  // copper coils
+  c.strokeStyle = '#c47a35';
+  c.lineWidth = 3;
+  for (let i = 0; i < 9; i++) {
+    c.beginPath();
+    c.moveTo(cx - 18, y0 + 50 + i * 8);
+    c.lineTo(cx - 10, y0 + 52 + i * 8);
+    c.moveTo(cx + 10, y0 + 52 + i * 8);
+    c.lineTo(cx + 18, y0 + 50 + i * 8);
+    c.stroke();
+  }
+  // electrodes
+  for (const s of [-1, 1]) {
+    c.fillStyle = steel(c, cx + s * 10 - 2, cx + s * 10 + 2);
+    c.fillRect(cx + s * 10 - 2, y0 + 10, 4, 32);
+    c.beginPath();
+    c.arc(cx + s * 10, y0 + 10, 4.5, 0, TAU);
+    c.fillStyle = '#e09a50';
+    c.fill();
+  }
+  c.fillStyle = steel(c, cx - 2.5, cx + 2.5);
+  c.fillRect(cx - 2.5, y0 + 2, 5, 40);
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  c.strokeStyle = `rgba(155,232,255,${0.6 + 0.4 * Math.sin(t * 30)})`;
+  c.lineWidth = 1.5;
+  jagged(c, cx - 10, y0 + 10, cx, y0 + 2, 3, 4);
+  jagged(c, cx + 10, y0 + 10, cx, y0 + 2, 3, 4);
+  c.restore();
+  glowDot(c, cx, y0 + 1, 3.5, '#bff1ff', 16);
+}
+
+function originalFishGun(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
+  angledGrip(c, cx, y0 + 112, '#0d4a7a', '#1f7fc0', 0.85);
+  triggerGuard(c, cx, y0 + 104, '#0b2f4d');
+  // stock cap
+  c.beginPath();
+  c.roundRect(cx - 14, y0 + 112, 28, 30, 6);
+  c.fillStyle = '#0d3a5e';
+  c.fill();
+  // tank
+  c.beginPath();
+  c.roundRect(cx - 22, y0 + 26, 44, 86, 14);
+  const wg = c.createLinearGradient(0, y0 + 26, 0, y0 + 112);
+  wg.addColorStop(0, 'rgba(140,225,255,0.75)');
+  wg.addColorStop(1, 'rgba(30,120,200,0.85)');
+  c.fillStyle = wg;
+  c.fill();
+  // swimming fish
+  c.save();
+  c.beginPath();
+  c.roundRect(cx - 22, y0 + 26, 44, 86, 14);
+  c.clip();
+  const fx = cx + Math.sin(t * 2) * 10;
+  const fy = y0 + 64 + Math.sin(t * 3) * 8;
+  const dir = Math.cos(t * 2) > 0 ? 1 : -1;
+  c.fillStyle = '#ff8a1c';
+  c.beginPath();
+  c.ellipse(fx, fy, 8, 5, 0, 0, TAU);
+  c.fill();
+  c.beginPath();
+  c.moveTo(fx - dir * 7, fy);
+  c.lineTo(fx - dir * 13, fy - 5);
+  c.lineTo(fx - dir * 13, fy + 5);
+  c.closePath();
+  c.fill();
+  c.fillStyle = '#fff';
+  c.fillRect(fx - 1, fy - 5, 2, 10);
+  c.fillStyle = '#000';
+  c.beginPath();
+  c.arc(fx + dir * 4, fy - 1, 1.2, 0, TAU);
+  c.fill();
+  // bubbles
+  c.strokeStyle = 'rgba(255,255,255,0.8)';
+  c.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const by = y0 + 110 - ((t * 30 + i * 19) % 84);
+    const bx = cx - 12 + i * 6 + Math.sin(t * 4 + i) * 2;
+    c.beginPath();
+    c.arc(bx, by, 1.5 + (i % 2), 0, TAU);
+    c.stroke();
+  }
+  // seaweed
+  c.strokeStyle = '#2fbf5a';
+  c.lineWidth = 2.5;
+  c.beginPath();
+  c.moveTo(cx - 14, y0 + 112);
+  c.quadraticCurveTo(cx - 10 + Math.sin(t * 2) * 4, y0 + 96, cx - 15, y0 + 84);
+  c.stroke();
+  c.restore();
+  c.beginPath();
+  c.roundRect(cx - 22, y0 + 26, 44, 86, 14);
+  c.strokeStyle = '#0b2f4d';
+  c.lineWidth = 4;
+  c.stroke();
+  c.fillStyle = 'rgba(255,255,255,0.35)';
+  c.fillRect(cx - 17, y0 + 34, 3, 70);
+  // bands
+  c.fillStyle = '#ff8a1c';
+  c.fillRect(cx - 24, y0 + 22, 48, 7);
+  c.fillRect(cx - 24, y0 + 106, 48, 8);
+  // funnel muzzle
+  c.beginPath();
+  c.moveTo(cx - 15, y0);
+  c.lineTo(cx + 15, y0);
+  c.lineTo(cx + 7, y0 + 23);
+  c.lineTo(cx - 7, y0 + 23);
+  c.closePath();
+  c.fillStyle = lin(c, cx - 15, cx + 15, ['#b85a00', '#ffb35a', '#c06000']);
+  c.fill();
+  c.strokeStyle = '#5a2a00';
+  c.lineWidth = 1.5;
+  c.stroke();
+  c.beginPath();
+  c.ellipse(cx, y0, 15, 3.5, 0, 0, TAU);
+  c.fillStyle = '#1a4d7a';
+  c.fill();
+}
+
 export function drawOriginalGun(c: C, id: VariantWeapon, cx: number, y0: number, t: number, ready = true) {
   switch (id) {
     case 'dragon': dragon(c, cx, y0, t); break;
@@ -33,6 +241,9 @@ export function drawOriginalGun(c: C, id: VariantWeapon, cx: number, y0: number,
     case 'laser': laserGun(c, cx, y0, t); break;
     case 'chicken': chickenGun(c, cx, y0, t, ready); break;
     case 'honey': classicHoney(c, cx, y0, t); break;
+    case 'cricket': originalCricket(c, cx, y0, t); break;
+    case 'electro': originalElectro(c, cx, y0, t); break;
+    case 'fish': originalFishGun(c, cx, y0, t); break;
     default: { const _never: never = id; return _never; }
   }
 }
@@ -125,7 +336,7 @@ function golden(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) 
 }
 
 function blackhole(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
-  angledGrip(c, cx, y0 + 108, '#1a1026', '#3a2456', 0.85);
+  drawVoidGrip(c, cx, y0 + 108);
   triggerGuard(c, cx, y0 + 100, '#120a1c');
   c.beginPath();
   c.roundRect(cx - 20, y0 + 36, 40, 96, 12);
@@ -459,7 +670,7 @@ function moonbeamGun(c: C, cx: number, y0: number, t: number) {
 // Added classic Plasma, Laser and Rubber Chicken: their original HEAD art.
 function plasma(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
   const pulse = 0.6 + 0.4 * Math.sin(t * 6);
-  angledGrip(c, cx, y0 + 112, '#1c1f2a', '#353a4d', 0.85);
+  drawPlasmaGrip(c, cx, y0 + 112, t);
   triggerGuard(c, cx, y0 + 104);
   for (const s of [-1, 1]) {
     c.beginPath();

@@ -6,6 +6,7 @@ import {
 } from './guns2';
 import { drawGunExtra2, FLASH2, FLASH3 } from './guns4';
 import { discGun } from './guns6';
+import { drawChronoGrip, drawPortalGrip } from './gripSystem';
 
 type C = CanvasRenderingContext2D;
 
@@ -508,7 +509,7 @@ function mirrorGun(c: C, cx: number, y0: number, t: number) {
 function portalGun(c: C, cx: number, y0: number, t: number) {
   const blue = Math.floor(t * 0.7) % 2 === 0;
   const pc = blue ? '#3b82f6' : '#fb923c';
-  grip(c, cx, y0 + 108, '#f8fafc', '#cbd5e1', 0.78);
+  drawPortalGrip(c, cx, y0 + 98, pc);
   guard(c, cx, y0 + 100, '#1f2937');
   // body white glossy
   c.beginPath();
@@ -554,7 +555,7 @@ function portalGun(c: C, cx: number, y0: number, t: number) {
 
 // ------------------------------------------------------------- CHRONO
 function chronoGun(c: C, cx: number, y0: number, t: number) {
-  grip(c, cx, y0 + 112, '#78350f', '#b45309', 0.8);
+  drawChronoGrip(c, cx, y0 + 102);
   guard(c, cx, y0 + 104, '#451a03');
   rr(c, cx - 16, y0 + 40, 32, 92, 6, brass(c, cx - 16, cx + 16), '#451a03');
   // gears

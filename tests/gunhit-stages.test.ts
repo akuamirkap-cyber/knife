@@ -1,26 +1,42 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game, makeLevel } from '../src/games/gunhit/game/Game';
-import { DiamondRock } from '../src/games/gunhit/game/art/diamondRock';
-import { getWeapon } from '../src/games/gunhit/game/weapons';
+import { allowsStarPowerups, diamondCoreProjectileRadius, Game, makeLevel, projectileSizeMultiplier } from '../src/games/gunhit/game/Game';
+import { DiamondRock, LARGE_DIAMOND_CORE_RADIUS } from '../src/games/gunhit/game/art/diamondRock';
+import { getWeapon, WEAPONS } from '../src/games/gunhit/game/weapons';
 import { throwTreasureCoins, advanceTreasureCoins, type TreasureCoin } from '../src/games/gunhit/game/treasureShower';
 
-test('Arcade progression includes playable rock, coin bonus, boss, then treasure', () => {
-  assert.deepEqual([1, 2, 3, 4, 5, 6].map(n => makeLevel(n).mode),
-    ['classic', 'classic', 'boulder', 'bonus', 'classic', 'treasure']);
-  assert.equal(makeLevel(5).boss, true);
-  assert.equal(makeLevel(10).boss, true); // bosses always take priority
-  assert.equal(makeLevel(13).mode, 'double'); // original double-gun mode survives
-  assert.equal(makeLevel(14).mode, 'bonus');
-  assert.equal(makeLevel(16).mode, 'treasure');
-  assert.equal(makeLevel(17).mode, 'boulder');
-  for (const n of [3, 4, 6]) {
+test('boss cycles contain three normal stages, one random special, then the boss', () => {
+  assert.deepEqual([1, 2, 3].map(n => makeLevel(n).mode), ['classic', 'classic', 'classic']);
+  const specialModes = ['boulder', 'bonus', 'treasure'];
+  for (const n of [4, 9, 14]) {
+    assert.ok(specialModes.includes(makeLevel(n).mode), `stage ${n} is the single pre-boss special`);
+  }
+  for (const n of [5, 10, 15]) {
+    const boss = makeLevel(n);
+    assert.equal(boss.boss, true);
+    assert.equal(boss.mode, 'classic');
+  }
+  assert.equal(makeLevel(6).mode, 'classic'); // normal stages do not become double-gun rounds
+  assert.equal(makeLevel(8).mode, 'classic');
+  for (const n of [4, 9, 14]) {
     const level = makeLevel(n);
     assert.equal(level.old + level.spikes + level.coins, 0);
-    assert.equal(level.ammo, 12); // renewable magazine on timed stages
+    assert.equal(level.ammo, 12); // renewable magazine on special stages
   }
-  assert.equal(makeLevel(3).radius, 166); // the full-size Diamond Breaker rock
-  assert.equal(makeLevel(4).radius, 166);
+  assert.equal(makeLevel(4, 'boulder').radius, 166);
+  assert.equal(makeLevel(4, 'bonus').radius, 166);
+  assert.equal(makeLevel(4, 'treasure').radius, 106);
+});
+
+test('pre-placed rusty bullet obstacles on the stage board are enlarged 2x', () => {
+  const game = Object.create(Game.prototype) as Game & { items: { type: string; scale?: number }[] };
+  Object.assign(game, { level: makeLevel(10), items: [] });
+  const placeObstacles = (game as unknown as { placeObstacles(): void }).placeObstacles;
+  placeObstacles.call(game);
+  const rustyBullets = (game as unknown as { items: { type: string; scale?: number }[] }).items
+    .filter(item => item.type === 'old');
+  assert.ok(rustyBullets.length > 0);
+  assert.ok(rustyBullets.every(item => item.scale === 2));
 });
 
 test('Diamond Breaker rock has individually breakable chunks and a protected diamond core', () => {
@@ -43,17 +59,62 @@ test('Diamond Breaker rock has individually breakable chunks and a protected dia
   }
 });
 
+test('every weapon gets a generous, width-aware hitbox on the large diamond', () => {
+  const rock = new DiamondRock();
+  const rockScale = 166 / 196;
+  for (const weapon of WEAPONS) {
+    const shotScale = projectileSizeMultiplier(weapon.id, false, false);
+    const projectileRadius = diamondCoreProjectileRadius(weapon.half, shotScale, rockScale);
+    const atVisibleGemEdge = LARGE_DIAMOND_CORE_RADIUS + projectileRadius - 0.25;
+    const hit = rock.hitAt({ x: atVisibleGemEdge, y: 0 }, 4, 0, projectileRadius);
+    assert.equal(hit?.kind, 'diamond', `${weapon.name} must register a hit on the visible diamond`);
+  }
+  assert.equal(rock.remaining, rock.total, 'hitting the core must not damage or consume stone chunks');
+});
+
+test('collecting the large core can scatter every remaining boulder chunk at once', () => {
+  const rock = new DiamondRock();
+  const broken = rock.shatterAll();
+  assert.equal(broken.length, rock.total);
+  assert.equal(rock.remaining, 0);
+  assert.equal(new Set(broken.map(cell => cell.id)).size, rock.total);
+  assert.equal(rock.shatterAll().length, 0, 'already scattered pieces are not emitted twice');
+});
+
+test('star items and their buffs are restricted to bosses and special/bonus stages', () => {
+  for (const n of [1, 2, 3, 6, 7, 8]) assert.equal(allowsStarPowerups(makeLevel(n)), false, `normal stage ${n}`);
+  for (const mode of ['boulder', 'bonus', 'treasure'] as const) {
+    assert.equal(allowsStarPowerups(makeLevel(4, mode)), true, `${mode} bonus stage`);
+  }
+  assert.equal(allowsStarPowerups(makeLevel(5)), true, 'boss stage');
+
+  const game = Object.create(Game.prototype) as Game & {
+    choosingBuff: boolean; twinGuns: boolean; holding: boolean; aiming: boolean;
+    charging: boolean; aimT: number; chargeT: number; chargeLevel: number; buff: string | null;
+  };
+  Object.assign(game, {
+    level: makeLevel(1), choosingBuff: true, twinGuns: false,
+    holding: false, aiming: false, charging: false, aimT: 0, chargeT: 0, chargeLevel: 0, buff: null,
+  });
+  game.applyBuff('double');
+  assert.equal(game.choosingBuff, false, 'a stale buff callback cannot leave normal play paused');
+  assert.equal(game.twinGuns, false, 'normal stages cannot receive the star double-gun buff');
+  assert.equal(game.buff, null, 'normal stages receive no star effects');
+});
+
 test('star upgrades pause the game until chosen and affect either type of stage', () => {
   const game = Object.create(Game.prototype) as Game & { choosingBuff: boolean; ammoLeft: number; maxAmmoMult: number; treasureBuff: string | null };
-  Object.assign(game, { level: makeLevel(3), weapon: getWeapon('pistol'), choosingBuff: true, ammoLeft: 4, maxAmmoMult: 1, treasureBuff: null });
+  Object.assign(game, { level: makeLevel(3, 'boulder'), weapon: getWeapon('pistol'), choosingBuff: true, ammoLeft: 4, maxAmmoMult: 1, treasureBuff: null });
   game.applyBuff('ammo');
   assert.equal(game.choosingBuff, false);
   assert.equal(game.ammoLeft, 16);
   assert.equal(game.maxAmmoMult, 2);
 
-  Object.assign(game, { level: makeLevel(6), choosingBuff: true });
-  game.applyBuff('power'); // ordinary upgrades cannot silently dismiss a treasure star
-  assert.equal(game.choosingBuff, true);
+  Object.assign(game, { level: makeLevel(6, 'treasure'), choosingBuff: true });
+  game.applyBuff('power'); // a stale modal choice falls back instead of freezing gameplay
+  assert.equal(game.choosingBuff, false);
+  assert.equal(game.treasureBuff, 'rapid');
+  Object.assign(game, { choosingBuff: true });
   game.applyBuff('double');
   assert.equal(game.choosingBuff, false);
   assert.equal(game.treasureBuff, 'double');
@@ -61,10 +122,35 @@ test('star upgrades pause the game until chosen and affect either type of stage'
   assert.deepEqual((game as unknown as { gunOffsets: number[] }).gunOffsets, [-30, 30]);
 
   // The same selectable pair is available on normal/rock stages too.
-  Object.assign(game, { level: makeLevel(3), choosingBuff: true, twinGuns: false });
+  Object.assign(game, { level: makeLevel(3, 'boulder'), choosingBuff: true, twinGuns: false });
   game.applyBuff('double');
   assert.equal(game.choosingBuff, false);
   assert.equal((game as unknown as { twinGuns: boolean }).twinGuns, true);
+});
+
+test('choosing a star buff in a boss fight releases pause and stale weapon input', () => {
+  const game = Object.create(Game.prototype) as Game & {
+    choosingBuff: boolean;
+    holding: boolean;
+    aiming: boolean;
+    charging: boolean;
+    chargeT: number;
+    chargeLevel: number;
+  };
+  Object.assign(game, {
+    level: makeLevel(5), weapon: getWeapon('sniper'), choosingBuff: true,
+    holding: true, aiming: true, aimT: 0.7, charging: true, chargeT: 0.8, chargeLevel: 1,
+    ammoLeft: 5, maxAmmoMult: 1, reloadT: 0, snowLoaded: 5,
+    twinGuns: false, buff: null,
+  });
+  game.applyBuff('speed');
+  assert.equal(game.choosingBuff, false);
+  assert.equal(game.holding, false);
+  assert.equal(game.aiming, false);
+  assert.equal(game.charging, false);
+  assert.equal(game.chargeT, 0);
+  assert.equal(game.chargeLevel, 0);
+  assert.equal((game as unknown as { buff: string }).buff, 'speed');
 });
 
 test('floating star traverses the gap instead of steering the weapon', () => {
@@ -75,7 +161,7 @@ test('floating star traverses the gap instead of steering the weapon', () => {
     choosingBuff: boolean;
   };
   Object.assign(game, {
-    level: makeLevel(3), state: 'play', star: null, choosingBuff: false,
+    level: makeLevel(3, 'boulder'), state: 'play', star: null, choosingBuff: false,
     particles: [], projs: [], flashWhite: 0, holding: false,
     sink: { push: () => {}, light: () => {} },
     events: { onStarHit: () => {} },
@@ -108,29 +194,29 @@ test('bonus rings and stage banking award coins only once', () => {
   assert.equal(coins.length, 48);
   assert.deepEqual([96, 132, 168].map(r => coins.filter(c => c.radius === r).length), [12, 16, 20]);
 
-  const awards: { mode: string; level: number; coins: number }[] = [];
+  const awards: { mode: string; level: number; coins: number; diamonds: number }[] = [];
   const game = Object.create(Game.prototype) as Game & { finishSpecialStage(): void };
   Object.assign(game, {
-    level: makeLevel(4), state: 'play', stageStartCoins: 3, coins: 17,
+    level: makeLevel(4, 'bonus'), state: 'play', stageStartCoins: 3, coins: 17,
     bankedCoins: 0, score: 100, shake: 0, particles: [], projs: [{}],
     star: { x: 1 }, holding: true, choosingBuff: false,
     sink: { light: () => {} },
-    events: { onStageReward: (mode: string, level: number, earned: number) => awards.push({ mode, level, coins: earned }) },
+    events: { onStageReward: (mode: string, level: number, earned: number, diamonds: number) => awards.push({ mode, level, coins: earned, diamonds }) },
   });
   game.finishSpecialStage();
   game.finishSpecialStage();
   assert.equal(game.state, 'clear');
   assert.equal(game.coins, 17);
-  assert.deepEqual(awards, [{ mode: 'bonus', level: 4, coins: 14 }]);
+  assert.deepEqual(awards, [{ mode: 'bonus', level: 4, coins: 14, diamonds: 0 }]);
   assert.equal((game as unknown as { bankedCoins: number }).bankedCoins, 14);
 
-  // The diamond-clear reward is granted once, separately from the coin round.
-  Object.assign(game, { level: makeLevel(3), state: 'play', stageStartCoins: 17, bankedCoins: 14, stageRewardPaid: false });
+  // The large diamond is credited only at successful stage clear, once.
+  Object.assign(game, { level: makeLevel(3, 'boulder'), state: 'play', stageStartCoins: 17, bankedCoins: 14, stageRewardPaid: false, centerDiamondCollected: true });
   game.finishSpecialStage();
   game.finishSpecialStage();
   assert.equal(game.coins, 20);
   assert.equal((game as unknown as { bankedCoins: number }).bankedCoins, 17);
-  assert.deepEqual(awards[1], { mode: 'boulder', level: 3, coins: 3 });
+  assert.deepEqual(awards[1], { mode: 'boulder', level: 3, coins: 3, diamonds: 50 });
   assert.equal(awards.length, 2);
 });
 
@@ -203,7 +289,7 @@ test('treasure coins bounce and credit gradually without losing or duplicating t
     time: number;
   };
   Object.assign(game, {
-    level: makeLevel(6), state: 'play', stageStartCoins: 4, coins: 4, score: 0,
+    level: makeLevel(6, 'treasure'), state: 'play', stageStartCoins: 4, coins: 4, score: 0,
     stageRewardPaid: false, bankedCoins: 3, time: 0, lastCoinSound: -10,
     coinPulse: 0, treasureCoins: throwTreasureCoins(210, 282, 6, () => 0.5),
     shake: 0, flashWhite: 0, particles: [], projs: [], star: null,

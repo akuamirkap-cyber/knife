@@ -46,7 +46,7 @@ export interface Weapon {
   ejectY?: number;
   explode?: boolean;
   explodeFx?: 'fire' | 'white' | 'firework';
-  slowStyle?: 'ice' | 'water' | 'honey' | 'stun';
+  slowStyle?: 'ice' | 'water' | 'honey';
   charge?: boolean;
   paint?: boolean;
   meltEvery?: number;
@@ -325,9 +325,8 @@ export const WEAPONS: Weapon[] = [
   { ...base, id: 'pencil', name: 'PENCIL GUN', emoji: '✏️', rarity: 'UMUM', perk: 'PENGHAPUS', desc: 'Pensil raksasa yang tajam dan tipis! Setiap 3 kali kena, penghapusnya MENGHAPUS 1 peluru berkarat.',
     speed: 2900, cooldown: 0.17, half: 2.6, stick: 20, recoil: 0.5, shake: 1.5, noSmoke: true, meltEvery: 3, meltText: '✏️ DIHAPUS!', meltColors: ['255,182,193', '255,228,225', '250,204,21'],
     color: '#facc15', trail: '255,240,180', sparks: ['#ffffff', '#fde047', '#374151'], previewLen: 210, previewY: 36, stats: { rate: 3, speed: 4, power: 2 } },
-  { ...base, id: 'sandal', name: 'SANDAL JEPIT', emoji: '🩴', rarity: 'UMUM', perk: 'PLAK!', desc: 'Senjata legendaris emak-emak Indonesia! Sandal jepit berputar dan bikin target PUSING melambat, 2 poin.',
-    speed: 2000, cooldown: 0.24, points: 2, half: 6, stick: 18, recoil: 0.8, shake: 3, noSmoke: true, spinFly: true,
-    slow: true, slowFactor: 0.45, slowTime: 1.1, slowRgb: '255,240,150', slowText: '💫 PUSING!', slowStyle: 'stun',
+  { ...base, id: 'sandal', name: 'SANDAL JEPIT', emoji: '🩴', rarity: 'UMUM', perk: 'PLAK!', desc: 'Sandal jepit besar melesat lurus dan memberi 2 poin tiap kena.',
+    speed: 2000, cooldown: 0.24, points: 2, half: 6, stick: 18, recoil: 0.8, shake: 3, noSmoke: true,
     color: '#3b82f6', trail: '200,220,255', sparks: ['#ffffff', '#93c5fd', '#1d4ed8'], previewY: 38, stats: { rate: 3, speed: 2, power: 3 } },
   { ...base, id: 'paintball', name: 'PAINTBALL GUN', emoji: '🎨', rarity: 'UMUM', perk: 'WARNA SAMA', desc: 'Bola cat warna acak, tahan untuk tembak beruntun! Kena dengan warna yang SAMA berturut-turut dapat bonus +3.',
     speed: 2600, cooldown: 0.12, auto: true, half: 4.5, stick: 12, recoil: 0.5, shake: 1.5, noSmoke: true, paint: true,
@@ -420,9 +419,9 @@ export const RARITY_COLOR: Record<Rarity, string> = {
 
 export const getWeapon = (id: string) => WEAPONS.find((w) => w.id === id) || WEAPONS[0];
 
-export function isWeaponUnlocked(_w: Weapon, _ownedIds?: string[], _highestLevel?: number): boolean {
-  // Semua senjata terbuka 100%!
-  return true;
+export function isWeaponUnlocked(w: Weapon, ownedIds: string[] = [], _highestLevel?: number): boolean {
+  // Senjata LANGKA hanya terbuka setelah dibeli dengan diamond di Arsenal.
+  return w.rarity !== 'LANGKA' || ownedIds.includes(w.id);
 }
 
 /** Peluang rarity untuk kotak hadiah boss (%). */
@@ -438,7 +437,8 @@ export const GIFT_RARITY_WEIGHT: Record<Rarity, number> = {
  * Senjata yang sedang dipakai (excludeId) dikecualikan supaya hadiah terasa baru.
  */
 export function rollGiftWeapon(excludeId?: string): Weapon {
-  const pool = WEAPONS.filter((w) => w.id !== excludeId);
+  // Kotak hadiah tidak dapat melewati syarat pembelian senjata LANGKA.
+  const pool = WEAPONS.filter((w) => w.id !== excludeId && w.rarity !== 'LANGKA');
   const source = pool.length > 0 ? pool : WEAPONS;
   const total = source.reduce((s, w) => s + GIFT_RARITY_WEIGHT[w.rarity], 0);
   let r = Math.random() * total;

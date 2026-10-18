@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { Download, LockKeyhole } from 'lucide-react';
+import DiamondSprite from '../../shared/DiamondSprite';
 import { WEAPONS, getWeapon, RARITY_COLOR, type WeaponId, type Weapon } from '../game/weapons';
 import { BOSS_ROSTER, type BossProfile } from '../game/bossRoster';
 import { renderBossHead } from '../game/bossRenderer';
+import { drawBossProjectile } from '../game/bossProjectileArt';
 import { drawGunCentered } from '../game/art/drawCentered';
 import { getGunMetrics } from '../game/art/metrics';
 import { sfx } from '../game/audio';
@@ -18,6 +21,9 @@ interface ArsenalProps {
   current: WeaponId;
   highestLevel: number;
   totalCoins: number;
+  diamonds: number;
+  onBuyRare: (id: WeaponId) => boolean;
+  onUnlockAll: () => WeaponId[];
   onPick: (id: WeaponId) => void;
   onClose: () => void;
 }
@@ -153,10 +159,65 @@ function SpotlightGun({ weapon, variant }: { weapon: Weapon; variant: GunVariant
   );
 }
 
+function BossAttackPreview({ boss }: { boss: BossProfile }) {
+  const active = useSlideActive();
+  const ref = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas || !active) return;
+    const W = 160, H = 96;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let raf = 0;
+    const start = performance.now();
+    const draw = (now: number) => {
+      const t = (now - start) / 1000;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(5,9,22,.92)';
+      ctx.beginPath(); ctx.roundRect(0, 0, W, H, 12); ctx.fill();
+      ctx.strokeStyle = `${boss.accent}88`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Mini firing loop: boss portrait, weapon projectile, and its real in-game trail.
+      ctx.save();
+      ctx.translate(27, 48);
+      renderBossHead(ctx, boss.id, 17);
+      ctx.restore();
+      const phase = t % 1.55;
+      if (phase < 1.02) {
+        const x = 72 + phase * 45;
+        drawBossProjectile(ctx, {
+          x,
+          y: 48 + Math.sin(t * 7) * 1.5,
+          vx: 180,
+          vy: 0,
+          rot: -Math.PI / 2,
+          type: boss.id,
+        }, t, 0.56);
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, [active, boss.id, boss.accent]);
+
+  return <canvas ref={ref} aria-label={`Demo serangan ${boss.name}`} className="h-24 w-40 shrink-0 rounded-xl" />;
+}
+
 export default function Arsenal({
   current,
   highestLevel,
   totalCoins,
+  diamonds,
+  onBuyRare,
+  onUnlockAll,
   onPick,
   onClose,
 }: ArsenalProps) {
@@ -164,15 +225,54 @@ export default function Arsenal({
   const [page, setPage] = useState(0);
   const [selectedGunId, setSelectedGunId] = useState<WeaponId>(current);
   const [useRandom, setUseRandom] = useState(false);
+  const [ownedRare, setOwnedRare] = useState<string[]>(() => {
+    try {
+      const ids = JSON.parse(localStorage.getItem('gunhit_rare_owned') || '[]');
+      return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [];
+    } catch { return []; }
+  });
   const [editingDesign, setEditingDesign] = useState(false);
   const [, setDesignRevision] = useState(0);
   const [selectedBoss, setSelectedBoss] = useState<BossProfile>(BOSS_ROSTER[0]);
+  const [bulkUnlockMessage, setBulkUnlockMessage] = useState('');
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (gridRef.current) gridRef.current.scrollTop = 0; }, [page, tab]);
 
+  useEffect(() => {
+    const handleSpace = (event: KeyboardEvent) => {
+      if (event.code !== 'Space') return;
+      // Consume Space only while Arsenal is mounted, so it never leaks into gameplay fire.
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      if (event.repeat) return;
+
+      const allRare = WEAPONS.filter(w => w.rarity === 'LANGKA');
+      const remaining = allRare.filter(w => !ownedRare.includes(w.id));
+      if (remaining.length === 0) {
+        setBulkUnlockMessage('Semua senjata LANGKA sudah dibeli.');
+        return;
+      }
+      const purchased = onUnlockAll();
+      if (purchased.length) {
+        setOwnedRare(ids => [...new Set([...ids, ...purchased])]);
+        const stillLocked = remaining.length - purchased.length;
+        setBulkUnlockMessage(stillLocked
+          ? `${purchased.length} dibeli · ${stillLocked} masih terkunci. Per senjata: 500 diamond.`
+          : `Semua ${allRare.length} senjata LANGKA terbuka · biaya 500 diamond per senjata.`);
+      } else {
+        setBulkUnlockMessage('Diamond belum cukup. Senjata LANGKA berharga 500 diamond masing-masing.');
+      }
+    };
+    window.addEventListener('keydown', handleSpace, true);
+    return () => window.removeEventListener('keydown', handleSpace, true);
+  }, [onUnlockAll, ownedRare]);
+
   const selectedGun = getWeapon(selectedGunId);
   const selectedVariant = getGunVariant(selectedGunId);
+  const isLocked = (w: Weapon) => w.rarity === 'LANGKA' && !ownedRare.includes(w.id);
+  const selectedLocked = isLocked(selectedGun);
 
   // Filter weapons
   const filteredWeapons = WEAPONS.filter((w) => {
@@ -193,6 +293,7 @@ export default function Arsenal({
 
   const handleSelectGun = (w: Weapon) => {
     setSelectedGunId(w.id);
+    if (isLocked(w)) return;
     onPick(w.id);
     sfx.unlock();
     sfx4.match();
@@ -202,7 +303,8 @@ export default function Arsenal({
     const next = !useRandom;
     setUseRandom(next);
     if (next) {
-      const randW = WEAPONS[Math.floor(Math.random() * WEAPONS.length)];
+      const available = WEAPONS.filter((w) => !isLocked(w));
+      const randW = available[Math.floor(Math.random() * available.length)];
       handleSelectGun(randW);
     }
   };
@@ -231,10 +333,24 @@ export default function Arsenal({
           </svg>
         </button>
 
+        <a
+          href={`${import.meta.env.BASE_URL}gun-hit-sga-weapons-svg.zip`}
+          download="gun-hit-sga-weapons-svg.zip"
+          target="_blank"
+          rel="noopener"
+          title={`Unduh seluruh ${WEAPONS.length} senjata sebagai SVG vektor dalam satu ZIP`}
+          aria-label={`Unduh seluruh ${WEAPONS.length} senjata sebagai SVG vektor dalam satu ZIP`}
+          className="flex h-9 items-center gap-1 rounded-xl border border-cyan-300/45 bg-gradient-to-b from-cyan-700 to-blue-800 px-2 text-[10px] font-black text-cyan-50 shadow-lg transition hover:brightness-110 active:scale-95"
+        >
+          <Download className="h-4 w-4" />
+          SVG ZIP
+        </a>
+
         {/* Currency Pill with + */}
         <div className="flex items-center gap-2 rounded-full border border-purple-400/40 bg-[#1e1038] py-1 pl-3.5 pr-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
           <span className="text-xl filter drop-shadow">🍎</span>
           <span className="font-mono text-xl font-black text-white drop-shadow">{totalCoins}</span>
+          <span className="ml-1 flex items-center border-l border-white/20 pl-2 font-mono text-lg font-black text-cyan-100"><DiamondSprite size={22} /> {diamonds}</span>
           <button
             onClick={() => sfx.coin()}
             className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-b from-[#6366f1] to-[#4338ca] text-base font-black text-white shadow transition hover:scale-105 active:scale-95"
@@ -262,8 +378,8 @@ export default function Arsenal({
             >
               {selectedGun.rarity}
             </span>
-            <div className="flex items-center gap-1 rounded-xl bg-gradient-to-r from-[#9333ea] to-[#7e22ce] px-2.5 py-1 border border-purple-300/40 text-[10px] font-black text-white shadow-md">
-              ✓ UNLOCKED
+            <div className={`flex items-center gap-1 rounded-xl px-2.5 py-1 border text-[10px] font-black shadow-md ${selectedLocked ? 'border-cyan-300/50 bg-slate-900 text-cyan-100' : 'border-purple-300/40 bg-gradient-to-r from-[#9333ea] to-[#7e22ce] text-white'}`}>
+              {selectedLocked ? <><LockKeyhole className="h-3 w-3" /> TERKUNCI</> : '✓ TERBUKA'}
             </div>
           </div>
         </div>
@@ -273,7 +389,7 @@ export default function Arsenal({
           <div className="pointer-events-none absolute inset-0" aria-hidden="true">
             <SunburstFX size={470} color={gunSunburstColor(selectedGun.rarity)} intensity={0.85} speed={30} stars={false} />
           </div>
-          <div className="relative z-10"><SpotlightGun weapon={selectedGun} variant={selectedVariant} /></div>
+          <div className={`relative z-10 ${selectedLocked ? 'opacity-35 grayscale' : ''}`}><SpotlightGun weapon={selectedGun} variant={selectedVariant} />{selectedLocked && <div className="absolute inset-0 flex items-center justify-center"><LockKeyhole className="h-14 w-14 rounded-2xl border-2 border-cyan-100/80 bg-slate-950/90 p-3 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.7)]" /></div>}</div>
         </div>
 
         {/* Active Gun Name & Perk */}
@@ -285,6 +401,17 @@ export default function Arsenal({
             {selectedGun.perk}
           </span>
         </div>
+        {selectedLocked && (
+          <div className="relative z-20 -mt-1 flex flex-col items-center gap-0.5">
+            <span className="text-[9px] font-bold text-cyan-100/80">Senjata langka · buka hanya dengan diamond</span>
+            <button type="button" onClick={() => {
+              if (diamonds < 500) { sfx.coin(); return; }
+              if (onBuyRare(selectedGun.id)) setOwnedRare((ids) => ids.includes(selectedGun.id) ? ids : [...ids, selectedGun.id]);
+            }} className={`rounded-xl border px-4 py-1 text-[11px] font-black shadow-lg transition active:scale-95 ${diamonds >= 500 ? 'border-cyan-100 bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:brightness-110' : 'border-white/20 bg-slate-900/90 text-white/55'}`}>
+              <LockKeyhole className="inline h-3 w-3" /> BELI · 500 <DiamondSprite size={18} className="inline align-middle" /> {diamonds < 500 ? `(kurang ${500 - diamonds})` : ''}
+            </button>
+          </div>
+        )}
         {canChooseGunDesign(selectedGunId) && (
           <button type="button" onClick={() => setEditingDesign(true)}
             aria-label={`Bandingkan desain ${selectedGun.name}`}
@@ -353,6 +480,9 @@ export default function Arsenal({
           + LABEL NAMA SENJATA DI BAWAH KOTAK 100% TERBACA JELAS
          ------------------------------------------------------------- */}
       <div className="relative z-10 flex-1 min-h-0 bg-[#120726] p-2.5 border-x border-b border-purple-500/30 shadow-2xl flex flex-col rounded-b-2xl">
+        <div role="status" className="mb-1 shrink-0 rounded-lg border border-cyan-400/20 bg-cyan-950/35 px-2 py-1 text-center text-[9px] font-bold leading-tight text-cyan-100/80">
+          {bulkUnlockMessage || 'SPACE: BORONG SENJATA LANGKA · 500 DIAMOND PER SENJATA'}
+        </div>
         {tab !== 'BOSS' ? (
           <>
             {/* Keep all twelve large thumbnails reachable on a 9:16 screen.
@@ -360,6 +490,7 @@ export default function Arsenal({
             <div ref={gridRef} aria-label="Senjata, gulir untuk melihat semua" className="grid grid-cols-3 auto-rows-[126px] content-start gap-2.5 flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-0.5 items-center justify-items-center">
               {currentPageWeapons.map((w) => {
                 const isSelected = selectedGunId === w.id;
+                const locked = isLocked(w);
                 const rc = RARITY_COLOR[w.rarity];
                 const rarityLabel =
                   w.rarity === 'LEGENDARIS'
@@ -374,7 +505,7 @@ export default function Arsenal({
                   <button
                     key={w.id}
                     onClick={() => handleSelectGun(w)}
-                    className={`relative flex h-[124px] w-[104px] flex-col items-center justify-between p-1.5 rounded-2xl transition-all active:scale-95 ${
+                    className={`relative flex h-[124px] w-[104px] flex-col items-center justify-between p-1.5 rounded-2xl transition-all active:scale-95 ${locked ? 'border border-cyan-300/30 bg-slate-950/80' : ''} ${
                       isSelected
                         ? 'border-[3.5px] border-[#fef08a] bg-[#2d1656] shadow-[0_0_24px_rgba(253,224,71,0.95),inset_0_0_12px_rgba(253,224,71,0.35)] z-10 scale-[1.02]'
                         : 'border border-purple-500/30 bg-[#1e1038] hover:bg-[#27144a]'
@@ -396,8 +527,11 @@ export default function Arsenal({
                     </div>
 
                     {/* 2. VISUAL SENJATA: EXACT CENTER PIVOT, 30% LEBIH BESAR, 100% UTUH NO CROP! */}
-                    <div className="flex-1 flex items-center justify-center w-full my-auto overflow-visible">
-                      <GunItemCanvas weapon={w} isSelected={isSelected} variant={getGunVariant(w.id)} size={82} />
+                    <div className="relative flex-1 w-full my-auto overflow-visible">
+                      <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${locked ? 'opacity-25 grayscale' : ''}`}>
+                        <GunItemCanvas weapon={w} isSelected={isSelected} variant={getGunVariant(w.id)} size={131} />
+                      </div>
+                      {locked && <div className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2"><LockKeyhole className="h-9 w-9 rounded-xl border border-cyan-100/80 bg-slate-950/95 p-1.5 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.65)]" /></div>}
                     </div>
 
                     {/* 3. LABEL NAMA SENJATA DI BAWAH KOTAK (JELAS, TEBAL, TIDAK TERPOTONG!) */}
@@ -489,6 +623,17 @@ export default function Arsenal({
               </div>
             </div>
 
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#110a24] p-2.5">
+              <BossAttackPreview boss={selectedBoss} />
+              <div className="min-w-0">
+                <div className="text-[9px] font-black tracking-[0.16em] text-white/55">DEMO SERANGAN BOS</div>
+                <div className="mt-1 text-[12px] font-black leading-tight" style={{ color: selectedBoss.accent }}>
+                  {selectedBoss.projectileEmoji} {selectedBoss.projectileName}
+                </div>
+                <div className="mt-1 text-[9px] leading-tight text-white/55">Senjata dan efek serangan bergerak sesuai karakter boss.</div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               {BOSS_ROSTER.map((b, idx) => {
                 const beaten = highestLevel >= (idx + 1) * 5;
@@ -522,7 +667,7 @@ export default function Arsenal({
         <span className="rounded-xl bg-black/40 px-3 py-1 font-mono text-sm text-yellow-300">
           {WEAPONS.length} / {WEAPONS.length}
         </span>
-        <span className="tracking-widest text-white drop-shadow">GUNS UNLOCKED</span>
+        <span className="tracking-widest text-white drop-shadow">{WEAPONS.filter((w) => !isLocked(w)).length} SENJATA TERBUKA</span>
       </div>
       {editingDesign && canChooseGunDesign(selectedGunId) && (
         <GunVariantPicker

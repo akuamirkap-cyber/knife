@@ -22,7 +22,7 @@ export const BOSS_ROSTER: BossProfile[] = [
     desc: 'Helm baja ksatria jahat dengan visor runcing & mata merah. Menembakkan pedang bayangan!',
     accent: '#38bdf8',
     glow: 'rgba(56, 189, 248, 0.4)',
-    projectileName: 'Shadow Dagger',
+    projectileName: 'Shadow Knight Sword',
     projectileEmoji: '🗡️',
     fireInterval: 2.2,
   },

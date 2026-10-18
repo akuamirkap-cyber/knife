@@ -20,6 +20,7 @@ import { drawBonusCoin, TreasureChest } from './art/bonusArt';
 import { advanceTreasureCoins, throwTreasureCoins, type TreasureCoin } from './treasureShower';
 import { drawBreakerCoin } from '../../shared/coinArt';
 import { getBossDef, type BossType } from './bossRoster';
+import { drawBossProjectile } from './bossProjectileArt';
 import { getExactBossRadius, onBossAssetsLoaded } from './bossAssetProcessor';
 
 export const W = 420;
@@ -41,8 +42,59 @@ const BLEN = TOTAL_LEN;
 const GUN_Y = H - 185; // muzzle tip
 const TAU = Math.PI * 2;
 const SPIKE_LEN = 28;
+export const BOARD_OBSTACLE_SCALE = 2;
+export const SPIKE_SCALE = BOARD_OBSTACLE_SCALE;
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+/** Keep the sandal's chunky silhouette at full size even if a mini-shot buff is active. */
+export function projectileSizeMultiplier(kind: WeaponId, mini: boolean, giant: boolean) {
+  if (kind === 'sandal' && mini) return giant ? 1.8 : 1;
+  return mini ? 0.65 : giant ? 1.8 : 1;
+}
+
+/** Preserve the normal Nail Gun size; only the weapon's existing charge buff enlarges shots. */
+export function embeddedProjectileScale(big = 0) {
+  return big ? 1 + big * 0.3 : 1;
+}
+
+/** Convert each weapon's visible shot width into the rock's local hit radius. */
+export function diamondCoreProjectileRadius(weaponHalf: number, shotScale: number, rockScale: number) {
+  return Math.max(6, weaponHalf * shotScale / Math.max(0.1, rockScale));
+}
+
+/** Bosses turn 20% faster while keeping the same readable reversal rhythms. */
+export function bossRotationSpeed(type: BossType, levelTime: number) {
+  switch (type) {
+    case 'knight': return (Math.floor(levelTime / 7) % 2 === 0 ? 1.65 : -1.65) * 1.2;
+    case 'oni': return (Math.floor(levelTime / 5) % 2 === 0 ? -2.05 : 2.05) * 1.2;
+    case 'cyborg': return 1.9 * Math.cos(levelTime * 0.82) * 1.2;
+    case 'pirate': return 2.1 * Math.cos(levelTime * 0.52 + 0.3) * 1.2;
+  }
+}
+
+const BOSS_RISE_HEIGHT = 58;
+const BOSS_MOVE_CYCLE = 10;
+const smooth01 = (value: number) => {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+};
+
+/** Rises smoothly, pauses at the high position, then returns and rests for strategy time. */
+export function bossRiseOffset(levelTime: number) {
+  const phase = ((levelTime % BOSS_MOVE_CYCLE) + BOSS_MOVE_CYCLE) % BOSS_MOVE_CYCLE;
+  if (phase < 2) return 0;
+  if (phase < 3.3) return BOSS_RISE_HEIGHT * smooth01((phase - 2) / 1.3);
+  if (phase < 4.6) return BOSS_RISE_HEIGHT;
+  if (phase < 5.9) return BOSS_RISE_HEIGHT * (1 - smooth01((phase - 4.6) / 1.3));
+  return 0;
+}
+
+/** Shorter intervals make bosses fire about 30% more often without bunching shots. */
+export function bossFireInterval(baseInterval: number, jitter = 0) {
+  return Math.max(1.05, baseInterval * 0.7 + jitter);
+}
+
 const norm = (a: number) => ((a % TAU) + TAU) % TAU;
 const angDiff = (a: number, b: number) => {
   let d = norm(a - b);
@@ -104,6 +156,7 @@ interface Flyer { x: number; y: number; vx: number; vy: number; rot: number; vr:
 interface Beam { x: number; y: number; life: number; max: number; rgb: string }
 interface Portal { x: number; y: number; life: number; max: number; rgb: string }
 interface BossProjectile { x: number; y: number; vx: number; vy: number; rot: number; type: BossType }
+
 interface RockFragment { x: number; y: number; vx: number; vy: number; rot: number; vr: number; size: number; seed: number; life: number; max: number }
 /** Coordinates and angle are local to a rock cell (or to the open chest). */
 interface EmbeddedShot { x: number; y: number; angle: number; age: number; w: WeaponId; scale: number; big: number; tint?: string; cellId?: number }
@@ -117,6 +170,11 @@ export type LevelMode = 'classic' | 'boulder' | 'double' | SpecialMode;
 
 const STAGE_SECONDS: Record<'boulder' | SpecialMode, number> = { boulder: 65, bonus: 45, treasure: 10 };
 const isSpecial = (mode: LevelMode): mode is 'boulder' | SpecialMode => mode === 'boulder' || mode === 'bonus' || mode === 'treasure';
+
+/** Star power-ups are reserved for bosses and special/bonus stages. */
+export function allowsStarPowerups(level: Pick<LevelCfg, 'boss' | 'mode'>) {
+  return level.boss || isSpecial(level.mode);
+}
 
 type PatternName = 'constant' | 'wave' | 'pendulum' | 'stopgo' | 'jerk' | 'chaos';
 const PATTERNS: Record<PatternName, (t: number, b: number, d: number) => number> = {
@@ -148,7 +206,7 @@ const BOSS_STYLES: Style[] = ['knight', 'oni', 'cyborg', 'pirate'];
 const WORLD_STYLES: Style[] = ['orange', 'wood', 'target'];
 const PRAISE = ['MANTAP!', 'KEREN!', 'SEMPURNA!', 'GACOR!', 'JAGO!', 'LUAR BIASA!'];
 
-export function makeLevel(n: number): LevelCfg {
+export function makeLevel(n: number, forcedMode?: LevelMode): LevelCfg {
   const boss = n % 5 === 0;
   const world = Math.floor((n - 1) / 5);
   const base = Math.min(1.5 + n * 0.11, 4.3);
@@ -162,7 +220,9 @@ export function makeLevel(n: number): LevelCfg {
     if (n >= 16) pool.push('chaos');
     pattern = pick(pool);
   }
-  const ammo = Math.min(5 + Math.floor(n * 0.5), 13) + (boss ? 2 : 0);
+  const regularAmmo = Math.min(5 + Math.floor(n * 0.5), 13);
+  // Double the boss shot quota so the fight can sustain exactly twice the HP without an early ammo clear.
+  const ammo = boss ? (regularAmmo + 2) * 2 : regularAmmo;
   const bossIdx = Math.floor(n / 5) - 1;
   const style: Style = boss ? BOSS_STYLES[Math.max(0, bossIdx) % BOSS_STYLES.length] : WORLD_STYLES[world % WORLD_STYLES.length];
   // Boss DARK KNIGHT tampil bersih: tanpa duri jebakan & penghalang (peluru berkarat).
@@ -177,13 +237,11 @@ export function makeLevel(n: number): LevelCfg {
     ? 0
     : Math.min(1 + Math.floor((n - 4) / 4), 4);
   const coins = (Math.random() < 0.65 ? 1 : 0) + (Math.random() < 0.3 ? 1 : 0);
-  // Level 3 = Diamond Breaker rock, 4 = coin bonus, 5 = boss, 6 = treasure.
-  // Afterwards treasure follows each boss; bonus recurs every ten levels.
-  const mode: LevelMode = boss ? 'classic'
-    : n > 1 && n % 5 === 1 ? 'treasure'
-    : n % 10 === 4 ? 'bonus'
-    : n % 7 === 3 ? 'boulder'
-    : n % 7 === 6 ? 'double' : 'classic';
+  // Each five-stage boss cycle is three ordinary stages, one random special,
+  // then a boss: stages 4, 9, 14... use exactly one of the three special modes.
+  const mode: LevelMode = forcedMode ?? (boss ? 'classic'
+    : n % 5 === 4 ? pick<LevelMode>(['boulder', 'bonus', 'treasure'])
+    : 'classic');
   return {
     n, boss, ammo: isSpecial(mode) ? 12 : ammo, base, pattern, dir: Math.random() < 0.5 ? 1 : -1,
     radius: boss ? 122 : mode === 'boulder' || mode === 'bonus' ? ROCK_RADIUS : 106, style,
@@ -195,12 +253,19 @@ export function makeLevel(n: number): LevelCfg {
 
 export interface GameEvents {
   onGameOver: (score: number, level: number, coinsToBank: number, runCoins: number) => void;
-  onBossDefeated?: (bossName: string, level: number, coinsEarned: number) => void;
+  onBossDefeated?: (bossName: string, level: number, coinsEarned: number, bossType: BossType) => void;
   /** The treasure counter and saved balance both grow as each flying coin reaches the HUD. */
   onTreasureCoin?: (amount: number) => void;
   /** Bank any remaining special-stage reward at its end, exactly once. */
-  onStageReward?: (mode: 'boulder' | SpecialMode, level: number, unbankedCoins: number) => void;
+  onStageReward?: (mode: 'boulder' | SpecialMode, level: number, unbankedCoins: number, diamondReward: number) => void;
+  /** Separate shop-diamond currency, awarded by the boulder core and small diamond pickups. */
+  onDiamondCollected?: (amount: number, large: boolean, origin: { x: number; y: number }) => void;
+  /** Called on successful standard-stage clears for the UI's short sunburst celebration. */
+  onStageCleared?: (level: number, boss: boolean, origin: { x: number; y: number }) => void;
+  /** Called whenever a new level begins so transient HUD modes can reset. */
+  onStageChange?: () => void;
   onStarHit?: (treasure: boolean) => void;
+  onShotFired?: (count: number) => void;
 }
 
 type State = 'idle' | 'intro' | 'play' | 'clear' | 'fail' | 'over';
@@ -256,7 +321,7 @@ export class Game {
   private slowT = 0;
   private slowF = 0.3;
   private slowRgb = '170,230,255';
-  private slowKind: 'ice' | 'water' | 'honey' | 'time' | 'stun' = 'ice';
+  private slowKind: 'ice' | 'water' | 'honey' | 'time' = 'ice';
   private aiming = false;
   private aimT = 0;
   private spin = 0;
@@ -286,6 +351,9 @@ export class Game {
   private stageStartCoins = 0;
   private bankedCoins = 0;
   private diamondPing = 0;
+  private centerDiamondCollected = false;
+  private centerDiamondHits = 0;
+  private diamondHoldUntil = 0;
   private choosingBuff = false;
   private buff: 'speed' | 'ammo' | 'power' | 'double' | null = null;
   private treasureBuff: TreasureBuff | null = null;
@@ -332,7 +400,10 @@ export class Game {
       ? SNOWBALL_MAG_SIZE : Math.min(SNOWBALL_MAG_SIZE, this.ammoLeft);
   }
 
-  private get targetY() { return isSpecial(this.level.mode) ? SPECIAL_CY : CY; }
+  private get targetY() {
+    if (isSpecial(this.level.mode)) return SPECIAL_CY;
+    return CY - (this.level.boss ? bossRiseOffset(this.levelTime) : 0);
+  }
   private get hasTwinGuns() { return this.level.mode === 'double' || this.twinGuns; }
   private get gunOffsets(): readonly number[] { return this.hasTwinGuns ? TWIN_BARRELS : SINGLE_BARREL; }
 
@@ -341,6 +412,7 @@ export class Game {
     this.ctx = canvas.getContext('2d')!;
     this.events = events;
     this.level = makeLevel(1);
+    this.events.onStageChange?.();
     this.level.style = 'orange';
     this.buildFace();
     this.placeObstacles();
@@ -482,7 +554,7 @@ export class Game {
     this.press();
   };
 
-  private startRun(level: number) {
+  private startRun(level: number, forcedMode?: LevelMode) {
     sfx.unlock();
     sfx.start();
     this.score = 0;
@@ -491,18 +563,22 @@ export class Game {
     this.particles = [];
     this.frags = [];
     this.flyers = [];
-    this.loadLevel(level);
+    this.loadLevel(level, forcedMode);
   }
 
   start() { this.startRun(1); }
 
+  /** Start an existing SGA level directly from the level map without changing its stage rules. */
+  startAtLevel(level: number) { this.startRun(Math.max(1, Math.floor(level))); }
+
   /** Menu shortcuts enter the same real, playable levels as the Arcade progression. */
-  startSpecialStage(mode: 'boulder' | SpecialMode) { this.startRun(mode === 'boulder' ? 3 : mode === 'bonus' ? 4 : 6); }
+  startSpecialStage(mode: 'boulder' | SpecialMode) { this.startRun(4, mode); }
 
   toIdle() {
     this.state = 'idle';
     this.snowLoaded = SNOWBALL_MAG_SIZE;
     this.level = makeLevel(1);
+    this.events.onStageChange?.();
     this.level.style = 'orange';
     this.items = [];
     this.projs = [];
@@ -530,21 +606,44 @@ export class Game {
 
   applyBuff(kind: BuffKind) {
     if (!this.choosingBuff) return;
+    if (!allowsStarPowerups(this.level)) {
+      // Stale UI/input must never grant normal-stage star effects or leave play paused.
+      this.choosingBuff = false;
+      this.holding = false;
+      this.aiming = false;
+      this.aimT = 0;
+      this.charging = false;
+      this.chargeT = 0;
+      this.chargeLevel = 0;
+      gunState.charge = 0;
+      return;
+    }
     if (this.level.mode === 'treasure') {
-      if (!['rapid', 'double', 'mini', 'giant'].includes(kind)) return;
-      this.treasureBuff = kind as TreasureBuff;
+      const treasureKinds: TreasureBuff[] = ['rapid', 'double', 'mini', 'giant'];
+      this.treasureBuff = treasureKinds.includes(kind as TreasureBuff) ? kind as TreasureBuff : 'rapid';
     } else {
-      if (!['speed', 'ammo', 'power', 'double'].includes(kind)) return;
-      this.buff = kind as 'speed' | 'ammo' | 'power' | 'double';
-      if (kind === 'ammo') {
+      const normalKinds = ['speed', 'ammo', 'power', 'double'] as const;
+      const selected = normalKinds.includes(kind as typeof normalKinds[number])
+        ? kind as typeof normalKinds[number] : 'speed';
+      this.buff = selected;
+      if (selected === 'ammo') {
         this.maxAmmoMult = 2;
         this.ammoLeft += this.level.ammo;
         if (this.weapon.id === 'snowball' && this.snowLoaded === 0 && this.reloadT === 0) this.reloadT = 0.85;
       }
-      if (kind === 'power') this.dmgMult = 2;
+      if (selected === 'power') this.dmgMult = 2;
     }
     if (kind === 'double') this.twinGuns = true;
+    // Always release paused input state after a choice. This is particularly
+    // important for boss fights and scoped/charged weapons interrupted by a star.
     this.choosingBuff = false;
+    this.holding = false;
+    this.aiming = false;
+    this.aimT = 0;
+    this.charging = false;
+    this.chargeT = 0;
+    this.chargeLevel = 0;
+    gunState.charge = 0;
     sfx4.magic();
   }
 
@@ -565,6 +664,7 @@ export class Game {
   }
 
   private spawnFloatingStar() {
+    if (!allowsStarPowerups(this.level)) return;
     const bottom = this.targetY + this.level.radius;
     const midGap = (bottom + GUN_Y) / 2;
     const baseY = Math.min(GUN_Y - 75, Math.max(bottom + 48, midGap + rand(-18, 18)));
@@ -578,9 +678,16 @@ export class Game {
   }
 
   private hitStar() {
-    const s = this.star!;
+    if (!this.star || !allowsStarPowerups(this.level)) return;
+    const s = this.star;
     this.star = null;
     this.holding = false;
+    this.aiming = false;
+    this.aimT = 0;
+    this.charging = false;
+    this.chargeT = 0;
+    this.chargeLevel = 0;
+    gunState.charge = 0;
     this.projs = [];
     this.choosingBuff = true;
     sfx4.magic();
@@ -596,8 +703,9 @@ export class Game {
     this.events.onStarHit?.(this.level.mode === 'treasure');
   }
 
-  private loadLevel(n: number) {
-    this.level = makeLevel(n);
+  private loadLevel(n: number, forcedMode?: LevelMode) {
+    this.level = makeLevel(n, forcedMode);
+    this.events.onStageChange?.();
     this.items = [];
     this.projs = [];
     this.rockFragments = [];
@@ -614,13 +722,17 @@ export class Game {
     this.stageStartCoins = this.coins;
     this.reloadT = 0;
     this.diamondPing = 0;
+    this.centerDiamondCollected = false;
+    this.centerDiamondHits = 0;
+    this.diamondHoldUntil = 0;
     this.choosingBuff = false;
     this.buff = null;
     this.treasureBuff = null;
     this.twinGuns = false;
     this.star = null;
-    // The treasure star flies across early enough for its buff to be useful.
-    this.starTimer = this.level.mode === 'treasure' ? 2.2 : 5 + Math.random() * 3;
+    // Only bosses and special/bonus stages get a star; treasure gets it early.
+    this.starTimer = !allowsStarPowerups(this.level) ? Infinity
+      : this.level.mode === 'treasure' ? 2.2 : 5 + Math.random() * 3;
     this.speedMult = 1;
     this.dmgMult = 1;
     this.maxAmmoMult = 1;
@@ -677,7 +789,8 @@ export class Game {
         for (let t = 0; t < 300; t++) {
           const a = rand(0, TAU);
           if (this.items.every((it) => angDiff(it.angle, a) > sep)) {
-            this.items.push({ angle: a, type, age: 10 });
+            this.items.push({ angle: a, type, age: 10,
+              scale: type === 'old' ? BOARD_OBSTACLE_SCALE : undefined });
             break;
           }
         }
@@ -729,6 +842,7 @@ export class Game {
     this.lastShotRT = this.rt;
     this.stretchPlayed = false;
     gunState.shots++;
+    this.events?.onShotFired?.(n);
     const big = w.charge ? this.chargeLevel : 0;
     const tint = w.paint ? pick(PAINT) : undefined;
     const vx = 0; // stars never steer the weapon or its shots
@@ -966,7 +1080,7 @@ export class Game {
       for (const it of others.slice(0, 4)) {
         const wa = it.angle + this.rot;
         this.particles.push({
-          x: hx, y: hy, tx: CX + Math.cos(wa) * (R + 18), ty: CY + Math.sin(wa) * (R + 18), vx: 0, vy: 0,
+          x: hx, y: hy, tx: CX + Math.cos(wa) * (R + 18), ty: this.targetY + Math.sin(wa) * (R + 18), vx: 0, vy: 0,
           life: 0.25, max: 0.25, size: 2, color: '#9be8ff', kind: 'bolt', rot: 0, vr: 0, g: 0,
         });
       }
@@ -979,9 +1093,8 @@ export class Game {
       else sfx.ice();
       if (this.slowT <= 0) this.addText(w.slowText ?? '❄ BEKU!', hx + rand(-40, 40), hy + 60,
         honey ? '#ffd56c' : water ? '#93c5fd' : '#bff1ff', 24);
-      if (w.slowStyle === 'stun') sfx4.dizzy();
       this.applySlow(w.slowTime ?? 1.3, w.slowFactor ?? 0.3, w.slowRgb ?? '170,230,255',
-        honey ? 'honey' : w.slowStyle === 'stun' ? 'stun' : water ? 'water' : 'ice');
+        honey ? 'honey' : water ? 'water' : 'ice');
       // Both liquids already have their own splash and droplets in spawnImpact.
       if (w.id !== 'soaker' && w.id !== 'honey') for (let i = 0; i < 14; i++) {
         const a = rand(0, TAU);
@@ -1005,7 +1118,7 @@ export class Game {
       for (const it of coins) {
         const wa = it.angle + this.rot;
         const cx = CX + Math.cos(wa) * (R + 14);
-        const cy = CY + Math.sin(wa) * (R + 14);
+        const cy = this.targetY + Math.sin(wa) * (R + 14);
         this.particles.push({
           x: cx, y: cy, tx: hx, ty: hy, vx: 0, vy: 0, life: 0.3, max: 0.3, size: 3, color: '#d8b4fe', kind: 'bolt', rot: 0, vr: 0, g: 0,
         });
@@ -1087,7 +1200,7 @@ export class Game {
     this.addText('DORR! 🎆', x + rand(-30, 30), y + 60, '#fde047', 30);
   }
 
-  private applySlow(time: number, factor: number, rgb: string, kind: 'ice' | 'water' | 'honey' | 'time' | 'stun') {
+  private applySlow(time: number, factor: number, rgb: string, kind: 'ice' | 'water' | 'honey' | 'time') {
     this.slowT = time;
     this.slowF = factor;
     this.slowRgb = rgb;
@@ -1098,7 +1211,7 @@ export class Game {
     this.level.dir *= -1;
     sfx2.reverse();
     this.addText(text, x, y, '#fde047', 24);
-    this.particles.push({ x: CX, y: CY, vx: 0, vy: 0, life: 0.5, max: 0.5, size: this.level.radius * 2.6, color: '#fde047', kind: 'ring', rot: 0, vr: 0, g: 0 });
+    this.particles.push({ x: CX, y: this.targetY, vx: 0, vy: 0, life: 0.5, max: 0.5, size: this.level.radius * 2.6, color: '#fde047', kind: 'ring', rot: 0, vr: 0, g: 0 });
   }
 
   private applyNewPerks(w: Weapon, hx: number, hy: number, R: number) {
@@ -1117,13 +1230,13 @@ export class Game {
     if (w.chronoEvery && this.perkCount % w.chronoEvery === 0) {
       sfx2.timestop();
       this.applySlow(1.2, 0, '250,220,120', 'time');
-      this.addText('⏱ STOP WAKTU!', CX, CY, '#fde047', 30);
+      this.addText('⏱ STOP WAKTU!', CX, this.targetY, '#fde047', 30);
       this.flashWhite = Math.max(this.flashWhite, 0.25);
     }
     if (w.spikeOff) {
       this.spikeOffT = w.spikeOff;
       for (let i = 0; i < 3; i++) {
-        this.particles.push({ x: CX, y: CY, vx: 0, vy: 0, life: 0.4 + i * 0.15, max: 0.4 + i * 0.15, size: R * (1.6 + i * 0.5), color: '#bef264', kind: 'ring', rot: 0, vr: 0, g: 0 });
+        this.particles.push({ x: CX, y: this.targetY, vx: 0, vy: 0, life: 0.4 + i * 0.15, max: 0.4 + i * 0.15, size: R * (1.6 + i * 0.5), color: '#bef264', kind: 'ring', rot: 0, vr: 0, g: 0 });
       }
       if (this.items.some((it) => it.type === 'spike')) this.addText(w.spikeText ?? '🔊 DURI MASUK!', hx, hy + 70, w.color, 22);
     }
@@ -1146,12 +1259,13 @@ export class Game {
       let any = false;
       for (const it of this.items) {
         if (it.type === 'bullet' || it.type === 'old') {
+          if (it.w === 'sandal') continue; // keep the oversized sandal visibly chunky
           const before = it.scale ?? 1;
           it.scale = Math.max(0.45, before * 0.85);
           if (it.scale < before) any = true;
         }
       }
-      for (let i = 0; i < 2; i++) this.particles.push({ x: CX, y: CY, vx: 0, vy: 0, life: 0.5, max: 0.5, size: R * (2.8 - i * 0.6), color: '#4ade80', kind: 'ring', rot: 0, vr: 0, g: 0 });
+      for (let i = 0; i < 2; i++) this.particles.push({ x: CX, y: this.targetY, vx: 0, vy: 0, life: 0.5, max: 0.5, size: R * (2.8 - i * 0.6), color: '#4ade80', kind: 'ring', rot: 0, vr: 0, g: 0 });
       if (any) this.addText('🔬 MENGECIL!', hx, hy + 70, '#86efac', 22);
     }
     if (w.grow) {
@@ -1195,7 +1309,7 @@ export class Game {
     if (w.jackpot && Math.random() < w.jackpot) {
       this.coins += 8;
       sfx2.jackpot();
-      this.addText(w.jackpotText ?? '🂡 AS! JACKPOT +8 💰', CX, CY + 10, '#fde047', 26);
+      this.addText(w.jackpotText ?? '🂡 AS! JACKPOT +8 💰', CX, this.targetY + 10, '#fde047', 26);
       this.flashWhite = Math.max(this.flashWhite, 0.3);
       for (let i = 0; i < 24; i++) {
         const a = rand(0, TAU);
@@ -1294,7 +1408,7 @@ export class Game {
     if (w.everyBonus && this.perkCount % w.everyBonus.n === 0) {
       this.score += w.everyBonus.pts;
       sfx2.jackpot();
-      this.addText(w.everyBonus.text, CX, CY + 10, '#fda4af', 28);
+      this.addText(w.everyBonus.text, CX, this.targetY + 10, '#fda4af', 28);
       this.flashWhite = Math.max(this.flashWhite, 0.2);
       for (let i = 0; i < 18; i++) {
         const a = rand(0, TAU);
@@ -1319,7 +1433,7 @@ export class Game {
         this.addText('🦄 DURI HILANG!', hx, hy + 70, '#c4b5fd', 22);
       } else this.transmuteOne(hx, hy, R, '🦄 JADI KOIN!');
       const RBC = ['248,113,113', '251,146,60', '250,204,21', '74,222,128', '96,165,250', '192,132,252'];
-      for (let i = 0; i < 6; i++) this.sink.push({ x: CX, y: CY, vx: 0, vy: 0, life: 0.5 + i * 0.06, max: 0.5 + i * 0.06, size: R * (1.4 + i * 0.25), color: RBC[i], kind: 'shock', rot: 0, vr: 0, g: 0 });
+      for (let i = 0; i < 6; i++) this.sink.push({ x: CX, y: this.targetY, vx: 0, vy: 0, life: 0.5 + i * 0.06, max: 0.5 + i * 0.06, size: R * (1.4 + i * 0.25), color: RBC[i], kind: 'shock', rot: 0, vr: 0, g: 0 });
     }
   }
 
@@ -1375,9 +1489,9 @@ export class Game {
     this.flashWhite = Math.max(this.flashWhite, 0.45);
     this.tintA = Math.max(this.tintA, 0.5);
     this.tintRgb = '74,222,128';
-    this.sink.light(CX, CY, R * 4, '74,222,128', 0.8);
-    this.sink.push({ x: CX, y: CY, vx: 0, vy: 0, life: 0.8, max: 0.8, size: R * 3.6, color: '74,222,128', kind: 'shock', rot: 0, vr: 0, g: 0 });
-    this.addText(kill.length ? `☢️ ${kill.length}x DIMUSNAHKAN!` : '☢️ OBLITERATE!', CX, CY - 10, '#86efac', 30);
+    this.sink.light(CX, this.targetY, R * 4, '74,222,128', 0.8);
+    this.sink.push({ x: CX, y: this.targetY, vx: 0, vy: 0, life: 0.8, max: 0.8, size: R * 3.6, color: '74,222,128', kind: 'shock', rot: 0, vr: 0, g: 0 });
+    this.addText(kill.length ? `☢️ ${kill.length}x DIMUSNAHKAN!` : '☢️ OBLITERATE!', CX, this.targetY - 10, '#86efac', 30);
   }
 
   private stickAt(local: number, p?: Proj) {
@@ -1385,14 +1499,14 @@ export class Game {
     const w = this.weapon;
     const big = p?.big ?? 0;
     const tint = p?.tint;
-    this.items.push({ angle: local, type: 'bullet', age: 0, w: w.id, big, tint, scale: big ? 1 + big * 0.3 : undefined });
+    this.items.push({ angle: local, type: 'bullet', age: 0, w: w.id, big, tint, scale: big ? embeddedProjectileScale(big) : undefined });
     this.stuck++;
     if (this.time - this.lastHit < (w.comboWindow ?? 0.5)) this.combo++;
     else this.combo = 1;
     this.lastHit = this.time;
     let pts = w.points * (big === 2 ? 4 : big === 1 ? 2 : 1);
     if (big) {
-      this.addText(big === 2 ? '⚡ FULL CHARGE x4!' : 'CHARGE x2', CX + rand(-40, 40), CY + R + 60, big === 2 ? '#fde047' : '#7dd3fc', big === 2 ? 28 : 20);
+      this.addText(big === 2 ? '⚡ FULL CHARGE x4!' : 'CHARGE x2', CX + rand(-40, 40), this.targetY + R + 60, big === 2 ? '#fde047' : '#7dd3fc', big === 2 ? 28 : 20);
       this.hitStop = Math.max(this.hitStop, big === 2 ? 0.12 : 0.04);
       if (big === 2) {
         const hp0 = this.worldPos(local, R);
@@ -1435,7 +1549,7 @@ export class Game {
     const cols = STYLE_COLORS[this.level.style].chips;
     this.applyPerks(w, hx, hy, R);
     const fxp = FX[w.id];
-    spawnImpact(this.sink, fxp, w, hx, hy, (hx - CX) / R, (hy - CY) / R, cols);
+    spawnImpact(this.sink, fxp, w, hx, hy, (hx - CX) / R, (hy - this.targetY) / R, cols);
     this.hitStop = Math.max(this.hitStop, fxp.hitstop);
     this.camY -= fxp.kick;
     this.shake = Math.max(this.shake, 3 + fxp.kick * 0.8);
@@ -1458,7 +1572,7 @@ export class Game {
     const R = this.level.radius;
     const wa = it.angle + this.rot;
     const x = CX + Math.cos(wa) * (R + 14);
-    const y = CY + Math.sin(wa) * (R + 14);
+    const y = this.targetY + Math.sin(wa) * (R + 14);
     this.items = this.items.filter((i) => i !== it);
     const v = this.weapon.coinValue;
     this.coins += v;
@@ -1479,7 +1593,7 @@ export class Game {
     const R = this.level.radius;
     const wa = it.angle + this.rot;
     const x = CX + Math.cos(wa) * (R + 18);
-    const y = CY + Math.sin(wa) * (R + 18);
+    const y = this.targetY + Math.sin(wa) * (R + 18);
     sfx4.shatter();
     this.shake = Math.max(this.shake, 6);
     this.addText('💎 1/2 RETAK!', x, y - 12, '#67e8f9', 18);
@@ -1495,13 +1609,14 @@ export class Game {
     const R = this.level.radius;
     const wa = it.angle + this.rot;
     const x = CX + Math.cos(wa) * (R + 18);
-    const y = CY + Math.sin(wa) * (R + 18);
+    const y = this.targetY + Math.sin(wa) * (R + 18);
     this.items = this.items.filter((i) => i !== it);
     this.coins += 5;
+    this.events.onDiamondCollected?.(10, false, { x, y });
     sfx3.chime();
     sfx2.jackpot();
     this.shake = Math.max(this.shake, 8);
-    this.addText('💎 DIAMOND JATUH! +5 💰', x, y - 12, '#67e8f9', 22);
+    this.addText('BERLIAN +10! +5 APEL', x, y - 12, '#67e8f9', 22);
     for (let i = 0; i < 26; i++) {
       const a = rand(0, TAU);
       const v = rand(120, 440);
@@ -1542,11 +1657,12 @@ export class Game {
       });
     }
     this.particles.push({ x: p.x, y: p.y, vx: 0, vy: 0, life: 0.4, max: 0.4, size: 70, color: '#ff3b3b', kind: 'ring', rot: 0, vr: 0, g: 0 });
-    this.addText('GAGAL!', CX, CY + this.level.radius + 110, '#ff4d4d', 40);
+    this.addText('GAGAL!', CX, this.targetY + this.level.radius + 110, '#ff4d4d', 40);
   }
 
   private clearLevel() {
     this.state = 'clear';
+    this.events.onStageCleared?.(this.level.n, this.level.boss, { x: CX, y: this.targetY });
     this.stateT = 0;
     this.projs = [];
     const R = this.level.radius;
@@ -1557,13 +1673,13 @@ export class Game {
       const a1 = offs + ((i + 1) / k) * TAU;
       const mid = (a0 + a1) / 2 + this.rot;
       const v = rand(260, 520);
-      this.frags.push({ x: CX, y: CY, vx: Math.cos(mid) * v, vy: Math.sin(mid) * v - 220, rot: this.rot, vr: rand(-6, 6), a0, a1 });
+      this.frags.push({ x: CX, y: this.targetY, vx: Math.cos(mid) * v, vy: Math.sin(mid) * v - 220, rot: this.rot, vr: rand(-6, 6), a0, a1 });
     }
     for (const it of this.items) {
       const wa = it.angle + this.rot;
       const v = rand(350, 650);
       this.flyers.push({
-        x: CX + Math.cos(wa) * R, y: CY + Math.sin(wa) * R, vx: Math.cos(wa) * v, vy: Math.sin(wa) * v - 200,
+        x: CX + Math.cos(wa) * R, y: this.targetY + Math.sin(wa) * R, vx: Math.cos(wa) * v, vy: Math.sin(wa) * v - 200,
         rot: wa - Math.PI / 2, vr: rand(-14, 14), kind: it.type, w: it.w,
       });
     }
@@ -1573,41 +1689,41 @@ export class Game {
       const a = rand(0, TAU);
       const v = rand(150, 750);
       this.particles.push({
-        x: CX + Math.cos(a) * rand(0, R), y: CY + Math.sin(a) * rand(0, R), vx: Math.cos(a) * v, vy: Math.sin(a) * v - 150,
+        x: CX + Math.cos(a) * rand(0, R), y: this.targetY + Math.sin(a) * rand(0, R), vx: Math.cos(a) * v, vy: Math.sin(a) * v - 150,
         life: rand(0.6, 1.2), max: 1.2, size: rand(3, 7), color: pick(cols), kind: 'chip', rot: rand(0, TAU), vr: rand(-20, 20), g: 1300,
       });
     }
     for (let i = 0; i < 14; i++) {
       this.particles.push({
-        x: CX + rand(-R, R) * 0.6, y: CY + rand(-R, R) * 0.6, vx: rand(-60, 60), vy: rand(-60, 20), life: rand(0.6, 1.1), max: 1.1,
+        x: CX + rand(-R, R) * 0.6, y: this.targetY + rand(-R, R) * 0.6, vx: rand(-60, 60), vy: rand(-60, 20), life: rand(0.6, 1.1), max: 1.1,
         size: rand(18, 34), color: 'rgba(220,220,220,', kind: 'smoke', rot: 0, vr: 0, g: -30,
       });
     }
-    this.particles.push({ x: CX, y: CY, vx: 0, vy: 0, life: 0.5, max: 0.5, size: R * 2.4, color: '#ffffff', kind: 'ring', rot: 0, vr: 0, g: 0 });
+    this.particles.push({ x: CX, y: this.targetY, vx: 0, vy: 0, life: 0.5, max: 0.5, size: R * 2.4, color: '#ffffff', kind: 'ring', rot: 0, vr: 0, g: 0 });
     sfx.shatter();
     this.shake = 18;
     this.flashWhite = 0.7;
     this.timeScale = 0.35;
     this.hitStop = 0.07;
     const lr = FX[this.weapon.id].light;
-    this.sink.light(CX, CY, R * 2.5, lr, 0.6);
-    this.sink.push({ x: CX, y: CY, vx: 0, vy: 0, life: 0.5, max: 0.5, size: R * 1.8, color: lr, kind: 'shock', rot: 0, vr: 0, g: 0 });
+    this.sink.light(CX, this.targetY, R * 2.5, lr, 0.6);
+    this.sink.push({ x: CX, y: this.targetY, vx: 0, vy: 0, life: 0.5, max: 0.5, size: R * 1.8, color: lr, kind: 'shock', rot: 0, vr: 0, g: 0 });
     const cc = STYLE_COLORS[this.level.style].chips;
     for (let i = 0; i < 18; i++) {
       const a = rand(0, TAU);
       const v = rand(250, 700);
-      this.sink.push({ x: CX + Math.cos(a) * R * 0.5, y: CY + Math.sin(a) * R * 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 200, life: rand(0.7, 1.2), max: 1.2, size: rand(6, 12), color: pick(cc), kind: 'shard', rot: rand(0, TAU), vr: rand(-20, 20), g: 1300 });
+      this.sink.push({ x: CX + Math.cos(a) * R * 0.5, y: this.targetY + Math.sin(a) * R * 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 200, life: rand(0.7, 1.2), max: 1.2, size: rand(6, 12), color: pick(cc), kind: 'shard', rot: rand(0, TAU), vr: rand(-20, 20), g: 1300 });
     }
     for (let i = 0; i < 14; i++) {
       const a = rand(0, TAU);
-      this.sink.push({ x: CX, y: CY, vx: Math.cos(a) * rand(100, 400), vy: Math.sin(a) * rand(100, 400), life: rand(0.5, 1), max: 1, size: rand(6, 11), color: '#ffffff', kind: 'star', rot: rand(0, TAU), vr: 0, g: 0, drag: 2.5 });
+      this.sink.push({ x: CX, y: this.targetY, vx: Math.cos(a) * rand(100, 400), vy: Math.sin(a) * rand(100, 400), life: rand(0.5, 1), max: 1, size: rand(6, 11), color: '#ffffff', kind: 'star', rot: rand(0, TAU), vr: 0, g: 0, drag: 2.5 });
     }
     if (this.level.boss) {
       this.coins += 5;
       this.score += 5;
-      this.addText('BOS KALAH! +5 💰', CX, CY + 20, '#ffd23f', 28);
+      this.addText('BOS KALAH! +5 💰', CX, this.targetY + 20, '#ffd23f', 28);
     } else {
-      this.addText(pick(PRAISE), CX, CY + 10, '#ffffff', 40);
+      this.addText(pick(PRAISE), CX, this.targetY + 10, '#ffffff', 40);
     }
   }
 
@@ -1692,10 +1808,10 @@ export class Game {
       } else if (it.type === 'spike') {
         if (this.spikeOffT > 0 || w.phaseSpikes) continue;
         const myHalf = w.half * (1 + (p.big ?? 0) * 0.3);
-        const spikeArc = (myHalf + 9) / Math.max(50, itemR);
+        const spikeArc = (myHalf + 9 * SPIKE_SCALE) / Math.max(50, itemR);
 
         // Check if projectile hits the spike protruding from boss head
-        if (d < spikeArc && dist <= itemR + SPIKE_LEN && dist >= itemR - 4) {
+        if (d < spikeArc && dist <= itemR + SPIKE_LEN * SPIKE_SCALE && dist >= itemR - 4) {
           return { res: 'fail', spike: true };
         }
       }
@@ -1780,13 +1896,41 @@ export class Game {
 
     const dmg = Math.round((4 + (this.weapon.points - 1) * 2 + (p.big ?? 0) * 2) * this.dmgMult);
     const splash = (mode === 'boulder' ? 43 : 32) + (this.weapon.explode ? 30 : 0);
-    const hit = rock.hitAt(local, dmg, splash);
+    const projectileRadius = diamondCoreProjectileRadius(
+      this.weapon.half * (1 + (p.big ?? 0) * 0.3),
+      projectileSizeMultiplier(this.weapon.id, !!p.mini, !!p.giant), sc,
+    );
+    const hit = rock.hitAt(local, dmg, splash, projectileRadius);
     if (!hit) return { res: 'none' };
     if (hit.kind === 'diamond') {
       this.diamondPing = 1;
+      // The core is collectible only in the designated boulder stage; the
+      // bonus-rock round keeps its own ring-coin objective.
+      if (mode !== 'boulder' || this.centerDiamondCollected) {
+        this.specialImpact(p.x, p.y, 'diamond');
+        this.burstSpecial(p.x, p.y, 'diamond', 8);
+        sfx3.chime();
+        return { res: 'hit' };
+      }
+      this.centerDiamondHits++;
+      this.addText(`BERLIAN ${this.centerDiamondHits}/3`, p.x, p.y - 26, '#a5f3fc', 22);
+      this.sink.light(p.x, p.y, 90 + this.centerDiamondHits * 20, '103,232,249', 0.35);
       this.specialImpact(p.x, p.y, 'diamond');
-      this.burstSpecial(p.x, p.y, 'diamond', 7);
+      this.burstSpecial(p.x, p.y, 'diamond', this.centerDiamondHits === 3 ? 28 : 10);
       sfx3.chime();
+      if (this.centerDiamondHits >= 3) {
+        this.centerDiamondCollected = true;
+        this.diamondHoldUntil = this.time + 3.1; // let the flight + reward burst finish before the next stage
+        this.events.onDiamondCollected?.(50, true, { x: p.x, y: p.y });
+        this.addText('DIAMOND DIDAPAT! +50', p.x, p.y - 54, '#e0f7ff', 28);
+        this.sink.light(p.x, p.y, 190, '210,240,255', 0.8);
+        this.burstSpecial(p.x, p.y, 'diamond', 56);
+        sfx4.shatter();
+        sfx2.jackpot();
+        const scattered = this.rock?.shatterAll() ?? [];
+        if (scattered.length) this.detachRockCells(scattered);
+        this.finishSpecialStage();
+      }
       return { res: 'hit' };
     }
     this.level.hp = hit.remaining;
@@ -1833,7 +1977,7 @@ export class Game {
   private makeEmbeddedShot(p: Proj, x: number, y: number, angle: number, cellId?: number): EmbeddedShot {
     return {
       x, y, angle, cellId, age: 0, w: this.weapon.id, big: p.big ?? 0, tint: p.tint,
-      scale: (1 + (p.big ?? 0) * 0.3) * (p.mini ? 0.65 : p.giant ? 1.8 : 1),
+      scale: (1 + (p.big ?? 0) * 0.3) * projectileSizeMultiplier(this.weapon.id, !!p.mini, !!p.giant),
     };
   }
 
@@ -1918,7 +2062,7 @@ export class Game {
       if (this.slowT <= 0) this.addText(w.slowText ?? '❄ BEKU!', x, y + 50,
         honey ? '#ffd56c' : water ? '#93c5fd' : '#bff1ff', 22);
       this.applySlow(w.slowTime ?? 1.3, w.slowFactor ?? 0.3, w.slowRgb ?? '170,230,255',
-        honey ? 'honey' : w.slowStyle === 'stun' ? 'stun' : water ? 'water' : 'ice');
+        honey ? 'honey' : water ? 'water' : 'ice');
       if (w.id !== 'soaker' && w.id !== 'honey') for (let i = 0; i < 10; i++) {
         const a = rand(0, TAU), speed = rand(60, 260);
         this.particles.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, life: rand(0.4, 0.8), max: 0.8,
@@ -1976,9 +2120,10 @@ export class Game {
     // Treasure coins were deposited one by one on arrival. Stage rewards for
     // stone/bonus (or a game without onTreasureCoin) are still paid here.
     const unbanked = this.level.mode === 'treasure' && this.events.onTreasureCoin ? 0 : earned;
+    const diamondReward = this.level.mode === 'boulder' && this.centerDiamondCollected ? 50 : 0;
     if (this.events.onStageReward) {
       this.bankedCoins += unbanked;
-      this.events.onStageReward(this.level.mode, this.level.n, unbanked);
+      this.events.onStageReward(this.level.mode, this.level.n, unbanked, diamondReward);
     }
   }
 
@@ -1996,7 +2141,7 @@ export class Game {
     if (mode === 'boulder') {
       this.coins += 3;
       this.score += 75;
-      this.addText('💎 DIAMOND BERSIH! +3 🪙', CX, this.targetY + 185, '#a5f3fc', 28);
+      this.addText('BERLIAN BERSIH! +3 APEL', CX, this.targetY + 185, '#a5f3fc', 28);
     } else if (mode === 'bonus') {
       this.addText(`🪙 BONUS +${this.coins - this.stageStartCoins}!`, CX, this.targetY + 185, '#fde68a', 26);
     } else if (this.treasureCoins.length) {
@@ -2117,9 +2262,9 @@ export class Game {
       const f0 = this.slowF;
       const slowF = this.slowT > 0 ? f0 + (1 - f0) * Math.max(0, (0.3 - this.slowT) / 0.3) : 1;
       const aimF = this.aiming ? 0.28 : 1;
-      // Bos berputar PELAN dan konstan (kelihatan hidup/muter, tidak kaku diem),
-      // bukan putaran liar mengikuti pola. Target biasa tetap pakai pola.
-      if (this.level.boss) this.rot += 0.5 * s * slowF * aimF;
+      // Faster, readable boss rhythms: Knight reverses every 7s, Oni every 5s,
+      // while Cyborg and Pirate reverse smoothly on their own distinct cycles.
+      if (this.level.boss) this.rot += bossRotationSpeed(this.level.style as BossType, this.levelTime) * s * slowF * aimF;
       else this.rot += v * s * slowF * aimF;
       this.slowT = Math.max(0, this.slowT - s);
     }
@@ -2182,7 +2327,7 @@ export class Game {
     }
 
     // Star flies across the open lane between the target and the upright gun.
-    if (this.state === 'play' && !this.star) {
+    if (this.state === 'play' && allowsStarPowerups(this.level) && !this.star) {
       this.starTimer -= dt;
       if (this.starTimer <= 0) {
         this.starTimer = 14 + Math.random() * 8;
@@ -2228,16 +2373,16 @@ export class Game {
       this.bossShootTimer -= s;
       if (this.bossShootTimer <= 0) {
         const bDef = getBossDef(this.level.style);
-        this.bossShootTimer = bDef.fireInterval + rand(-0.3, 0.4);
+        this.bossShootTimer = bossFireInterval(bDef.fireInterval, rand(-0.18, 0.22));
         const bType = this.level.style as BossType;
         // Boss launches projectile downward toward the player with aim spread
-        const spawnY = CY + this.level.radius * 0.8;
+        const spawnY = this.targetY + this.level.radius * 0.8;
         const targetX = CX + rand(-60, 60);
         const dx = targetX - CX;
         const dy = (GUN_Y + 40) - spawnY;
         const dist = Math.hypot(dx, dy);
-        // Serangan boss LEBIH BESAR 3X dan LEBIH LAMBAT (mudah ditembak pemain!)
-        const spd = 160 + this.level.n * 3; // Lambat dan telegraf jelas
+        // Boss shots travel 1.9x faster, but retain clear telegraphing and interceptable hitboxes.
+        const spd = (160 + this.level.n * 3) * 1.9;
         this.bossProjs.push({
           x: CX,
           y: spawnY,
@@ -2251,8 +2396,16 @@ export class Game {
         else if (bType === 'cyborg') sfx2.railgun();
         else if (bType === 'pirate') sfx2.pirate();
         else sfx3.keris();
-        this.sink.light(CX, spawnY, 140, bDef.accent === '#38bdf8' ? '56,189,248' : '239,68,68', 0.25);
-        this.sink.push({ x: CX, y: spawnY, vx: 0, vy: 0, life: 0.3, max: 0.3, size: 50, color: bDef.accent, kind: 'shock', rot: 0, vr: 0, g: 0 });
+        // Crisp boss-specific firing flecks instead of a large halo around the boss.
+        const bossRgb = bType === 'knight' ? '56,189,248' : bType === 'oni' ? '239,68,68' : bType === 'cyborg' ? '34,211,238' : '234,179,8';
+        for (let k = 0; k < 5; k++) {
+          this.particles.push({
+            x: CX + rand(-12, 12), y: spawnY + rand(-8, 8),
+            vx: rand(-95, 95), vy: rand(-70, 70), life: 0.16, max: 0.16,
+            size: rand(2, 4), color: bossRgb, kind: bType === 'oni' ? 'glow' : 'spark',
+            rot: 0, vr: 0, g: 0,
+          });
+        }
       }
     }
 
@@ -2272,34 +2425,46 @@ export class Game {
       const tailX = bp.x - dirx * 44;
       const tailY = bp.y - diry * 44;
       if (Math.random() < 0.85) {
+        // Tail material/color follows each boss rather than sharing orange fire.
+        const trail = bp.type === 'knight'
+          ? { color: '56,189,248', kind: 'spark' as const }
+          : bp.type === 'oni'
+          ? { color: '239,68,68', kind: 'glow' as const }
+          : bp.type === 'cyborg'
+          ? { color: '34,211,238', kind: 'spark' as const }
+          : { color: '71,85,105', kind: 'smoke' as const };
         this.particles.push({
           x: tailX + rand(-7, 7),
           y: tailY + rand(-7, 7),
           vx: -dirx * rand(30, 90) + rand(-25, 25),
           vy: -diry * rand(30, 90) + rand(-25, 25),
-          life: 0.32,
-          max: 0.32,
-          size: rand(3, 5.5),
-          color: bp.type === 'oni' ? '239,68,68' : bp.type === 'knight' ? '56,189,248' : bp.type === 'cyborg' ? '34,211,238' : '234,179,8',
-          kind: 'glow',
+          life: bp.type === 'pirate' ? 0.48 : 0.28,
+          max: bp.type === 'pirate' ? 0.48 : 0.28,
+          size: bp.type === 'pirate' ? rand(4, 7) : rand(2.5, 5),
+          color: bp.type === 'pirate' ? 'rgba(71,85,105,' : trail.color,
+          kind: trail.kind,
           rot: 0,
           vr: 0,
           g: 0,
         });
-        this.particles.push({
-          x: tailX + rand(-5, 5),
-          y: tailY + rand(-5, 5),
-          vx: -dirx * rand(40, 110) + rand(-18, 18),
-          vy: -diry * rand(40, 110) + rand(-18, 18),
-          life: 0.22,
-          max: 0.22,
-          size: rand(4, 7.5),
-          color: pick(['255,200,80', '255,120,30', '255,60,20']),
-          kind: 'glow',
-          rot: 0,
-          vr: 0,
-          g: 0,
-        });
+        if (bp.type === 'oni') {
+          this.particles.push({
+            x: tailX + rand(-5, 5),
+            y: tailY + rand(-5, 5),
+            vx: -dirx * rand(40, 110) + rand(-18, 18),
+            vy: -diry * rand(40, 110) + rand(-18, 18),
+            life: 0.22, max: 0.22, size: rand(4, 7.5),
+            color: pick(['255,200,80', '255,120,30', '255,60,20']),
+            kind: 'glow', rot: 0, vr: 0, g: 0,
+          });
+        } else if (bp.type === 'pirate' && Math.random() < 0.45) {
+          this.particles.push({
+            x: tailX + rand(-5, 5), y: tailY + rand(-5, 5),
+            vx: -dirx * 35 + rand(-20, 20), vy: -diry * 35 + rand(-20, 20),
+            life: 0.3, max: 0.3, size: rand(2, 3.5), color: '34,197,94',
+            kind: 'spark', rot: 0, vr: 0, g: 0,
+          });
+        }
       }
 
       // 1. Collision with player's rising projectiles (Hitbox besar 40px karena ukuran proyektil 3x!)
@@ -2549,11 +2714,11 @@ export class Game {
 
     if (this.state === 'clear') {
       this.stateT += dt;
-      if (this.stateT > 1.3 && (this.level.mode !== 'treasure' || this.stageRewardPaid)) {
+      if (this.stateT > 1.3 && this.time >= this.diamondHoldUntil && (this.level.mode !== 'treasure' || this.stageRewardPaid)) {
         if (this.level.boss && this.events.onBossDefeated) {
           this.state = 'idle';
           this.bankedCoins += 5; // the boss reward was already included in this.coins
-          this.events.onBossDefeated(this.level.name, this.level.n, 5);
+          this.events.onBossDefeated(this.level.name, this.level.n, 5, this.level.style as BossType);
         } else {
           this.loadLevel(this.level.n + 1);
         }
@@ -2569,6 +2734,8 @@ export class Game {
 
   // ---------- drawing ----------
   private drawSpike(c: CanvasRenderingContext2D) {
+    c.save();
+    c.scale(SPIKE_SCALE, SPIKE_SCALE); // stage-board spikes are doubled; Nail Gun shots stay normal-sized
     const g = c.createLinearGradient(0, 0, 0, SPIKE_LEN + 6);
     g.addColorStop(0, '#2a2d33');
     g.addColorStop(0.6, '#5b616b');
@@ -2589,6 +2756,7 @@ export class Game {
     c.strokeStyle = 'rgba(255,255,255,0.35)';
     c.lineWidth = 1.2;
     c.stroke();
+    c.restore();
   }
 
   private drawCoin(c: CanvasRenderingContext2D, t: number, glowing = true) {
@@ -2880,7 +3048,7 @@ export class Game {
     const bg = c.createLinearGradient(0, 0, 0, H);
     bg.addColorStop(0, pal.bgTop);
     bg.addColorStop(0.7, pal.bgBot);
-    bg.addColorStop(1, '#0c2228');
+    bg.addColorStop(1, '#0d252c');
     c.fillStyle = bg;
     c.fillRect(0, 0, W, H);
 
@@ -2944,6 +3112,13 @@ export class Game {
     c.fillStyle = targetGlow;
     c.fillRect(0, 0, W, H);
 
+    // A restrained bottom vignette adds depth while keeping the lower forest readable.
+    const lowerShade = c.createLinearGradient(0, H * 0.48, 0, H);
+    lowerShade.addColorStop(0, 'rgba(2, 10, 18, 0)');
+    lowerShade.addColorStop(0.58, 'rgba(2, 10, 18, 0.045)');
+    lowerShade.addColorStop(1, 'rgba(2, 10, 18, 0.12)');
+    c.fillStyle = lowerShade;
+    c.fillRect(0, 0, W, H);
   }
 
   private drawBonusRing(c: CanvasRenderingContext2D, radius: number) {
@@ -2997,7 +3172,7 @@ export class Game {
       // Ordinary round targets keep their drop shadow. The special rock and
       // treasure chest must NOT sit on a large black disk as chunks fall away.
       // Dark Knight juga tampil tanpa lingkaran hitam di belakangnya.
-      if (!isSpecial(this.level.mode) && !(this.level.boss && this.level.style === 'knight')) {
+      if (!isSpecial(this.level.mode) && !this.level.boss) {
         c.beginPath();
         c.arc(0, 10, R + 6, 0, TAU);
         c.fillStyle = 'rgba(0,0,0,0.35)';
@@ -3013,7 +3188,7 @@ export class Game {
         const breath = 1 + Math.sin(bt * 1.35) * 0.014;
         c.scale(breath, breath);
       }
-      if (this.rock) drawRockDiamond(c, R, this.time, this.diamondPing);
+      if (this.rock && !this.centerDiamondCollected) drawRockDiamond(c, R, this.time, this.diamondPing);
       // Lapisan target berputar — bos juga berputar pelan (this.rot di update),
       // bukan terkunci diam. Kecepatan boss konstan agar tidak muter liar.
       if (this.level.mode !== 'treasure') c.rotate(this.rot);
@@ -3040,7 +3215,8 @@ export class Game {
           if (it.tint) gunState.tint = it.tint;
           this.drawProj(c, it.type === 'old' ? 'old' : it.w || 'pistol', len, it.age,
             snowball || it.w === 'honey' || it.w === 'banana'
-              || it.w === 'bee' || it.w === 'moonbeam' || it.w === 'plasma' || it.w === 'blackhole');
+              || it.w === 'bee' || it.w === 'moonbeam' || it.w === 'plasma' || it.w === 'blackhole'
+              || it.w === 'nail');
           gunState.bigShot = 0;
           c.restore();
         } else if (it.type === 'spike') {
@@ -3049,7 +3225,7 @@ export class Game {
           const k = this.spikeOffT > 0 ? Math.min(1, this.spikeOffT / 0.25) * (this.spikeOffT > 0.3 ? 1 : this.spikeOffT / 0.3) : 0;
           // Di boss, duri menempel pas pada permukaan kontur kepala organik boss!
           const itemR = this.level.boss ? getExactBossRadius(this.level.style as BossType, it.angle, R) : R;
-          c.translate(0, itemR - 6 - (SPIKE_LEN + 4) * Math.min(1, k * 1.5));
+          c.translate(0, itemR - 6 - (SPIKE_LEN + 4) * SPIKE_SCALE * Math.min(1, k * 1.5));
           this.drawSpike(c);
           c.restore();
         }
@@ -3074,6 +3250,7 @@ export class Game {
       if (this.hitFlash > 0 && !isSpecial(this.level.mode)) {
         c.beginPath();
         c.arc(0, 0, R, 0, TAU);
+        // Brief surface flash: the whole circular board/boss lights up on impact.
         c.fillStyle = `rgba(255,255,255,${this.hitFlash * 0.28})`;
         c.fill();
       }
@@ -3105,38 +3282,6 @@ export class Game {
               c.lineTo(Math.cos(a + 0.15) * R * 0.95, Math.sin(a + 0.15) * R * 0.95);
               c.stroke();
             }
-          } else if (this.slowKind === 'stun') {
-            c.save();
-            c.rotate(-this.rot);
-            for (let i = 0; i < 5; i++) {
-              const a = this.time * 4 + (i / 5) * TAU;
-              const sx = Math.cos(a) * R * 0.75;
-              const sy = -R - 18 + Math.sin(a) * 10;
-              c.save();
-              c.translate(sx, sy);
-              c.rotate(this.time * 6 + i);
-              c.globalAlpha = fa;
-              c.fillStyle = i % 2 ? '#fde047' : '#ffffff';
-              c.beginPath();
-              for (let k = 0; k < 10; k++) {
-                const rr2 = k % 2 === 0 ? 7 : 3;
-                const aa = (k / 10) * TAU - Math.PI / 2;
-                c.lineTo(Math.cos(aa) * rr2, Math.sin(aa) * rr2);
-              }
-              c.closePath();
-              c.fill();
-              c.restore();
-            }
-            c.strokeStyle = `rgba(255,255,255,${0.6 * fa})`;
-            c.lineWidth = 2;
-            c.beginPath();
-            for (let k = 0; k < 40; k++) {
-              const a = this.time * 6 + k * 0.4;
-              const rr2 = 4 + k * 1.2;
-              c.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2);
-            }
-            c.stroke();
-            c.restore();
           } else {
             c.save();
             c.rotate(-this.rot);
@@ -3304,7 +3449,8 @@ export class Game {
       // ring; the usual white laser wedge made all three look like tadpoles.
       if (!drawMaterialTrail(c, wid)) {
         const tl = Math.min(260, 50 + this.weapon.speed * 0.045) * fxp.streak;
-        const tw = Math.max(2, this.weapon.half) * 1.25 * (p.mini ? 0.65 : p.giant ? 1.8 : 1);
+        const tw = Math.max(2, this.weapon.half) * 1.25
+          * projectileSizeMultiplier(wid, !!p.mini, !!p.giant);
         c.globalCompositeOperation = 'lighter';
         const tg = c.createLinearGradient(0, 6, 0, 6 + tl);
         tg.addColorStop(0, `rgba(${trailCol},0.75)`);
@@ -3337,8 +3483,8 @@ export class Game {
       gunState.bigShot = p.big ?? 0;
       if (p.tint) gunState.tint = p.tint;
       if (p.big) c.scale(1 + p.big * 0.3, 1 + p.big * 0.3);
-      if (p.mini) c.scale(0.65, 0.65);
-      if (p.giant) c.scale(1.8, 1.8);
+      const sizeMultiplier = projectileSizeMultiplier(wid, !!p.mini, !!p.giant);
+      if (sizeMultiplier !== 1) c.scale(sizeMultiplier, sizeMultiplier);
       if (this.weapon.spinFly) {
         const l2 = this.weapon.stick + EMBED;
         c.translate(0, l2 / 2);
@@ -3373,110 +3519,8 @@ export class Game {
       c.restore();
     }
 
-    // ---------------- Render Boss Projectiles: DIBESARIN 3X! ----------------
-    for (const bp of this.bossProjs) {
-      c.save();
-      c.translate(bp.x, bp.y);
-      c.scale(2.8, 2.8); // DIBESARIN ~3X!
-      c.rotate(bp.rot);
-
-      // Api mengekor di EKOR peluru (lokal -Y = berlawanan arah gerak).
-      {
-        const flick = 1 + Math.sin(this.time * 26 + bp.x * 0.06) * 0.22;
-        const len = 30 * flick;
-        c.save();
-        c.shadowColor = '#f97316';
-        c.shadowBlur = 12;
-        const fg = c.createLinearGradient(0, -13, 0, -13 - len);
-        fg.addColorStop(0, 'rgba(255,255,255,0.95)');
-        fg.addColorStop(0.35, 'rgba(255,196,60,0.9)');
-        fg.addColorStop(0.75, 'rgba(255,96,24,0.55)');
-        fg.addColorStop(1, 'rgba(255,60,20,0)');
-        c.fillStyle = fg;
-        c.beginPath();
-        c.moveTo(-7, -12);
-        c.quadraticCurveTo(-8.5 * flick, -13 - len * 0.55, 0, -13 - len);
-        c.quadraticCurveTo(8.5 * flick, -13 - len * 0.55, 7, -12);
-        c.closePath();
-        c.fill();
-        const cg = c.createLinearGradient(0, -12, 0, -12 - len * 0.62);
-        cg.addColorStop(0, 'rgba(255,255,240,0.95)');
-        cg.addColorStop(1, 'rgba(255,220,120,0)');
-        c.fillStyle = cg;
-        c.beginPath();
-        c.moveTo(-3.5, -12);
-        c.quadraticCurveTo(-4, -12 - len * 0.38, 0, -12 - len * 0.62);
-        c.quadraticCurveTo(4, -12 - len * 0.38, 3.5, -12);
-        c.closePath();
-        c.fill();
-        c.restore();
-      }
-
-      if (bp.type === 'oni') {
-        // Giant Demon Fireball
-        const g = c.createRadialGradient(0, 0, 2, 0, 0, 16);
-        g.addColorStop(0, '#ffffff');
-        g.addColorStop(0.35, '#fde047');
-        g.addColorStop(0.7, '#ef4444');
-        g.addColorStop(1, 'rgba(185,28,28,0)');
-        c.fillStyle = g;
-        c.shadowColor = '#ef4444';
-        c.shadowBlur = 12;
-        c.beginPath();
-        c.arc(0, 0, 15, 0, TAU);
-        c.fill();
-        c.shadowBlur = 0;
-      } else if (bp.type === 'knight') {
-        // Giant Shadow Dagger
-        c.fillStyle = '#38bdf8';
-        c.shadowColor = '#38bdf8';
-        c.shadowBlur = 14;
-        c.beginPath();
-        c.moveTo(0, 16);
-        c.lineTo(6, -6);
-        c.lineTo(0, -14);
-        c.lineTo(-6, -6);
-        c.closePath();
-        c.fill();
-        c.shadowBlur = 0;
-        c.fillStyle = '#082f49';
-        c.fillRect(-4, -16, 8, 4);
-      } else if (bp.type === 'cyborg') {
-        // Giant Cyber Rocket
-        c.fillStyle = '#22d3ee';
-        c.shadowColor = '#22d3ee';
-        c.shadowBlur = 12;
-        c.beginPath();
-        c.moveTo(0, 16);
-        c.lineTo(5, 5);
-        c.lineTo(5, -12);
-        c.lineTo(-5, -12);
-        c.lineTo(-5, 5);
-        c.closePath();
-        c.fill();
-        c.shadowBlur = 0;
-        c.fillStyle = '#ff1133';
-        c.fillRect(-3, -15, 6, 4);
-      } else {
-        // Giant Pirate Cursed Cannonball
-        c.fillStyle = '#0f172a';
-        c.beginPath();
-        c.arc(0, 0, 12, 0, TAU);
-        c.fill();
-        c.strokeStyle = '#eab308';
-        c.lineWidth = 2.5;
-        c.stroke();
-        c.fillStyle = '#22c55e';
-        c.shadowColor = '#22c55e';
-        c.shadowBlur = 10;
-        c.beginPath();
-        c.arc(0, 0, 4.5, 0, TAU);
-        c.fill();
-        c.shadowBlur = 0;
-      }
-
-      c.restore();
-    }
+    // ---------------- Distinct, flat boss attack silhouettes ----------------
+    for (const bp of this.bossProjs) drawBossProjectile(c, bp, this.time);
 
     if (this.state !== 'idle') {
       this.drawGunNow(c);

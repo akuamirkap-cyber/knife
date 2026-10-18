@@ -44,8 +44,8 @@ function pathsFor(id: VariantWeapon, variant: GunVariant) {
 test('user loadouts use the requested classic/new combination; only real alternatives can be selected', () => {
   assert.deepEqual(GUN_VARIANTS.map(v => v.label), ['Sebelumnya', 'Sekarang', 'Terbaru']);
   assert.deepEqual(GUN_EFFECTS.map(v => v.label), ['Sebelumnya', 'Baru']);
-  assert.equal(VARIANT_WEAPONS.length, 11);
-  assert.equal(EDITABLE_WEAPONS.length, 8);
+  assert.equal(VARIANT_WEAPONS.length, 14);
+  assert.equal(EDITABLE_WEAPONS.length, 11);
   assert.equal(getGunVariant('pistol'), 'current');
   assert.equal(getGunEffect('pistol'), 'new');
   for (const id of FIXED_CLASSIC_WEAPONS) {
@@ -65,12 +65,16 @@ test('user loadouts use the requested classic/new combination; only real alterna
     diamond: ['latest', 'new'], moonbeam: ['original', 'original'],
     golden: ['original', 'original'], honey: ['original', 'new'],
     chicken: ['latest', 'new'],
+    cricket: ['current', 'new'], fish: ['current', 'new'], electro: ['current', 'new'],
   } as const;
   for (const id of EDITABLE_WEAPONS) {
     assert.equal(canChooseGunDesign(id), true);
     assert.deepEqual([getGunVariant(id), getGunEffect(id)], requested[id]);
   }
   assert.deepEqual(getGunVariantOptions('honey').map(v => v.id), ['original', 'current']);
+  for (const id of ['cricket', 'fish', 'electro'] as const) {
+    assert.deepEqual(getGunVariantOptions(id).map(v => v.id), ['original', 'current']);
+  }
   assert.equal(getGunVariantOptions('chicken').length, 3);
   assert.equal(getGunEffectOptions('honey').length, 2);
   assert.equal(getGunMetrics('honey', 'latest').span, getGunMetrics('honey', 'current').span);
@@ -135,7 +139,7 @@ function effectArt(id: VariantWeapon, effect: GunEffect) {
   return calls.join(',');
 }
 
-test('eight editable guns show the old and new actual shot renderers', () => {
+test('eleven editable guns show the old and new actual shot renderers', () => {
   for (const id of EDITABLE_WEAPONS) {
     const oldArt = effectArt(id, 'original');
     const newArt = effectArt(id, 'new');

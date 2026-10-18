@@ -15,6 +15,9 @@ const DESCRIPTIONS: Description = {
   golden: ['Pistol emas klasik', 'Emas berukir dan reload', 'Meriam emas, silinder dan slide bergerak'],
   moonbeam: ['Bulan sabit klasik', 'Tongkat bulan berbintang', 'Tongkat sihir dengan bintang dan aura'],
   honey: ['Stoples madu klasik dengan tutup kain', 'Blaster lebah dengan pompa dan reservoir madu'],
+  cricket: ['Cricket mini lama dengan receiver dan grip mungil', 'Profil krom seperti referensi: laras panjang, pelatuk terbuka, grip hitam'],
+  fish: ['Fish Gun dengan grip lama', 'Grip akuatik ramping dengan aksen sirip dan warna amber'],
+  electro: ['Electro Gun dengan lilitan dan receiver lama', 'Receiver graphite, kapasitor cyan, dan lilitan tembaga rapi'],
 };
 
 function VariantCanvas({ weapon, variant }: { weapon: Weapon; variant: GunVariant }) {

@@ -75,6 +75,270 @@ function checkering(c: CanvasRenderingContext2D, mat: Mat, cx: number, y: number
   c.restore();
 }
 
+/** All themed grips share Golden Gun's pronounced downward rake. */
+function beginGoldenAngleGrip(c: CanvasRenderingContext2D, cx: number, y: number) {
+  c.save();
+  c.translate(cx, y + 20);
+  c.rotate(-0.72);
+  c.translate(-cx, -(y + 20));
+}
+
+/** Portal Gun grip: silver shell, charcoal palm panel, and a live portal insert. */
+export function drawPortalGrip(c: CanvasRenderingContext2D, cx: number, y: number, accent: string) {
+  beginGoldenAngleGrip(c, cx, y);
+  c.beginPath();
+  c.moveTo(cx - 10, y + 18); c.lineTo(cx + 10, y + 18);
+  c.lineTo(cx + 14, y + 34); c.lineTo(cx + 12, y + 73);
+  c.lineTo(cx + 10, y + 84); c.lineTo(cx + 4, y + 91);
+  c.lineTo(cx + 1, y + 97); c.lineTo(cx - 11, y + 87);
+  c.lineTo(cx - 14, y + 35); c.closePath();
+  c.fillStyle = lin(c, cx - 14, cx + 14, ['#64748b', '#f8fafc', '#cbd5e1', '#475569']);
+  c.fill(); c.strokeStyle = '#1e293b'; c.lineWidth = 2.5; c.stroke();
+  c.beginPath(); c.roundRect(cx - 6, y + 28, 12, 49, 6); c.fillStyle = '#111827'; c.fill();
+  c.strokeStyle = '#475569'; c.lineWidth = 1.2; c.stroke();
+  c.fillStyle = accent; c.beginPath(); c.roundRect(cx - 3.5, y + 33, 7, 32, 3.5); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.75)'; c.fillRect(cx - 2, y + 36, 1, 24);
+  c.strokeStyle = '#334155'; c.lineWidth = 2;
+  for (const gy of [y + 70, y + 77, y + 84]) {
+    c.beginPath(); c.moveTo(cx - 9, gy); c.quadraticCurveTo(cx, gy + 4, cx + 9, gy); c.stroke();
+  }
+  c.strokeStyle = '#475569'; c.lineWidth = 2.2;
+  c.beginPath(); c.moveTo(cx - 11, y + 24); c.quadraticCurveTo(cx - 22, y + 39, cx - 16, y + 54);
+  c.quadraticCurveTo(cx - 12, y + 62, cx - 4, y + 59); c.stroke();
+  c.fillStyle = accent; c.beginPath(); c.arc(cx, y + 88, 3.3, 0, TAU); c.fill();
+  c.fillStyle = '#e2e8f0'; c.beginPath(); c.arc(cx, y + 88, 1.2, 0, TAU); c.fill();
+  c.restore();
+}
+
+/** Chrono Gun grip: warm walnut body, ivory palm scales, and brass time marks. */
+export function drawChronoGrip(c: CanvasRenderingContext2D, cx: number, y: number) {
+  beginGoldenAngleGrip(c, cx, y);
+  c.beginPath();
+  c.moveTo(cx - 9, y + 18); c.lineTo(cx + 9, y + 18);
+  c.lineTo(cx + 14, y + 31); c.lineTo(cx + 11, y + 78);
+  c.lineTo(cx + 8, y + 88); c.lineTo(cx + 1, y + 98);
+  c.lineTo(cx - 10, y + 89); c.lineTo(cx - 12, y + 78);
+  c.lineTo(cx - 14, y + 34); c.closePath();
+  c.fillStyle = lin(c, cx - 14, cx + 14, ['#451a03', '#92400e', '#b45309', '#3f1b08']);
+  c.fill(); c.strokeStyle = '#2b1205'; c.lineWidth = 2.5; c.stroke();
+  c.beginPath(); c.moveTo(cx - 6, y + 29); c.lineTo(cx + 6, y + 27);
+  c.lineTo(cx + 7, y + 78); c.lineTo(cx + 1, y + 86); c.lineTo(cx - 7, y + 78); c.closePath();
+  c.fillStyle = lin(c, cx - 7, cx + 7, ['#d6b878', '#fff7d6', '#c9a85a']); c.fill();
+  c.strokeStyle = '#713f12'; c.lineWidth = 1.5; c.stroke();
+  c.strokeStyle = '#a16207'; c.lineWidth = 2.5;
+  for (const gy of [y + 42, y + 54, y + 66, y + 78]) {
+    c.beginPath(); c.moveTo(cx - 8, gy); c.lineTo(cx + 8, gy - 2); c.stroke();
+  }
+  c.fillStyle = '#fef3c7'; c.beginPath(); c.arc(cx, y + 34, 2.5, 0, TAU); c.fill();
+  c.strokeStyle = '#713f12'; c.lineWidth = 1.2; c.stroke();
+  c.fillStyle = '#fbbf24'; c.strokeStyle = '#713f12'; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(cx - 9, y + 88); c.lineTo(cx + 1, y + 96);
+  c.lineTo(cx + 9, y + 88); c.lineTo(cx + 6, y + 94);
+  c.lineTo(cx + 1, y + 98); c.lineTo(cx - 7, y + 92); c.closePath(); c.fill(); c.stroke();
+  c.restore();
+}
+
+/** Freeze Ray grip: angled ice-blue palm swell with frosted ridges and snowflake. */
+export function drawFreezeGrip(c: CanvasRenderingContext2D, cx: number, y: number) {
+  beginGoldenAngleGrip(c, cx, y);
+  c.beginPath();
+  c.moveTo(cx - 9, y + 18); c.lineTo(cx + 9, y + 18);
+  c.lineTo(cx + 13, y + 31); c.lineTo(cx + 11, y + 79);
+  c.lineTo(cx + 8, y + 89); c.lineTo(cx + 1, y + 99);
+  c.lineTo(cx - 9, y + 90); c.lineTo(cx - 12, y + 78);
+  c.lineTo(cx - 13, y + 32); c.closePath();
+  c.fillStyle = lin(c, cx - 13, cx + 13, ['#083344', '#0e7490', '#67e8f9', '#a5f3fc', '#164e63']);
+  c.fill(); c.strokeStyle = '#164e63'; c.lineWidth = 2.2; c.stroke();
+  // Deep-teal grip panel makes the cryogenic handle read clearly against
+  // the white receiver; the narrow luminous core keeps the rare-weapon feel.
+  c.beginPath(); c.roundRect(cx - 4, y + 41, 8, 43, 3);
+  c.fillStyle = '#075985'; c.fill();
+  c.fillStyle = '#67e8f9'; c.beginPath(); c.roundRect(cx - 1.5, y + 44, 3, 37, 1.5); c.fill();
+  c.beginPath(); c.moveTo(cx - 8, y + 29); c.lineTo(cx - 4, y + 27);
+  c.lineTo(cx - 6, y + 86); c.lineTo(cx - 10, y + 80); c.closePath();
+  c.fillStyle = 'rgba(255,255,255,0.88)'; c.fill();
+  for (const gy of [y + 43, y + 57, y + 71, y + 84]) {
+    c.strokeStyle = 'rgba(8,51,68,0.88)'; c.lineWidth = 1.7;
+    c.beginPath(); c.moveTo(cx - 9, gy); c.quadraticCurveTo(cx, gy + 3, cx + 9, gy); c.stroke();
+    c.strokeStyle = 'rgba(224,251,255,0.92)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(cx - 7, gy + 2); c.lineTo(cx + 7, gy + 2); c.stroke();
+  }
+  c.strokeStyle = '#f0fbff'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(cx, y + 30); c.lineTo(cx, y + 41); c.moveTo(cx - 5, y + 35.5); c.lineTo(cx + 5, y + 35.5);
+  c.moveTo(cx - 3.5, y + 32); c.lineTo(cx + 3.5, y + 39); c.moveTo(cx + 3.5, y + 32); c.lineTo(cx - 3.5, y + 39); c.stroke();
+  c.fillStyle = '#dff8ff'; c.strokeStyle = '#0e7490'; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(cx - 9, y + 89); c.lineTo(cx + 1, y + 97);
+  c.lineTo(cx + 9, y + 89); c.lineTo(cx + 6, y + 95);
+  c.lineTo(cx + 1, y + 99); c.lineTo(cx - 7, y + 93); c.closePath(); c.fill(); c.stroke();
+  c.restore();
+}
+
+/** Slim aquarium-blue grip with a fin-shaped butt for the Fish Gun. */
+export function drawFishGrip(c: CanvasRenderingContext2D, cx: number, y: number) {
+  beginGoldenAngleGrip(c, cx, y);
+  c.beginPath();
+  c.moveTo(cx - 8, y + 18); c.lineTo(cx + 8, y + 18);
+  c.lineTo(cx + 12, y + 34); c.lineTo(cx + 9, y + 68);
+  c.lineTo(cx + 14, y + 75); c.lineTo(cx + 7, y + 81);
+  c.lineTo(cx + 5, y + 89); c.lineTo(cx + 1, y + 98);
+  c.lineTo(cx - 8, y + 90); c.lineTo(cx - 15, y + 83);
+  c.lineTo(cx - 9, y + 76); c.lineTo(cx - 12, y + 68);
+  c.lineTo(cx - 12, y + 34); c.closePath();
+  c.fillStyle = lin(c, cx - 15, cx + 14, ['#082f49', '#0e7490', '#38bdf8', '#164e63']);
+  c.fill(); c.strokeStyle = '#062338'; c.lineWidth = 2; c.stroke();
+  c.beginPath(); c.roundRect(cx - 5, y + 29, 8, 48, 3);
+  c.fillStyle = lin(c, cx - 5, cx + 3, ['#075985', '#67e8f9', '#0e7490']); c.fill();
+  c.fillStyle = 'rgba(224,251,255,0.72)'; c.fillRect(cx - 3, y + 34, 1.4, 38);
+  c.strokeStyle = 'rgba(3,42,63,0.82)'; c.lineWidth = 1.8;
+  for (const gy of [y + 47, y + 59, y + 71]) {
+    c.beginPath(); c.moveTo(cx - 8, gy); c.quadraticCurveTo(cx - 4, gy + 5, cx, gy + 3);
+    c.quadraticCurveTo(cx + 5, gy + 5, cx + 8, gy); c.stroke();
+  }
+  // Tail-like butt cap and a small amber locking pin.
+  c.fillStyle = lin(c, cx - 15, cx + 14, ['#c2410c', '#fb923c', '#fdba74']);
+  c.strokeStyle = '#7c2d12'; c.lineWidth = 1.3;
+  c.beginPath(); c.moveTo(cx - 13, y + 78); c.lineTo(cx - 5, y + 82);
+  c.lineTo(cx + 1, y + 97); c.lineTo(cx + 7, y + 82);
+  c.lineTo(cx + 13, y + 76); c.lineTo(cx + 9, y + 89);
+  c.lineTo(cx + 1, y + 98); c.lineTo(cx - 10, y + 88); c.closePath(); c.fill(); c.stroke();
+  c.strokeStyle = 'rgba(255,237,213,0.8)'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(cx + 1, y + 84); c.lineTo(cx + 1, y + 95); c.stroke();
+  c.fillStyle = '#ffedd5'; c.beginPath(); c.arc(cx - 5, y + 38, 1.5, 0, TAU); c.fill();
+  c.restore();
+}
+
+/** Compact insulated hand-grip with a live cyan conductor spine. */
+export function drawElectroGrip(c: CanvasRenderingContext2D, cx: number, y: number) {
+  beginGoldenAngleGrip(c, cx, y);
+  c.beginPath();
+  c.moveTo(cx - 9, y + 18); c.lineTo(cx + 9, y + 18);
+  c.lineTo(cx + 13, y + 32); c.lineTo(cx + 10, y + 78);
+  c.lineTo(cx + 6, y + 89); c.lineTo(cx + 1, y + 98);
+  c.lineTo(cx - 10, y + 89); c.lineTo(cx - 13, y + 76);
+  c.lineTo(cx - 13, y + 32); c.closePath();
+  c.fillStyle = lin(c, cx - 13, cx + 13, ['#071a26', '#0f2f43', '#17506a', '#071a26']);
+  c.fill(); c.strokeStyle = '#03111b'; c.lineWidth = 2.4; c.stroke();
+  c.beginPath(); c.moveTo(cx - 5, y + 29); c.lineTo(cx + 5, y + 29);
+  c.lineTo(cx + 3, y + 81); c.lineTo(cx + 1, y + 90); c.lineTo(cx - 5, y + 84); c.closePath();
+  c.fillStyle = lin(c, cx - 5, cx + 5, ['#164e63', '#22d3ee', '#0e7490']); c.fill();
+  c.fillStyle = 'rgba(224,251,255,0.8)'; c.fillRect(cx - 2, y + 35, 1.5, 42);
+  c.strokeStyle = '#d97732'; c.lineWidth = 1.6;
+  for (const gy of [y + 48, y + 61, y + 74]) {
+    c.beginPath(); c.moveTo(cx - 10, gy); c.lineTo(cx + 10, gy - 2); c.stroke();
+  }
+  c.fillStyle = '#fbbf24'; c.strokeStyle = '#713f12'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(cx - 9, y + 87); c.lineTo(cx + 1, y + 95);
+  c.lineTo(cx + 9, y + 86); c.lineTo(cx + 5, y + 94);
+  c.lineTo(cx + 1, y + 98); c.lineTo(cx - 7, y + 92); c.closePath(); c.fill(); c.stroke();
+  c.restore();
+}
+
+/** Molded, toy-like grip to match the bright Super Soaker body. */
+export function drawWaterGrip(c: CanvasRenderingContext2D, cx: number, y: number) {
+  c.save();
+  // The grip branches off the receiver at a downward angle instead of
+  // continuing the barrel axis like a bazooka tube.
+  c.translate(cx, y + 20);
+  c.rotate(-0.72);
+  c.translate(-cx, -(y + 20));
+  c.beginPath();
+  c.moveTo(cx - 9, y + 20); c.lineTo(cx + 9, y + 20);
+  c.quadraticCurveTo(cx + 15, y + 25, cx + 14, y + 43);
+  c.lineTo(cx + 12, y + 78); c.lineTo(cx + 9, y + 85);
+  c.lineTo(cx + 3, y + 91); c.lineTo(cx + 1, y + 96);
+  c.lineTo(cx - 9, y + 88); c.quadraticCurveTo(cx - 15, y + 81, cx - 14, y + 68);
+  c.lineTo(cx - 14, y + 34); c.quadraticCurveTo(cx - 13, y + 24, cx - 9, y + 20);
+  c.closePath();
+  c.fillStyle = lin(c, cx - 14, cx + 15, ['#064e3b', '#0f766e', '#14b8a6', '#65a30d']);
+  c.fill(); c.strokeStyle = '#052e2b'; c.lineWidth = 2.5; c.stroke();
+  c.save(); c.clip();
+  c.fillStyle = 'rgba(190,242,100,0.78)';
+  c.beginPath(); c.moveTo(cx + 6, y + 28); c.lineTo(cx + 11, y + 32); c.lineTo(cx + 9, y + 76); c.lineTo(cx + 3, y + 83); c.closePath(); c.fill();
+  c.fillStyle = 'rgba(125,211,252,0.85)';
+  c.beginPath(); c.roundRect(cx - 11, y + 35, 6, 37, 3); c.fill();
+  c.strokeStyle = 'rgba(5,46,42,0.7)'; c.lineWidth = 2;
+  for (const gy of [y + 50, y + 61, y + 72]) {
+    c.beginPath(); c.moveTo(cx - 6, gy); c.quadraticCurveTo(cx, gy + 3, cx + 7, gy); c.stroke();
+  }
+  c.restore();
+  // Molded trigger loop and orange release lever, matching the pump detail.
+  c.beginPath(); c.moveTo(cx - 11, y + 25); c.quadraticCurveTo(cx - 20, y + 37, cx - 15, y + 53);
+  c.quadraticCurveTo(cx - 12, y + 61, cx - 4, y + 58);
+  c.strokeStyle = '#0f766e'; c.lineWidth = 2.8; c.stroke();
+  c.strokeStyle = '#99f6e4'; c.lineWidth = 1.2; c.stroke();
+  c.fillStyle = '#fb923c'; c.beginPath(); c.roundRect(cx - 6, y + 29, 4, 13, 2); c.fill();
+  c.fillStyle = '#a3e635'; c.strokeStyle = '#14532d'; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(cx - 9, y + 84); c.lineTo(cx + 1, y + 92);
+  c.lineTo(cx + 9, y + 84); c.lineTo(cx + 7, y + 91);
+  c.lineTo(cx + 1, y + 96); c.lineTo(cx - 8, y + 90); c.closePath(); c.fill(); c.stroke();
+  c.restore();
+}
+
+/** Frosted insulated grip with pale blue wraps for the Snowball Cannon. */
+export function drawFrostGrip(c: CanvasRenderingContext2D, cx: number, y: number) {
+  c.save();
+  // The grip branches off the receiver at a downward angle instead of
+  // continuing the barrel axis like a bazooka tube.
+  c.translate(cx, y + 20);
+  c.rotate(-0.72);
+  c.translate(-cx, -(y + 20));
+  c.beginPath();
+  c.moveTo(cx - 12, y + 19); c.lineTo(cx + 12, y + 19);
+  c.lineTo(cx + 16, y + 29); c.lineTo(cx + 14, y + 82);
+  c.quadraticCurveTo(cx + 13, y + 94, cx, y + 98);
+  c.quadraticCurveTo(cx - 13, y + 94, cx - 14, y + 82);
+  c.lineTo(cx - 16, y + 29); c.closePath();
+  c.fillStyle = lin(c, cx - 16, cx + 16, ['#0c4a6e', '#38bdf8', '#bae6fd', '#38bdf8', '#075985']);
+  c.fill(); c.strokeStyle = '#082f49'; c.lineWidth = 2.5; c.stroke();
+  c.save(); c.clip();
+  c.fillStyle = 'rgba(255,255,255,0.78)';
+  c.beginPath(); c.moveTo(cx - 10, y + 30); c.lineTo(cx - 5, y + 26); c.lineTo(cx - 6, y + 88); c.lineTo(cx - 12, y + 84); c.closePath(); c.fill();
+  for (const gy of [y + 43, y + 56, y + 69, y + 82]) {
+    c.fillStyle = 'rgba(7,89,133,0.62)';
+    c.beginPath(); c.roundRect(cx - 14, gy, 28, 4, 2); c.fill();
+    c.fillStyle = 'rgba(224,242,254,0.68)';
+    c.fillRect(cx - 11, gy, 22, 1);
+  }
+  c.restore();
+  c.fillStyle = '#e0f2fe';
+  c.beginPath(); c.arc(cx + 7, y + 34, 2, 0, TAU); c.fill();
+  c.beginPath(); c.moveTo(cx, y + 86); c.lineTo(cx - 4, y + 92); c.lineTo(cx + 4, y + 92); c.closePath(); c.fill();
+  c.fillStyle = '#7dd3fc'; c.beginPath(); c.roundRect(cx - 13, y + 92, 26, 7, 3); c.fill();
+  c.restore();
+}
+
+/** Segmented violet containment grip for the BLACK HOLE launcher. */
+export function drawVoidGrip(c: CanvasRenderingContext2D, cx: number, y: number) {
+  c.save();
+  // The grip branches off the receiver at a downward angle instead of
+  // continuing the barrel axis like a bazooka tube.
+  c.translate(cx, y + 20);
+  c.rotate(-0.72);
+  c.translate(-cx, -(y + 20));
+  c.beginPath();
+  c.moveTo(cx - 11, y + 20); c.lineTo(cx + 11, y + 20);
+  c.lineTo(cx + 17, y + 31); c.lineTo(cx + 12, y + 79);
+  c.quadraticCurveTo(cx + 10, y + 94, cx, y + 98);
+  c.quadraticCurveTo(cx - 10, y + 94, cx - 12, y + 79);
+  c.lineTo(cx - 17, y + 31); c.closePath();
+  c.fillStyle = lin(c, cx - 17, cx + 17, ['#10091b', '#3b1d59', '#6b3c91', '#2b123f', '#0c0714']);
+  c.fill(); c.strokeStyle = '#170d29'; c.lineWidth = 3; c.stroke();
+  c.save(); c.clip();
+  c.fillStyle = 'rgba(196,132,252,0.38)';
+  c.beginPath(); c.moveTo(cx - 5, y + 26); c.lineTo(cx + 2, y + 24); c.lineTo(cx + 4, y + 91); c.lineTo(cx - 4, y + 91); c.closePath(); c.fill();
+  for (let i = 0; i < 4; i++) {
+    const gy = y + 40 + i * 13;
+    c.strokeStyle = i % 2 ? '#a855f7' : '#d8b4fe'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(cx - 13, gy); c.quadraticCurveTo(cx, gy + 5, cx + 13, gy); c.stroke();
+    c.strokeStyle = 'rgba(17,10,28,0.8)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(cx - 11, gy + 4); c.quadraticCurveTo(cx, gy + 8, cx + 11, gy + 4); c.stroke();
+  }
+  c.restore();
+  c.fillStyle = '#e9d5ff'; c.beginPath(); c.arc(cx, y + 33, 3, 0, TAU); c.fill();
+  c.fillStyle = '#a855f7'; c.beginPath(); c.roundRect(cx - 13, y + 92, 26, 7, 3); c.fill();
+  c.restore();
+}
+
 /**
  * Pegangan senjata ultra-detail & ergonomis.
  * Memanjang ke bawah dari (cx, y). Lebar kira-kira 44px, panjang 100px.
@@ -259,6 +523,96 @@ export function drawModernGrip(
   c.stroke();
   c.restore();
 
+  c.restore();
+}
+
+/** Plasma sidearm grip: angled titanium shell, dark palm panel and restrained green power details. */
+export function drawPlasmaGrip(c: CanvasRenderingContext2D, cx: number, y: number, t = 0) {
+  c.save();
+  c.translate(cx, y + 15);
+  c.rotate(-0.32);
+  c.translate(-cx, -(y + 15));
+
+  c.beginPath();
+  c.moveTo(cx - 18, y + 4);
+  c.lineTo(cx + 17, y + 4);
+  c.lineTo(cx + 19, y + 19);
+  c.lineTo(cx + 12, y + 65);
+  c.quadraticCurveTo(cx + 10, y + 81, cx + 2, y + 91);
+  c.lineTo(cx - 19, y + 80);
+  c.quadraticCurveTo(cx - 27, y + 76, cx - 24, y + 66);
+  c.lineTo(cx - 14, y + 22);
+  c.closePath();
+  c.fillStyle = lin(c, cx - 27, cx + 20, ['#10191d', '#45565a', '#26383b', '#0b1417']);
+  c.fill();
+  c.strokeStyle = '#061013'; c.lineWidth = 2.8; c.stroke();
+
+  // Replaceable, slightly inset palm pad, kept dark so the green accents read as hardware.
+  c.beginPath();
+  c.moveTo(cx - 11, y + 26);
+  c.quadraticCurveTo(cx - 4, y + 22, cx + 10, y + 27);
+  c.lineTo(cx + 7, y + 66);
+  c.quadraticCurveTo(cx + 5, y + 75, cx - 2, y + 81);
+  c.lineTo(cx - 16, y + 72);
+  c.closePath();
+  c.fillStyle = lin(c, cx - 17, cx + 11, ['#061313', '#102b27', '#071714']);
+  c.fill(); c.strokeStyle = '#172d29'; c.lineWidth = 1.4; c.stroke();
+
+  c.strokeStyle = 'rgba(155,255,216,0.42)'; c.lineWidth = 1.1;
+  for (let i = 0; i < 5; i++) {
+    const gy = y + 39 + i * 7;
+    c.beginPath(); c.moveTo(cx - 11, gy); c.quadraticCurveTo(cx - 2, gy + 3, cx + 7, gy + 1); c.stroke();
+  }
+  c.fillStyle = '#152321';
+  c.beginPath(); c.roundRect(cx - 6, y + 8, 12, 8, 3); c.fill();
+  c.strokeStyle = '#7bffd0'; c.lineWidth = 1.5;
+  c.beginPath(); c.moveTo(cx - 4, y + 12); c.lineTo(cx + 4, y + 12); c.stroke();
+  const pulse = 0.45 + 0.35 * Math.sin(t * 5);
+  c.fillStyle = `rgba(67,255,183,${pulse})`;
+  c.beginPath(); c.arc(cx + 8, y + 72, 2.2, 0, TAU); c.fill();
+
+  // Raised, beveled heel cap makes the grip end deliberate rather than blunt.
+  c.beginPath();
+  c.moveTo(cx - 20, y + 75); c.lineTo(cx - 2, y + 85);
+  c.lineTo(cx + 2, y + 91); c.lineTo(cx - 9, y + 89);
+  c.closePath();
+  c.fillStyle = lin(c, cx - 20, cx + 3, ['#101719', '#65767a', '#202a2d']);
+  c.fill(); c.strokeStyle = '#071013'; c.lineWidth = 1.4; c.stroke();
+  c.restore();
+}
+
+/** Compact polymer handgun grip using the same pronounced rearward rake as the Electro Gun. */
+export function drawPistolGrip(c: CanvasRenderingContext2D, cx: number, y: number) {
+  beginGoldenAngleGrip(c, cx, y);
+  c.beginPath();
+  c.moveTo(cx - 12, y + 15); c.lineTo(cx + 12, y + 15);
+  c.quadraticCurveTo(cx + 17, y + 22, cx + 14, y + 38);
+  c.lineTo(cx + 11, y + 72);
+  c.quadraticCurveTo(cx + 9, y + 85, cx - 2, y + 94);
+  c.lineTo(cx - 24, y + 80);
+  c.quadraticCurveTo(cx - 31, y + 75, cx - 27, y + 64);
+  c.lineTo(cx - 17, y + 29);
+  c.quadraticCurveTo(cx - 15, y + 19, cx - 12, y + 15);
+  c.closePath();
+  c.fillStyle = lin(c, cx - 30, cx + 17, ['#090b0f', '#333a43', '#171b20', '#080a0d']);
+  c.fill(); c.strokeStyle = '#050608'; c.lineWidth = 2.8; c.stroke();
+
+  c.save();
+  c.beginPath();
+  c.moveTo(cx - 12, y + 31); c.lineTo(cx + 8, y + 38);
+  c.lineTo(cx + 5, y + 72); c.quadraticCurveTo(cx + 3, y + 82, cx - 4, y + 86);
+  c.lineTo(cx - 20, y + 76); c.closePath(); c.clip();
+  c.fillStyle = lin(c, cx - 22, cx + 10, ['#11151a', '#252b33', '#101317']);
+  c.fillRect(cx - 23, y + 28, 34, 61);
+  c.strokeStyle = 'rgba(255,255,255,0.13)'; c.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    const gy = y + 39 + i * 5;
+    c.beginPath(); c.moveTo(cx - 19, gy); c.lineTo(cx + 6, gy + 7); c.stroke();
+  }
+  c.restore();
+  c.strokeStyle = '#424b55'; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(cx - 11, y + 22); c.lineTo(cx + 9, y + 22); c.stroke();
+  c.fillStyle = '#0b0d10'; c.beginPath(); c.roundRect(cx - 18, y + 72, 28, 5, 2); c.fill();
   c.restore();
 }
 

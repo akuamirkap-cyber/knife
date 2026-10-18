@@ -21,7 +21,7 @@ export function drawProjectile(c: CanvasRenderingContext2D, kind: ProjKind, len:
     case 'ak47': akRound(c, len); break;
     case 'cricket': cricket(c, len, t); break;
     case 'electro': electro(c, len); break;
-    case 'nail': nail(c, len); break;
+    case 'nail': nail(c, len, embedded); break;
     case 'fish': fish(c, len, t); break;
     case 'crossbow': bolt(c, len); break;
     case 'bazooka': rocket(c, len); break;
@@ -192,7 +192,56 @@ function electro(c: CanvasRenderingContext2D, len: number) {
   c.fill();
 }
 
-function nail(c: CanvasRenderingContext2D, len: number) {
+function nail(c: CanvasRenderingContext2D, len: number, embedded: boolean) {
+  if (embedded) {
+    // Once it lands, show a proper knife embedded point-first in the board:
+    // the blade disappears into the target while the guard and grip remain visible.
+    const guardY = len * 0.52;
+    const gripY = len * 0.6;
+    c.beginPath();
+    c.moveTo(0, -2);
+    c.lineTo(4.2, guardY - 8);
+    c.lineTo(3.2, guardY);
+    c.lineTo(-3.2, guardY);
+    c.lineTo(-4.2, guardY - 8);
+    c.closePath();
+    c.fillStyle = lin(c, -4, 4, ['#64748b', '#f8fafc', '#94a3b8']);
+    c.fill();
+    c.strokeStyle = '#334155';
+    c.lineWidth = 0.9;
+    c.stroke();
+    c.fillStyle = '#dbeafe';
+    c.beginPath();
+    c.moveTo(0, 3);
+    c.lineTo(1, guardY - 9);
+    c.lineTo(-0.5, guardY - 9);
+    c.closePath();
+    c.fill();
+
+    // Brass guard and a dark, wrapped handle jut out from the board.
+    c.fillStyle = '#fbbf24';
+    c.beginPath();
+    c.roundRect(-7, guardY - 1.5, 14, 4, 1.5);
+    c.fill();
+    c.fillStyle = '#5b3520';
+    c.beginPath();
+    c.roundRect(-3.6, gripY, 7.2, len - gripY - 1, 3.2);
+    c.fill();
+    c.strokeStyle = '#d6a36a';
+    c.lineWidth = 0.9;
+    for (let y = gripY + 4; y < len - 3; y += 4) {
+      c.beginPath();
+      c.moveTo(-3, y);
+      c.lineTo(3, y + 1.5);
+      c.stroke();
+    }
+    c.fillStyle = '#cbd5e1';
+    c.beginPath();
+    c.roundRect(-4.5, len - 3.5, 9, 3.5, 1.5);
+    c.fill();
+    return;
+  }
+
   c.fillStyle = lin(c, -2, 2, ['#5a6068', '#e8edf2', '#5a6068']);
   c.beginPath();
   c.moveTo(0, -2);

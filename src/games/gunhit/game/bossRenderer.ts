@@ -11,15 +11,6 @@ export function renderBossHead(c: CanvasRenderingContext2D, type: BossType, R: n
     const pad = R * 1.05;
     const size = pad * 2;
 
-    const glowColor =
-      type === 'knight'
-        ? '#38bdf8'
-        : type === 'oni'
-        ? '#ef4444'
-        : type === 'cyborg'
-        ? '#22d3ee'
-        : '#eab308';
-
     // 1. Organic Silhouette Clip to guarantee NO SQUARE/DIAMOND CORNERS EVER SHOW!
     c.save();
     c.beginPath();
@@ -40,28 +31,8 @@ export function renderBossHead(c: CanvasRenderingContext2D, type: BossType, R: n
     c.drawImage(asset.canvas, -pad, -pad, size, size);
     c.restore();
 
-    // 2. Add lush neon cartoon villain outline following the character contour
-    // (Dark Knight tampil polos: glow outline dihilangkan sesuai permintaan.)
-    if (type !== 'knight') {
-      c.save();
-      c.shadowColor = glowColor;
-      c.shadowBlur = 14;
-      c.strokeStyle = glowColor;
-      c.lineWidth = 3.5;
-      c.beginPath();
-      for (let deg = 0; deg <= 360; deg += 4) {
-        const rad = (deg * Math.PI) / 180;
-        const idx = deg % 360;
-        const r = (asset.radii[idx] || 0.72) * pad * 1.01;
-        const x = Math.cos(rad) * r;
-        const y = Math.sin(rad) * r;
-        if (deg === 0) c.moveTo(x, y);
-        else c.lineTo(x, y);
-      }
-      c.closePath();
-      c.stroke();
-      c.restore();
-    }
+    // Boss portraits stay clean and flat: no neon/glow outline for any boss,
+    // matching the restrained DARK KNIGHT presentation.
 
     c.restore();
     return;

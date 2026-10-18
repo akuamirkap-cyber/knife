@@ -165,14 +165,14 @@ export function drawFace(c: CanvasRenderingContext2D, R: number, style: Style) {
 }
 
 export const STYLE_COLORS: Record<Style, { chips: string[]; bgTop: string; bgBot: string; glow: string; gridColor: string }> = {
-  // Latar Hutan 2D (+20% lebih cerah, segar persis foto 1 & 2 referensi Knife Hit)
-  orange: { chips: ['#fffae8', '#ffa700', '#ff7a00'], bgTop: '#1d424b', bgBot: '#132e36', glow: 'rgba(255,165,0,0.32)', gridColor: 'rgba(255,165,0,0.08)' },
-  wood: { chips: ['#d98b43', '#a55b23', '#683411'], bgTop: '#223c42', bgBot: '#15292e', glow: 'rgba(245,158,11,0.3)', gridColor: 'rgba(245,158,11,0.08)' },
-  target: { chips: ['#f8fafc', '#ef4444', '#eab308'], bgTop: '#203f47', bgBot: '#142c33', glow: 'rgba(239,68,68,0.3)', gridColor: 'rgba(239,68,68,0.08)' },
+  // Latar hutan dibuat sedikit lebih kaya warna tanpa menghilangkan suasana gelap.
+  orange: { chips: ['#fffae8', '#ffa700', '#ff7a00'], bgTop: '#1b4d59', bgBot: '#153743', glow: 'rgba(255,165,0,0.32)', gridColor: 'rgba(255,165,0,0.08)' },
+  wood: { chips: ['#d98b43', '#a55b23', '#683411'], bgTop: '#2b4c4a', bgBot: '#1a3436', glow: 'rgba(245,158,11,0.3)', gridColor: 'rgba(245,158,11,0.08)' },
+  target: { chips: ['#f8fafc', '#ef4444', '#eab308'], bgTop: '#214b57', bgBot: '#163540', glow: 'rgba(239,68,68,0.3)', gridColor: 'rgba(239,68,68,0.08)' },
 
-  // Boss Villain Khas (Latar Hutan Malam Tegas)
-  knight: { chips: ['#38bdf8', '#0284c7', '#ff1133'], bgTop: '#1b384a', bgBot: '#102432', glow: 'rgba(56,189,248,0.42)', gridColor: 'rgba(56,189,248,0.1)' },
-  oni: { chips: ['#ef4444', '#b91c1c', '#facc15'], bgTop: '#381c22', bgBot: '#220e13', glow: 'rgba(239,68,68,0.45)', gridColor: 'rgba(239,68,68,0.1)' },
-  cyborg: { chips: ['#94a3b8', '#475569', '#ff1133'], bgTop: '#20364e', bgBot: '#122234', glow: 'rgba(34,211,238,0.42)', gridColor: 'rgba(34,211,238,0.1)' },
-  pirate: { chips: ['#f1f5f9', '#0f172a', '#eab308'], bgTop: '#1e2c45', bgBot: '#111b2d', glow: 'rgba(234,179,8,0.42)', gridColor: 'rgba(234,179,8,0.1)' },
+  // Boss palettes keep their identity, with a little more saturation in the forest sky.
+  knight: { chips: ['#38bdf8', '#0284c7', '#ff1133'], bgTop: '#20465c', bgBot: '#122c40', glow: 'rgba(56,189,248,0.42)', gridColor: 'rgba(56,189,248,0.1)' },
+  oni: { chips: ['#ef4444', '#b91c1c', '#facc15'], bgTop: '#46212b', bgBot: '#28121c', glow: 'rgba(239,68,68,0.45)', gridColor: 'rgba(239,68,68,0.1)' },
+  cyborg: { chips: ['#94a3b8', '#475569', '#ff1133'], bgTop: '#26435b', bgBot: '#172d42', glow: 'rgba(34,211,238,0.42)', gridColor: 'rgba(34,211,238,0.1)' },
+  pirate: { chips: ['#f1f5f9', '#0f172a', '#eab308'], bgTop: '#263752', bgBot: '#17283b', glow: 'rgba(234,179,8,0.42)', gridColor: 'rgba(234,179,8,0.1)' },
 };

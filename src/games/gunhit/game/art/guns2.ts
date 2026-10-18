@@ -1,5 +1,6 @@
 import { TAU, rand, lin, vlin, steel, chrome, wood, rr, grip, guard, glow, star, radial, gunState } from './kit';
 import { shotPulse } from './commonGunMotion';
+import { drawFrostGrip, drawWaterGrip } from './gripSystem';
 
 type C = CanvasRenderingContext2D;
 export const SNOWBALL_MAG_SIZE = 5;
@@ -453,7 +454,7 @@ export function shotgun(c: C, cx: number, y0: number, t: number, ready: boolean)
 // ------------------------------------------------------------- SUPER SOAKER
 export function soaker(c: C, cx: number, y0: number, t: number) {
   const pressure = shotPulse(gunState.sinceShot, 0.34);
-  grip(c, cx, y0 + 112, '#0d9488', '#14b8a6', 0.8);
+  drawWaterGrip(c, cx, y0 + 98);
   guard(c, cx, y0 + 104, '#0f766e');
   // body
   c.beginPath();
@@ -534,7 +535,7 @@ export function soaker(c: C, cx: number, y0: number, t: number) {
 // ------------------------------------------------------------- SNOWBALL CANNON
 export function snowball(c: C, cx: number, y0: number, t: number, loaded = SNOWBALL_MAG_SIZE) {
   const thump = shotPulse(gunState.sinceShot, 0.34);
-  grip(c, cx, y0 + 118, '#bae6fd', '#38bdf8', 0.8);
+  drawFrostGrip(c, cx, y0 + 118);
   guard(c, cx, y0 + 110, '#0c4a6e');
   // Five visible chambers: each snowball disappears after a shot, then the
   // hopper refills together when the magazine's reload animation finishes.
