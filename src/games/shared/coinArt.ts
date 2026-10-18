@@ -62,7 +62,7 @@ function coinSprites(): CoinSprites {
 /** The same reflective dollar sign, moving specular sweep and sparkle in both games. */
 export function drawBreakerCoin(
   ctx: CanvasRenderingContext2D, x: number, y: number, r: number, time: number,
-  phase = 0, flat = 1, glowing = false,
+  phase = 0, flat = 1, glowing = false, sparkle = true,
 ) {
   const { face, sheen, glow } = coinSprites();
   // Canvas artwork is cached at 2x. Account for its actual pixel radius when
@@ -88,6 +88,7 @@ export function drawBreakerCoin(
   ctx.restore();
   ctx.restore();
 
+  if (!sparkle) return;
   const twinkle = Math.sin(time * 5 + phase * 2);
   if (twinkle <= 0.72) return;
   ctx.save();

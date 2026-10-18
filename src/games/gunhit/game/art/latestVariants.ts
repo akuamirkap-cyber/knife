@@ -1,4 +1,4 @@
-import type { VariantWeapon } from './gunVariants';
+import type { LatestDesignWeapon } from './gunVariants';
 import { TAU, gunState, lin, radial, rr, glow, star } from './kit';
 
 type C = CanvasRenderingContext2D;
@@ -453,7 +453,7 @@ function chicken(c: C, t: number) {
 }
 
 /** Called on the same muzzle coordinates as the game renderer. */
-export function drawLatestGun(c: C, id: Exclude<VariantWeapon, 'honey'>, cx: number, y0: number, t: number) {
+export function drawLatestGun(c: C, id: LatestDesignWeapon, cx: number, y0: number, t: number) {
   c.save(); c.translate(cx, y0);
   // The fixed game muzzle is only 185px above the screen edge. Preserve that
   // muzzle while fitting the full, newly articulated handle on screen.
@@ -464,10 +464,7 @@ export function drawLatestGun(c: C, id: Exclude<VariantWeapon, 'honey'>, cx: num
     case 'meteor': meteor(c, t); break;
     case 'diamond': diamond(c, t); break;
     case 'golden': golden(c, t); break;
-    case 'blackhole': blackhole(c, t); break;
     case 'moonbeam': moonbeam(c, t); break;
-    case 'plasma': plasma(c, t); break;
-    case 'laser': laserGun(c, t); break;
     case 'chicken': chicken(c, t); break;
     default: { const _never: never = id; return _never; }
   }

@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Crosshair, Flame, Sword, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
+import { Flame, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
 
 import ScaledFrame from './components/ScaledFrame';
 import { SlideActivityProvider } from './games/shared/SlideActivity';
-import RifleRockGame from './games/rifle-rock/App';
 import GunHitGame from './games/gunhit/App';
-import KnifeHitGame from './games/knife-hit/App';
 
-type SlideId = 'rifle' | 'gunhit' | 'knife';
+type SlideId = 'gunhit';
 
 interface GameSlide {
   id: SlideId;
   name: string;
+  fullName: string;
   icon: React.ElementType;
   themeColor: string;
   borderColor: string;
@@ -22,7 +21,7 @@ export default function App() {
   const [fullscreenId, setFullscreenId] = useState<SlideId | null>(null);
   const [activeId, setActiveId] = useState<SlideId | null>(null);
   const [pageVisible, setPageVisible] = useState(() => !document.hidden);
-  const [keys, setKeys] = useState<Record<SlideId, number>>({ rifle: 0, gunhit: 0, knife: 0 });
+  const [keys, setKeys] = useState<Record<SlideId, number>>({ gunhit: 0 });
 
   const reloadGame = (id: SlideId) => {
     setActiveId(id);
@@ -51,38 +50,15 @@ export default function App() {
 
   const slides: GameSlide[] = [
     {
-      id: 'rifle',
-      name: 'Diamond Breaker',
-      icon: Crosshair,
-      themeColor: 'text-cyan-400',
-      borderColor: 'border-cyan-500/40 hover:border-cyan-400/80 shadow-cyan-950/40',
-      render: () => (
-        <ScaledFrame baseWidth={480} baseHeight={880}>
-          <RifleRockGame key={keys.rifle} onExit={fullscreenId === 'rifle' ? () => setFullscreenId(null) : undefined} />
-        </ScaledFrame>
-      ),
-    },
-    {
       id: 'gunhit',
-      name: 'Gun Hit Arcade',
+      name: 'SGA',
+      fullName: 'Gun Hit Arcade',
       icon: Flame,
       themeColor: 'text-amber-400',
       borderColor: 'border-amber-500/40 hover:border-amber-400/80 shadow-amber-950/40',
       render: () => (
         <ScaledFrame baseWidth={420} baseHeight={760}>
           <GunHitGame key={keys.gunhit} />
-        </ScaledFrame>
-      ),
-    },
-    {
-      id: 'knife',
-      name: 'Knife Boss 100 Lv',
-      icon: Sword,
-      themeColor: 'text-emerald-400',
-      borderColor: 'border-emerald-500/40 hover:border-emerald-400/80 shadow-emerald-950/40',
-      render: () => (
-        <ScaledFrame baseWidth={420} baseHeight={920}>
-          <KnifeHitGame key={keys.knife} onExit={fullscreenId === 'knife' ? () => setFullscreenId(null) : undefined} />
         </ScaledFrame>
       ),
     },
@@ -96,11 +72,11 @@ export default function App() {
       <header className="h-[34px] flex-shrink-0 z-30 flex items-center justify-between px-3 sm:px-4 bg-neutral-950/95 border-b border-white/10 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-400/20 border border-amber-400/40 text-amber-300 font-bold text-[11px]">
-            <span className="sm:hidden">3 Game</span>
-            <span className="hidden sm:inline">3 Game Berjejer (9:16)</span>
+            <span className="sm:hidden">SGA</span>
+            <span className="hidden sm:inline">SGA · Gun Hit Arcade</span>
           </span>
           <span className="text-[11px] text-neutral-400 hidden sm:inline">
-            Klik game untuk bermain • Game lain dijeda otomatis
+            Gun Hit Arcade · Peta QUEST 100 Stage
           </span>
         </div>
 
@@ -119,8 +95,8 @@ export default function App() {
                 className="flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-400 text-neutral-950 font-bold text-xs hover:bg-amber-300 transition cursor-pointer"
               >
                 <Minimize2 className="w-3 h-3" />
-                <span className="sm:hidden">Jejer 3</span>
-                <span className="hidden sm:inline">Kembali Jejer 3</span>
+                <span className="sm:hidden">Menu</span>
+                <span className="hidden sm:inline">Kembali ke SGA</span>
               </button>
             </>
           ) : (
@@ -158,26 +134,21 @@ export default function App() {
                 >
                   <div className="flex items-center gap-1.5 truncate">
                     <Icon className={`w-3.5 h-3.5 ${slide.themeColor} flex-shrink-0`} />
-                    <span className="font-bold text-white truncate text-xs">{slide.name}</span>
-                    {slide.id === 'knife' && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/25 text-emerald-300 font-semibold border border-emerald-400/30 flex items-center gap-0.5">
-                        Sunburst FX ✨
-                      </span>
-                    )}
+                    <span className="font-bold text-white truncate text-xs" title={slide.fullName} aria-label={`${slide.fullName} (${slide.name})`}>{slide.name}</span>
                     {active && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-emerald-400" title="Aktif" />}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => reloadGame(slide.id)}
                       className="p-1 rounded hover:bg-white/15 text-neutral-400 hover:text-white transition cursor-pointer"
-                      title={`Restart ${slide.name}`}
+                      title={`Restart ${slide.fullName}`}
                     >
                       <RotateCcw className="w-3 h-3" />
                     </button>
                     <button
                       onClick={() => focusGame(slide.id)}
                       className="p-1 rounded hover:bg-white/15 text-neutral-400 hover:text-white transition cursor-pointer"
-                      title={`Perbesar ${slide.name}`}
+                      title={`Perbesar ${slide.fullName}`}
                     >
                       <Maximize2 className="w-3 h-3" />
                     </button>

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  Crosshair, 
   Gamepad2, 
   Sword, 
   Trophy, 
@@ -13,7 +12,7 @@ import {
   Crown
 } from 'lucide-react';
 
-export type GameKey = 'rifle-rock' | 'gunhit' | 'knife-hit';
+export type GameKey = 'gunhit' | 'knife-hit';
 
 interface GameItem {
   id: GameKey;
@@ -33,26 +32,6 @@ interface GameItem {
 }
 
 const GAMES: GameItem[] = [
-  {
-    id: 'rifle-rock',
-    zipName: '2d-rifle-rock-destruction.zip',
-    title: 'Diamond Breaker',
-    subtitle: 'Rifle Rock Destruction',
-    description: 'Tembak bongkahan batu besar lapis demi lapis dengan senapan berkekuatan tinggi hingga serpihan berlian di intinya bersih terungkap!',
-    badge: '2D Destruction Physics',
-    badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/30',
-    themeColor: 'cyan',
-    borderGlow: 'hover:border-cyan-400/50 hover:shadow-cyan-500/20',
-    bgGradient: 'from-cyan-950/40 via-slate-900/60 to-neutral-950/80',
-    buttonGradient: 'from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black',
-    stats: [
-      { label: 'Senjata', value: '9+' },
-      { label: 'Mekanik', value: 'Shatter' },
-      { label: 'Mode', value: 'Batu & Diamond' }
-    ],
-    tags: ['Recoil Physics', 'Layer Shatter', 'Buff Cards', 'Arsenal'],
-    icon: Crosshair,
-  },
   {
     id: 'gunhit',
     zipName: 'gunhit.zip',
@@ -115,7 +94,7 @@ export default function Launcher({ onSelectGame }: LauncherProps) {
         <header className="text-center max-w-3xl mx-auto mb-10 sm:mb-14">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs sm:text-sm font-medium text-amber-300 mb-4 backdrop-blur-md">
             <Gamepad2 className="w-4 h-4 text-amber-400" />
-            <span>3 Game Koleksi Lengkap Siap Dimainkan Langsung</span>
+            <span>2 Game Koleksi Lengkap Siap Dimainkan Langsung</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-tight">
@@ -130,7 +109,7 @@ export default function Launcher({ onSelectGame }: LauncherProps) {
           </p>
         </header>
 
-        {/* 3 Games Grid */}
+        {/* 2 Games Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
           {GAMES.map((game, idx) => {
             const Icon = game.icon;
@@ -232,7 +211,7 @@ export default function Launcher({ onSelectGame }: LauncherProps) {
 
             <div className="flex items-center gap-3">
               <span className="px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-neutral-300">
-                3/3 Game Ready
+                2/2 Game Ready
               </span>
             </div>
           </div>
@@ -240,7 +219,7 @@ export default function Launcher({ onSelectGame }: LauncherProps) {
 
         {/* Footer */}
         <footer className="mt-12 text-center text-xs text-neutral-500">
-          Game Arcade Hub • Diamond Breaker, Gun Hit Arcade, dan Knife Boss 100 Lv.
+          Game Arcade Hub • Gun Hit Arcade dan Knife Boss 100 Lv.
         </footer>
       </div>
     </div>

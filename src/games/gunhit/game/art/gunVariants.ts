@@ -7,8 +7,10 @@ export type FixedClassicWeapon = (typeof FIXED_CLASSIC_WEAPONS)[number];
 /** Only guns with an actual design choice appear in the DESAIN tab. */
 export const EDITABLE_WEAPONS = [
   'dragon', 'diamond', 'rainbow', 'meteor', 'golden', 'moonbeam', 'chicken', 'honey',
+  'cricket', 'fish', 'electro',
 ] as const satisfies readonly WeaponId[];
 export type EditableWeapon = (typeof EDITABLE_WEAPONS)[number];
+export type LatestDesignWeapon = Exclude<EditableWeapon, 'honey' | 'cricket' | 'fish' | 'electro'>;
 export const VARIANT_WEAPONS = [...EDITABLE_WEAPONS, ...FIXED_CLASSIC_WEAPONS] as const;
 export type VariantWeapon = (typeof VARIANT_WEAPONS)[number];
 
@@ -33,12 +35,16 @@ export function canChooseGunDesign(id: WeaponId | 'old'): id is EditableWeapon {
 export function supportsGunVariants(id: WeaponId | 'old'): id is VariantWeapon {
   return isFixedClassicGun(id) || canChooseGunDesign(id);
 }
+export function supportsLatestDesign(id: VariantWeapon): id is LatestDesignWeapon {
+  return !isFixedClassicGun(id) && !(['honey', 'cricket', 'fish', 'electro'] as const).includes(id as 'honey' | 'cricket' | 'fish' | 'electro');
+}
 
 export function getGunVariantOptions(id: VariantWeapon) {
   if (isFixedClassicGun(id)) return GUN_VARIANTS.slice(0, 1);
-  // Honey Blaster has its classic jar and the reworked bee blaster, not a
-  // fictitious third renderer with the same drawing under a different name.
-  return id === 'honey' ? GUN_VARIANTS.slice(0, 2) : GUN_VARIANTS;
+  // These have a previous/current comparison only; don't offer a fake third
+  // card whose renderer would duplicate one of those two designs.
+  return (['honey', 'cricket', 'fish', 'electro'] as const).includes(id as 'honey' | 'cricket' | 'fish' | 'electro')
+    ? GUN_VARIANTS.slice(0, 2) : GUN_VARIANTS;
 }
 export function getGunEffectOptions(id: VariantWeapon) {
   return isFixedClassicGun(id) ? GUN_EFFECTS.slice(0, 1) : GUN_EFFECTS;
@@ -49,10 +55,12 @@ export function getGunEffectOptions(id: VariantWeapon) {
 const DEFAULT_DESIGNS: Record<EditableWeapon, GunVariant> = {
   dragon: 'original', diamond: 'latest', rainbow: 'original', meteor: 'original',
   golden: 'original', moonbeam: 'original', chicken: 'latest', honey: 'original',
+  cricket: 'current', fish: 'current', electro: 'current',
 };
 const DEFAULT_EFFECTS: Record<EditableWeapon, GunEffect> = {
   dragon: 'new', diamond: 'new', rainbow: 'new', meteor: 'new',
   golden: 'original', moonbeam: 'original', chicken: 'new', honey: 'new',
+  cricket: 'new', fish: 'new', electro: 'new',
 };
 
 function readChoices(key: string): Record<string, unknown> | null {

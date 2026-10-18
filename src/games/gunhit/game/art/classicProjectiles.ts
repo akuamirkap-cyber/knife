@@ -18,8 +18,42 @@ export function drawClassicProjectile(c: C, kind: VariantWeapon, len: number, t:
     case 'moonbeam': classicMoonbeam(c, len, t); break;
     case 'chicken': classicChicken(c, len); break;
     case 'honey': classicHoney(c, len, t); break;
+    case 'cricket': classicCricket(c, len, t); break;
+    case 'electro': classicElectro(c, len, t); break;
+    case 'fish': classicFish(c, len, t); break;
     default: { const _never: never = kind; return _never; }
   }
+}
+
+function classicCricket(c: C, len: number, t: number) {
+  const y = len * 0.38;
+  c.save(); c.globalCompositeOperation = 'lighter';
+  c.shadowColor = '#62caff'; c.shadowBlur = 9;
+  c.fillStyle = '#8edaff'; c.beginPath(); c.ellipse(0, y, 4, 7, 0, 0, TAU); c.fill();
+  c.shadowBlur = 0; c.strokeStyle = `rgba(220,248,255,${0.55 + 0.35 * Math.sin(t * 12)})`;
+  c.lineWidth = 1;
+  for (const r of [7, 10]) { c.beginPath(); c.ellipse(0, y, r, 2.5, t * 0.7, 0, TAU); c.stroke(); }
+  c.restore();
+}
+
+function classicElectro(c: C, len: number, t: number) {
+  const end = Math.max(10, len * 0.7);
+  c.save(); c.globalCompositeOperation = 'lighter';
+  c.strokeStyle = 'rgba(90,209,255,0.45)'; c.lineWidth = 6; c.beginPath(); c.moveTo(0, 0);
+  c.lineTo(Math.sin(t * 9) * 3, end * 0.5); c.lineTo(0, end); c.stroke();
+  c.strokeStyle = '#c6f5ff'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, 0);
+  c.lineTo(Math.sin(t * 9) * 3, end * 0.5); c.lineTo(0, end); c.stroke();
+  c.restore();
+}
+
+function classicFish(c: C, len: number, t: number) {
+  const y = len * 0.38, sway = Math.sin(t * 9) * 2;
+  c.fillStyle = '#ff9a3a'; c.beginPath();
+  c.moveTo(0, y + 3); c.lineTo(-5 + sway, y + 10); c.lineTo(0, y + 7); c.lineTo(5 + sway, y + 10); c.closePath(); c.fill();
+  c.fillStyle = '#ef6c1b'; c.beginPath(); c.ellipse(0, y, 4, 8, 0, 0, TAU); c.fill();
+  c.strokeStyle = 'rgba(255,246,220,0.85)'; c.lineWidth = 1;
+  c.beginPath(); c.ellipse(0, y, 4.5, 8.5, 0, 0, TAU); c.stroke();
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(2, y - 3, 1, 0, TAU); c.fill();
 }
 
 // The pre-rework syrup droplet: short, pointed and without the newer liquid

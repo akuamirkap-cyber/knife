@@ -146,9 +146,6 @@ export const sfx4 = {
     tone(400, 140, 0.06, 'square', 0.25);
     noise(0.15, 800, 0.4, 'lowpass', 200, 0.02);
   },
-  dizzy() {
-    for (let i = 0; i < 4; i++) tone(1200 - i * 150, 900 - i * 150, 0.08, 'sine', 0.06, i * 0.06);
-  },
   // ---- wand
   wand() {
     [1568, 1976, 2349, 3136].forEach((f, i) => tone(f, f, 0.2, 'sine', 0.07, i * 0.04));

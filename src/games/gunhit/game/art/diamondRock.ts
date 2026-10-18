@@ -3,6 +3,7 @@ import { drawBreakerDiamond } from '../../../shared/diamondArt';
 const TAU = Math.PI * 2;
 const REFERENCE_RADIUS = 196;
 const IMAGE_RADIUS = 230;
+export const LARGE_DIAMOND_CORE_RADIUS = 62; // Covers the full visible gem outline in rock-local coordinates.
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 type Point = { x: number; y: number };
 
@@ -142,15 +143,37 @@ export class DiamondRock {
     this.shimmer = this.cells.filter(c => c.type === 'crystal' || c.type === 'ore');
   }
 
+  /** Break every surviving chunk at once when the large core is collected. */
+  shatterAll(): BrokenRockCell[] {
+    const broken: BrokenRockCell[] = [];
+    for (const cell of this.cells) {
+      if (!cell.alive) continue;
+      cell.alive = false;
+      cell.flash = 1;
+      this.remaining--;
+      this.eraseChunk(cell);
+      broken.push({ id: cell.id, ...cell.center });
+    }
+    this.shimmer = [];
+    this.flashing = [];
+    this.cracked = [];
+    return broken;
+  }
+
   /** Projectile position is in rock-local Diamond Breaker coordinates. */
-  hitAt(p: Point, damage: number, splash: number): RockHit | null {
+  hitAt(p: Point, damage: number, splash: number, projectileRadius = 0): RockHit | null {
     const r = Math.hypot(p.x, p.y);
     if (r > 215) return null;
+    // The gem is visible beneath the inner rock rim. Give its full silhouette a
+    // forgiving, weapon-aware hit area so skinny/offset shots don't look inert.
+    if (r <= LARGE_DIAMOND_CORE_RADIUS + Math.max(0, projectileRadius)) {
+      return { kind: 'diamond', broken: [], remaining: this.remaining };
+    }
     // Keep an untouched texture for chunks that later fall away. In the game
     // this is normally baked by the first render, before a shot can arrive.
     if (typeof document !== 'undefined' && !this.intactCanvas) this.bake();
     const struck = this.cells.find(c => c.alive && r >= c.rMin - 2 && r <= c.rMax + 2 && pointInPoly(p, c.poly));
-    if (!struck) return r < 56 ? { kind: 'diamond', broken: [], remaining: this.remaining } : null;
+    if (!struck) return null;
 
     const broken: BrokenRockCell[] = [];
     const damageCell = (c: RockCell, amount: number, at: Point) => {

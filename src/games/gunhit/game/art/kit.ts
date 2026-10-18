@@ -6,14 +6,60 @@ export const gunState = { spin: 0, spinAngle: 0, sinceShot: 9, reloadT: 0, charg
 
 type C = CanvasRenderingContext2D;
 
+type RGBA = [number, number, number, number];
+
+function parseColor(color: string): RGBA | null {
+  const hex = color.match(/^#([\da-f]{3,8})$/i);
+  if (hex) {
+    let value = hex[1];
+    if (value.length === 3 || value.length === 4) value = [...value].map(ch => ch + ch).join('');
+    if (value.length !== 6 && value.length !== 8) return null;
+    return [parseInt(value.slice(0, 2), 16), parseInt(value.slice(2, 4), 16),
+      parseInt(value.slice(4, 6), 16), value.length === 8 ? parseInt(value.slice(6, 8), 16) / 255 : 1];
+  }
+  const rgb = color.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/i);
+  if (!rgb) return null;
+  const alpha = rgb[4] ? (rgb[4].endsWith('%') ? Number(rgb[4].slice(0, -1)) / 100 : Number(rgb[4])) : 1;
+  return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3]), alpha];
+}
+
+function formatGlossColor([r, g, b, a]: RGBA, amount: number) {
+  const lift = (channel: number) => Math.round(channel + (255 - channel) * amount);
+  return `rgba(${lift(r)},${lift(g)},${lift(b)},${a})`;
+}
+
+/** Build a broad, opaque specular highlight by sampling and lifting the
+ * material itself. This stays smooth on segmented bodies—no white cutout bands. */
+function addGlossStops(g: CanvasGradient, stops: string[], peak = 0.43) {
+  const palette = stops.map(parseColor);
+  if (palette.some(color => color === null)) {
+    stops.forEach((color, i) => g.addColorStop(i / (stops.length - 1), color));
+    return;
+  }
+  const colors = palette as RGBA[];
+  const sourcePositions = colors.map((_, i) => i / (colors.length - 1));
+  const positions = [...new Set([...sourcePositions, 0.16, 0.32, peak, 0.62, 0.82])].sort((a, b) => a - b);
+  for (const at of positions) {
+    let index = sourcePositions.findIndex(position => position >= at);
+    if (index < 0) index = colors.length - 1;
+    const left = Math.max(0, index - 1), right = index;
+    const span = sourcePositions[right] - sourcePositions[left];
+    const mix = span === 0 ? 0 : (at - sourcePositions[left]) / span;
+    const base = colors[left].map((channel, i) => channel + (colors[right][i] - channel) * mix) as RGBA;
+    const distance = (at - peak) / 0.28;
+    const sheen = 0.04 + 0.26 * Math.exp(-(distance * distance));
+    g.addColorStop(at, formatGlossColor(base, sheen));
+  }
+}
+
 export function lin(c: C, x0: number, x1: number, stops: string[]) {
   const g = c.createLinearGradient(x0, 0, x1, 0);
-  stops.forEach((s, i) => g.addColorStop(i / (stops.length - 1), s));
+  addGlossStops(g, stops, 0.43);
   return g;
 }
 export function vlin(c: C, y0: number, y1: number, stops: string[]) {
   const g = c.createLinearGradient(0, y0, 0, y1);
-  stops.forEach((s, i) => g.addColorStop(i / (stops.length - 1), s));
+  addGlossStops(g, stops, 0.42);
   return g;
 }
 export const steel = (c: C, x0: number, x1: number) => lin(c, x0, x1, ['#141619', '#5a6068', '#141619']);

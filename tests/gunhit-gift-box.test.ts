@@ -6,6 +6,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   GIFT_RARITY_WEIGHT,
+  isWeaponUnlocked,
   WEAPONS,
   rollGiftWeapon,
   type Rarity,
@@ -24,6 +25,7 @@ test('rollGiftWeapon mengambil senjata dari katalog Gun Hit dan mengkecualikan s
     assert.ok(WEAPONS.some((w) => w.id === rolled.id), 'hasil roll harus ada di WEAPONS');
     assert.notEqual(rolled.id, current, 'senjata yang sedang dipakai tidak boleh jadi hadiah');
     assert.ok(GIFT_RARITY_WEIGHT[rolled.rarity] > 0);
+    assert.notEqual(rolled.rarity, 'LANGKA', 'kotak hadiah tidak boleh membuka senjata LANGKA gratis');
   }
   // eksklusi penuh: panggil berulang dengan excludeId berbeda tetap valid
   for (const w of WEAPONS) {
@@ -88,4 +90,29 @@ test('alur boss Gun Hit memakai BossGiftBoxModal sebagai bonus stage', () => {
   assert.match(app, /<BossGiftBoxModal/);
   assert.match(app, /onClaim=\{handleGiftBoxClaim\}/);
   assert.match(app, /setBonusStageOpen\(true\)/);
+});
+
+
+test('reward details sit close below the fixed weapon reveal position', () => {
+  const modal = readFileSync(path.join(ROOT, 'src/games/gunhit/components/BossGiftBoxModal.tsx'), 'utf8');
+  assert.ok(modal.includes('absolute left-1/2 top-[300px] w-[200px]'));
+  assert.ok(modal.includes("showInfo ? 'top-[390px]' : 'bottom-[36px]'"));
+  assert.ok(modal.includes('max-w-[300px] px-4 py-2 text-[18px]'));
+});
+
+test('stage-clear sunburst stays pinned to the board pivot without a completion label', () => {
+  const app = readFileSync(path.join(ROOT, 'src/games/gunhit/App.tsx'), 'utf8');
+  const game = readFileSync(path.join(ROOT, 'src/games/gunhit/game/Game.ts'), 'utf8');
+  assert.ok(game.includes('this.events.onStageCleared?.(this.level.n, this.level.boss, { x: CX, y: this.targetY });'));
+  assert.ok(app.includes("left: stageClearBurst.x, top: stageClearBurst.y, transform: 'translate(-50%, -50%)'"));
+  assert.ok(app.includes('<div className="stage-clear-burst">'));
+  assert.ok(!app.includes('STAGE CLEAR!'));
+});
+
+test('senjata LANGKA butuh kepemilikan pembelian, sementara rarity lain tetap tersedia', () => {
+  const rare = WEAPONS.find((w) => w.rarity === 'LANGKA')!;
+  const common = WEAPONS.find((w) => w.rarity === 'UMUM')!;
+  assert.equal(isWeaponUnlocked(rare), false);
+  assert.equal(isWeaponUnlocked(rare, [rare.id]), true);
+  assert.equal(isWeaponUnlocked(common), true);
 });

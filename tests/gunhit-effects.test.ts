@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game, makeLevel } from '../src/games/gunhit/game/Game';
+import { BOARD_OBSTACLE_SCALE, embeddedProjectileScale, Game, makeLevel, projectileSizeMultiplier, type LevelMode } from '../src/games/gunhit/game/Game';
 import { DiamondRock } from '../src/games/gunhit/game/art/diamondRock';
 import { TreasureChest } from '../src/games/gunhit/game/art/bonusArt';
 import { SNOWBALL_RADIUS } from '../src/games/gunhit/game/art/projectiles2';
@@ -44,12 +44,48 @@ interface Probe {
   slowKind: string;
 }
 
-function probe(level: number, weapon = 'pistol'): Probe {
+test('Sandal shots stay full-sized and do not use the spinning flight animation', () => {
+  const sandal = getWeapon('sandal');
+  assert.equal(sandal.spinFly, undefined);
+  assert.equal(sandal.slow, undefined, 'sandal hits no longer slow or stun the target');
+  assert.equal(sandal.slowStyle, undefined, 'the dizzy visual/status is removed from Sandal');
+  assert.equal(projectileSizeMultiplier('sandal', true, false), 1,
+    'a mini-shot modifier cannot shrink the sandal');
+  assert.equal(projectileSizeMultiplier('sandal', false, false), 1,
+    'the normal sandal remains at its original full size');
+  assert.equal(projectileSizeMultiplier('sandal', false, true), 1.8,
+    'an explicit giant modifier can still enlarge it');
+  assert.equal(projectileSizeMultiplier('pistol', true, false), 0.65,
+    'mini-shot sizing remains unchanged for other weapons');
+});
+
+test('stage-board obstacles are doubled while embedded weapon shots keep normal size', () => {
+  assert.equal(BOARD_OBSTACLE_SCALE, 2, 'pre-placed rusty bullets and spikes use 2x scale');
+  assert.equal(embeddedProjectileScale(), 1, 'Nail Gun knife shots return to normal size');
+  assert.ok(Math.abs(embeddedProjectileScale(1) - 1.3) < 1e-10, 'only an explicit charge buff enlarges a shot');
+});
+
+test('an embedded Nail Gun projectile is rendered as a knife with an exposed handle', () => {
+  const fillStyles: unknown[] = [];
+  const gradient = { addColorStop: () => {} };
+  const ctx = new Proxy({} as CanvasRenderingContext2D, {
+    get: (_target, key) => key === 'createLinearGradient' ? () => gradient : () => {},
+    set: (_target, key, value) => {
+      if (key === 'fillStyle') fillStyles.push(value);
+      return true;
+    },
+  });
+  drawProjectile(ctx, 'nail', 39, 0, 99, true);
+  assert.ok(fillStyles.includes('#5b3520'), 'the knife grip is drawn over the board');
+  assert.ok(fillStyles.includes('#fbbf24'), 'the knife has a visible guard');
+});
+
+function probe(level: number, weapon = 'pistol', mode?: LevelMode): Probe {
   const game = Object.create(Game.prototype) as Probe;
   const particles: Probe['particles'] = [];
   const lights: Probe['lights'] = [];
   Object.assign(game, {
-    level: makeLevel(level), weapon: getWeapon(weapon), state: 'play',
+    level: makeLevel(level, mode), weapon: getWeapon(weapon), state: 'play',
     projs: [], beams: [], rockBullets: [], chestBullets: [], treasureCoins: [], fallenCells: [], rockFragments: [], flyers: [],
     particles, lights, sink: {
       push: (p: Probe['particles'][number]) => particles.push(p),
@@ -117,7 +153,7 @@ test('the five Snowball Cannon chambers empty on shots and refill only after a r
   assert.equal(game.snowLoaded, 2);
   assert.equal(game.ammoLeft, 2);
 
-  const timed = probe(3, 'snowball');
+  const timed = probe(3, 'snowball', 'boulder');
   timed.snowLoaded = 1;
   timed.shoot();
   assert.ok(timed.reloadT > 0);
@@ -163,7 +199,7 @@ test('Honey Blaster keeps its slowdown but leaves sticky amber beads and a splas
   assert.ok(particles.filter(p => p.kind === 'honeyDrop').length >= 17);
   assert.ok(particles.every(p => p.kind !== 'waterDrop' && p.kind !== 'chip'));
 
-  const rock = probe(3, 'honey');
+  const rock = probe(3, 'honey', 'boulder');
   const stone = new DiamondRock();
   const cells = (stone as unknown as { cells: { center: { x: number; y: number }; hp: number }[] }).cells;
   const cell = cells.find(c => c.hp >= 2 && c.center.y > 140 && Math.abs(c.center.x) < 40)!;
@@ -177,7 +213,7 @@ test('Honey Blaster keeps its slowdown but leaves sticky amber beads and a splas
   assert.equal(rock.slowF, 0.5);
   assert.ok(rock.particles.some(p => p.kind === 'honeySplash'));
 
-  const chest = probe(6, 'honey');
+  const chest = probe(6, 'honey', 'treasure');
   Object.assign(chest, { chest: { hit: () => {} } });
   assert.equal(chest.stepSpecialProjectile({ x: 210, y: 362, vx: 0, vy: -1900 }).res, 'hit');
   assert.equal(chest.chestBullets[0].w, 'honey', 'the liquid sticks to the shaking treasure chest too');
@@ -279,8 +315,8 @@ test('treasure coins form a supported heap inside the rim, without clipped crown
 });
 
 test('both barrels own their muzzle rings, glow and projectiles in rock and treasure', () => {
-  for (const stage of [3, 6]) {
-    const game = probe(stage, 'plasma');
+  for (const [stage, mode] of [[3, 'boulder'], [6, 'treasure']] as const) {
+    const game = probe(stage, 'plasma', mode);
     Object.assign(game, { twinGuns: true });
     game.shoot();
     assert.deepEqual(game.projs.map(p => p.x), [180, 240]);
@@ -289,7 +325,7 @@ test('both barrels own their muzzle rings, glow and projectiles in rock and trea
     assert.equal(game.ammoLeft, 11);
   }
 
-  const pistol = probe(3);
+  const pistol = probe(3, 'pistol', 'boulder');
   Object.assign(pistol, { twinGuns: true });
   pistol.shoot();
   const casings = pistol.particles.filter(p => p.kind === 'shell');
@@ -297,8 +333,8 @@ test('both barrels own their muzzle rings, glow and projectiles in rock and trea
 });
 
 test('special-stage explosions keep the weapon’s normal impact burst', () => {
-  for (const [stage, material] of [[3, 'rock'], [6, 'gold']] as const) {
-    const game = probe(stage, 'rpg');
+  for (const [stage, material, mode] of [[3, 'rock', 'boulder'], [6, 'gold', 'bonus']] as const) {
+    const game = probe(stage, 'rpg', mode);
     game.specialImpact(164, 360, material);
     assert.ok(game.particles.some(p => p.kind === 'shock' && p.x === 164));
     assert.ok(game.particles.some(p => p.kind === 'smoke' && Math.abs(p.x - 164) < 25));
@@ -312,7 +348,7 @@ test('rounds stay on their exact rotating cell and tumble with that cell when it
   const target = cells.find(c => c.hp >= 2 && c.center.y > 150 && Math.abs(c.center.x) < 40)!;
   assert.ok(target);
   const initialHp = target.hp;
-  const game = probe(3);
+  const game = probe(3, 'pistol', 'boulder');
   Object.assign(game, { rock, dmgMult: 0.25, twinGuns: true });
   const sc = game.level.radius / 196;
   for (let i = 0; i < initialHp; i++) {
@@ -352,7 +388,7 @@ test('splash damage carries bullets away with neighboring chunks too', () => {
     && cells.some(other => other !== c && Math.hypot(other.center.x - c.center.x, other.center.y - c.center.y) < 40))!;
   assert.ok(target);
   const neighbor = cells.find(c => c !== target && Math.hypot(c.center.x - target.center.x, c.center.y - target.center.y) < 40)!;
-  const game = probe(3);
+  const game = probe(3, 'pistol', 'boulder');
   Object.assign(game, { rock, dmgMult: 0.25 });
   const sc = game.level.radius / 196;
   const hit = (cell: typeof target) => game.stepSpecialProjectile({
@@ -368,7 +404,7 @@ test('splash damage carries bullets away with neighboring chunks too', () => {
 });
 
 test('treasure hits use normal weapon impacts at each lane and embed rounds in the shaking chest', () => {
-  const game = probe(6, 'plasma');
+  const game = probe(6, 'plasma', 'treasure');
   let hits = 0;
   Object.assign(game, { chest: { hit: () => { hits++; } }, treasureBuff: 'double', twinGuns: true });
   for (const x of [180, 240]) assert.equal(game.stepSpecialProjectile({ x, y: 362, vx: 0, vy: -1700 }).res, 'hit');
@@ -421,7 +457,7 @@ test('Banana flesh enters the target halfway, splashes juice, and never gains re
   classic.ammoLeft = classic.level.ammo;
   classic.shoot();
   assert.equal(classic.ammoLeft, classic.level.ammo - 1, 'closing peel does not refill ammo');
-  const chest = probe(6, 'banana');
+  const chest = probe(6, 'banana', 'treasure');
   Object.assign(chest, { chest: { hit: () => {} } });
   assert.equal(chest.stepSpecialProjectile({ x: 210, y: 362, vx: 0, vy: -1700 }).res, 'hit');
   assert.equal(chest.chestBullets[0].w, 'banana');
@@ -455,7 +491,7 @@ test('Golden Gun cycles its slide after a shot and while reloading without refil
   classic.shoot();
   assert.equal(classic.ammoLeft, 11);
   assert.equal(classic.reloadT, 0, 'classic stage has no invented reload between shots');
-  const timed = probe(3, 'golden');
+  const timed = probe(3, 'golden', 'treasure');
   timed.ammoLeft = 1;
   timed.shoot();
   assert.ok(timed.reloadT > 0);

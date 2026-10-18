@@ -70,8 +70,8 @@ function GunRevealCanvas({ id, silhouette }: { id: WeaponId; silhouette: boolean
   useEffect(() => {
     const cv = ref.current;
     if (!cv) return;
-    const W = 210;
-    const H = 150;
+    const W = 210 * 1.6;
+    const H = 150 * 1.6;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     cv.width = W * dpr;
     cv.height = H * dpr;
@@ -103,8 +103,8 @@ function GunRevealCanvas({ id, silhouette }: { id: WeaponId; silhouette: boolean
     <canvas
       ref={ref}
       style={{
-        width: 210,
-        height: 150,
+        width: 336,
+        height: 240,
         filter: silhouette ? 'brightness(0)' : 'drop-shadow(0 10px 18px rgba(0,0,0,.55))',
         transition: 'filter .25s',
       }}
@@ -270,7 +270,7 @@ export const BossGiftBoxModal = ({ bossName, stage, currentWeaponId, onClaim }: 
         {isOpen && <div className="beam-up pointer-events-none absolute bottom-[110px] left-1/2 h-[520px] w-[150px] bg-gradient-to-t from-white via-amber-100/60 to-transparent blur-md" />}
 
         {isOpen && (
-          <div className="absolute left-1/2 top-[10px] z-20 h-[130px] w-[210px] -translate-x-1/2">
+          <div className="absolute left-1/2 top-[-62px] z-20 h-[240px] w-[336px] -translate-x-1/2">
             <div className="weapon-rise h-full w-full">
               <div className={`float relative flex h-full w-full items-center justify-center ${showInfo ? 'reveal-pop' : ''}`}>
                 <GunRevealCanvas id={weapon.id} silhouette={!showInfo} />
@@ -335,7 +335,7 @@ export const BossGiftBoxModal = ({ bossName, stage, currentWeaponId, onClaim }: 
       {isOpen && <div className="flash pointer-events-none absolute inset-0 bg-white" />}
 
       {/* Info senjata + aksi */}
-      <div className="absolute inset-x-0 bottom-[36px] flex flex-col items-center gap-2.5 px-6">
+      <div className={`absolute inset-x-0 ${showInfo ? 'top-[390px]' : 'bottom-[36px]'} flex flex-col items-center gap-2 px-6`}>
         {state === 'ready' && (
           <>
             <div className="flex gap-2.5">
@@ -352,24 +352,24 @@ export const BossGiftBoxModal = ({ bossName, stage, currentWeaponId, onClaim }: 
           </>
         )}
         {showInfo && (
-          <div className="pop-in flex w-full max-w-[320px] flex-col items-center gap-2">
-            <div className="flex items-center gap-2">
-              <span className="rounded-full border border-white/20 bg-black/45 px-3 py-1 text-[12px] font-black tracking-widest text-amber-200">
+          <div className="pop-in flex w-full max-w-[340px] flex-col items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              <span className="rounded-full border border-white/20 bg-black/45 px-2.5 py-1 text-[11px] font-black tracking-wide text-amber-200">
                 {weapon.emoji} {weapon.name}
               </span>
               <span
-                className="rounded-full px-2.5 py-1 text-[11px] font-black text-white"
+                className="rounded-full px-2 py-1 text-[10px] font-black text-white"
                 style={{ background: RARITY_COLOR[weapon.rarity] }}
               >
                 ⚡ {weapon.perk}
               </span>
             </div>
-            <p className="text-[13px] font-medium text-white/80">{weapon.desc}</p>
-            <p className="text-[18px] font-black text-amber-300 drop-shadow-[0_2px_0_#7a4a00]">+{coins} KOIN 💰</p>
-            <GreenButton onClick={() => claim(true)} className="w-full px-6 py-3 text-[20px]">
+            <p className="max-w-[340px] text-center text-[12px] leading-snug font-medium text-white/80">{weapon.desc}</p>
+            <p className="text-[16px] font-black text-amber-300 drop-shadow-[0_2px_0_#7a4a00]">+{coins} KOIN 💰</p>
+            <GreenButton onClick={() => claim(true)} className="w-full max-w-[300px] px-4 py-2 text-[18px]">
               PAKAI &amp; LANJUT ➜
             </GreenButton>
-            <button onClick={() => claim(false)} className="text-[13px] font-bold text-white/75 underline underline-offset-4">
+            <button onClick={() => claim(false)} className="text-[12px] font-bold text-white/75 underline underline-offset-2">
               Lanjut tanpa ganti senjata
             </button>
           </div>

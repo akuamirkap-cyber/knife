@@ -19,10 +19,10 @@ export const GUN_METRICS: Partial<Record<WeaponId, Partial<GunMetrics>>> = {
   crossbow: { totalLen: 225, centerOffsetY: 110, centerOffsetX: 0, span: 230 },
   plasma: { totalLen: 225, centerOffsetY: 106, centerOffsetX: 12, span: 245 },
   laser: { totalLen: 220, centerOffsetY: 105, centerOffsetX: 12, span: 240 },
-  fish: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 18, span: 180 },
+  fish: { totalLen: 205, centerOffsetY: 100, centerOffsetX: 18, span: 225 },
   rpg: { totalLen: 275, centerOffsetY: 135, centerOffsetX: 15, span: 280 },
-  cricket: { totalLen: 95, centerOffsetY: 45, centerOffsetX: 12, span: 110 },
-  electro: { totalLen: 170, centerOffsetY: 82, centerOffsetX: 18, span: 180 },
+  cricket: { totalLen: 160, centerOffsetY: 77, centerOffsetX: 4, span: 190 },
+  electro: { totalLen: 205, centerOffsetY: 100, centerOffsetX: 18, span: 220 },
   bazooka: { totalLen: 270, centerOffsetY: 132, centerOffsetX: 12, span: 275 },
   freeze: { totalLen: 175, centerOffsetY: 85, centerOffsetX: 16, span: 185 },
   golden: { totalLen: 180, centerOffsetY: 86, centerOffsetX: 17, span: 210 },
@@ -153,6 +153,15 @@ const VARIANT_METRICS: Record<VariantWeapon, { original: GunMetrics; latest?: Gu
   },
   honey: {
     original: { totalLen: 180, centerOffsetY: 87, centerOffsetX: 12, span: 200 },
+  },
+  cricket: {
+    original: { totalLen: 95, centerOffsetY: 45, centerOffsetX: 12, span: 110 },
+  },
+  fish: {
+    original: { totalLen: 210, centerOffsetY: 104, centerOffsetX: 18, span: 230 },
+  },
+  electro: {
+    original: { totalLen: 215, centerOffsetY: 105, centerOffsetX: 18, span: 230 },
   },
 };
 

@@ -1,18 +1,16 @@
 import type { WeaponId } from '../weapons';
-import { getGunVariant, isFixedClassicGun, supportsGunVariants, type GunVariant } from './gunVariants';
+import { getGunVariant, isFixedClassicGun, supportsGunVariants, supportsLatestDesign, type GunVariant } from './gunVariants';
 import { drawOriginalGun } from './legacyVariants';
 import { drawLatestGun } from './latestVariants';
 import { drawGunExtra, drawFlashExtra } from './guns3';
-import { gunState } from './kit';
+import { gunState, lin as sharedLin } from './kit';
 import { shotPulse } from './commonGunMotion';
 
 const TAU = Math.PI * 2;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 function lin(c: CanvasRenderingContext2D, x0: number, x1: number, stops: string[]) {
-  const g = c.createLinearGradient(x0, 0, x1, 0);
-  stops.forEach((s, i) => g.addColorStop(i / (stops.length - 1), s));
-  return g;
+  return sharedLin(c, x0, x1, stops);
 }
 const steel = (c: CanvasRenderingContext2D, x0: number, x1: number) => lin(c, x0, x1, ['#141619', '#5a6068', '#141619']);
 const chrome = (c: CanvasRenderingContext2D, x0: number, x1: number) => lin(c, x0, x1, ['#4a515c', '#f5f7fa', '#aeb6c2', '#3d434c']);
@@ -30,7 +28,7 @@ function jagged(c: CanvasRenderingContext2D, x0: number, y0: number, x1: number,
   c.stroke();
 }
 
-import { drawModernGrip } from './gripSystem';
+import { drawElectroGrip, drawFishGrip, drawFreezeGrip, drawModernGrip, drawPistolGrip } from './gripSystem';
 
 function angledGrip(c: CanvasRenderingContext2D, cx: number, y: number, c1: string, _c2?: string, _len = 1) {
   drawModernGrip(c, cx, y, c1, 'g10');
@@ -62,10 +60,10 @@ export function drawGun(
   // The three retired guns ALWAYS render the original, even if an obsolete
   // saved choice or a caller explicitly requests a removed design. Honey has
   // two genuine silhouettes, not a duplicate 'latest' card.
-  if (supportsGunVariants(id) && (isFixedClassicGun(id) ||
-    (variant !== 'current' && (id !== 'honey' || variant === 'original')))) {
+  if (supportsGunVariants(id) && (isFixedClassicGun(id) || variant === 'original' ||
+    (variant === 'latest' && supportsLatestDesign(id)))) {
     if (isFixedClassicGun(id) || variant === 'original') drawOriginalGun(c, id, cx, y0, t, ready);
-    else if (id !== 'honey') drawLatestGun(c, id, cx, y0, t);
+    else if (supportsLatestDesign(id)) drawLatestGun(c, id, cx, y0, t);
   } else switch (id) {
     case 'pistol': pistol(c, cx, y0, t); break;
     case 'ak47': ak(c, cx, y0, t); break;
@@ -85,52 +83,80 @@ export function drawGun(
 }
 
 function pistol(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
-  const slide = shotPulse(gunState.sinceShot, 0.25) * 12;
-  angledGrip(c, cx, y0 + 82, '#2b2420', '#4a3a2e');
-  triggerGuard(c, cx, y0 + 70);
-  c.beginPath();
-  c.roundRect(cx - 16, y0, 32, 130, [6, 6, 4, 4]);
-  c.fillStyle = lin(c, cx - 17, cx + 17, ['#1d2025', '#5e6670', '#8a939e', '#1a1d22']);
-  c.fill();
-  c.strokeStyle = '#0b0c0e';
-  c.lineWidth = 2;
-  c.stroke();
-  // The ejection channel remains fixed while the steel slide racks backward.
-  c.fillStyle = '#0b0d11';
-  c.fillRect(cx - 14, y0 + 3, 28, 52);
-  c.beginPath();
-  c.roundRect(cx - 16, y0 + slide, 32, 53, [6, 6, 2, 2]);
-  c.fillStyle = lin(c, cx - 16, cx + 16, ['#1d2025', '#7d8792', '#b2bdc7', '#1a1d22']);
-  c.fill(); c.stroke();
-  c.fillStyle = '#0a0a0b';
-  c.beginPath();
-  c.roundRect(cx - 6, y0 - 4 + slide, 12, 8, 2);
-  c.fill();
-  c.fillStyle = '#ff5a36';
-  c.fillRect(cx - 2, y0 + 4 + slide, 4, 5);
-  c.fillStyle = '#0e0f12';
-  c.fillRect(cx + 2, y0 + 38 + slide, 12, 22);
-  c.fillStyle = '#c99a3a';
-  c.fillRect(cx + 5, y0 + 42 + slide, 6, 14);
-  c.strokeStyle = `rgba(238,248,255,${0.23 + 0.22 * Math.sin(t * 2.8) ** 2})`;
-  c.lineWidth = 2;
-  c.beginPath();
-  c.moveTo(cx - 11, y0 + 8 + slide + (t * 18) % 30);
-  c.lineTo(cx - 11, y0 + 18 + slide + (t * 18) % 30);
-  c.stroke();
-  c.strokeStyle = 'rgba(0,0,0,0.5)';
-  c.lineWidth = 1.5;
-  for (let i = 0; i < 6; i++) {
-    c.beginPath();
-    c.moveTo(cx - 13, y0 + 92 + i * 6);
-    c.lineTo(cx + 13, y0 + 92 + i * 6);
-    c.stroke();
-  }
-  c.fillStyle = 'rgba(255,255,255,0.18)';
-  c.fillRect(cx - 6, y0 + 8 + slide, 3, 42);
-  c.fillRect(cx - 6, y0 + 66, 3, 57);
-}
+  const slide = shotPulse(gunState.sinceShot, 0.25) * 8;
 
+  // A clean compact 9 mm profile: raked grip, broad slide, separate lower frame.
+  drawPistolGrip(c, cx, y0 + 75);
+  c.beginPath();
+  c.moveTo(cx - 18, y0 + 65); c.lineTo(cx + 18, y0 + 65);
+  c.lineTo(cx + 21, y0 + 88); c.lineTo(cx + 17, y0 + 108);
+  c.quadraticCurveTo(cx + 14, y0 + 117, cx + 7, y0 + 120);
+  c.lineTo(cx - 14, y0 + 120); c.lineTo(cx - 20, y0 + 108); c.closePath();
+  c.fillStyle = lin(c, cx - 20, cx + 21, ['#151a20', '#434d58', '#242b33', '#11161b']);
+  c.fill(); c.strokeStyle = '#080b0e'; c.lineWidth = 2.2; c.stroke();
+
+  // Brushed-steel slide with soft shoulders and a short, defined dust cover.
+  c.beginPath();
+  c.moveTo(cx - 17, y0 + 8); c.quadraticCurveTo(cx - 17, y0 + 2, cx - 11, y0 + 1);
+  c.lineTo(cx + 11, y0 + 1); c.quadraticCurveTo(cx + 18, y0 + 2, cx + 18, y0 + 9);
+  c.lineTo(cx + 18, y0 + 82); c.quadraticCurveTo(cx + 18, y0 + 91, cx + 10, y0 + 96);
+  c.lineTo(cx - 10, y0 + 96); c.quadraticCurveTo(cx - 18, y0 + 91, cx - 18, y0 + 82);
+  c.closePath();
+  c.fillStyle = lin(c, cx - 18, cx + 18, ['#343d47', '#b8c1ca', '#e1e5e9', '#77828d', '#303841']);
+  c.fill(); c.strokeStyle = '#11161b'; c.lineWidth = 2.4; c.stroke();
+  c.strokeStyle = 'rgba(255,255,255,0.36)'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(cx - 13, y0 + 14 + slide); c.lineTo(cx - 13, y0 + 58 + slide); c.stroke();
+
+  // Muzzle crown and centered barrel opening.
+  c.fillStyle = '#202831';
+  c.beginPath(); c.roundRect(cx - 10, y0 - 1 + slide, 20, 8, 3); c.fill();
+  c.strokeStyle = '#090c0f'; c.lineWidth = 1.5; c.stroke();
+  c.fillStyle = '#080b0e';
+  c.beginPath(); c.ellipse(cx, y0 + 2 + slide, 4.8, 2.2, 0, 0, TAU); c.fill();
+  c.fillStyle = '#d1d7dd'; c.beginPath(); c.roundRect(cx - 5, y0 - 4 + slide, 10, 5, 1.5); c.fill();
+
+  // Simple aligned sights; a single red front dot adds a readable accent.
+  c.fillStyle = '#171d23';
+  c.beginPath(); c.roundRect(cx - 7, y0 + 92, 14, 7, 2); c.fill();
+  c.fillStyle = '#ff6a5e'; c.beginPath(); c.arc(cx, y0 + 95, 1.5, 0, TAU); c.fill();
+  c.fillStyle = '#171d23'; c.beginPath(); c.roundRect(cx - 5, y0 + 5 + slide, 10, 4, 1.5); c.fill();
+
+  // Recessed ejection port and a small steel chamber—no oversized gold block.
+  c.fillStyle = '#20262d';
+  c.beginPath(); c.roundRect(cx + 4, y0 + 36 + slide, 10, 17, 2.5); c.fill();
+  c.fillStyle = '#87929b';
+  c.beginPath(); c.roundRect(cx + 6, y0 + 39 + slide, 5, 11, 1.5); c.fill();
+  c.fillStyle = '#d8dee2'; c.fillRect(cx + 7, y0 + 42 + slide, 3, 2);
+
+  // Short, paired rear serrations to identify the slide while keeping it clean.
+  c.strokeStyle = '#353d45'; c.lineWidth = 1.6;
+  for (let i = 0; i < 4; i++) {
+    const yy = y0 + 66 + i * 4;
+    c.beginPath(); c.moveTo(cx - 15, yy); c.lineTo(cx - 9, yy - 2); c.stroke();
+    c.beginPath(); c.moveTo(cx + 9, yy - 2); c.lineTo(cx + 15, yy); c.stroke();
+  }
+  // Moving sheen keeps the selected pistol alive without cluttering its shape.
+  c.strokeStyle = `rgba(255,255,255,${0.24 + 0.12 * Math.sin(t * 2.8) ** 2})`;
+  c.lineWidth = 1.6;
+  const gleamY = y0 + 15 + slide + (t * 18) % 27;
+  c.beginPath(); c.moveTo(cx - 13, gleamY); c.lineTo(cx - 13, gleamY + 9); c.stroke();
+
+  // Rounded, open trigger guard and simple curved trigger.
+  c.beginPath(); c.moveTo(cx - 15, y0 + 88);
+  c.quadraticCurveTo(cx - 22, y0 + 105, cx - 14, y0 + 119);
+  c.quadraticCurveTo(cx - 10, y0 + 126, cx + 6, y0 + 124);
+  c.quadraticCurveTo(cx + 16, y0 + 122, cx + 12, y0 + 101);
+  c.strokeStyle = '#090c10'; c.lineWidth = 5; c.lineCap = 'round'; c.stroke();
+  c.strokeStyle = '#a3adb6'; c.lineWidth = 1.25; c.stroke();
+  c.beginPath(); c.moveTo(cx + 1, y0 + 101); c.quadraticCurveTo(cx + 4, y0 + 110, cx - 3, y0 + 116);
+  c.strokeStyle = '#d9dfe4'; c.lineWidth = 2.4; c.stroke();
+
+  // Frame pin and one understated rail edge.
+  c.fillStyle = '#c1c9cf'; c.beginPath(); c.arc(cx - 13, y0 + 104, 2, 0, TAU); c.fill();
+  c.strokeStyle = '#10151a'; c.lineWidth = 1; c.stroke();
+  c.strokeStyle = 'rgba(255,255,255,0.26)'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(cx + 14, y0 + 71); c.lineTo(cx + 10, y0 + 89); c.stroke();
+}
 function ak(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
   const bolt = 18 * shotPulse(gunState.sinceShot, 0.22);
   c.beginPath();
@@ -347,123 +373,134 @@ function laserGun(c: CanvasRenderingContext2D, cx: number, y0: number, t: number
 }
 
 function cricket(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
-  const pulse = 0.6 + 0.4 * Math.sin(t * 7);
-  // tiny grip
+  const pulse = 0.62 + 0.38 * Math.sin(t * 7);
+  // Match the reference's side-profile silhouette: long needle barrel,
+  // chrome breech, open oval trigger guard, and a steep black pistol grip.
   c.beginPath();
-  c.moveTo(cx + 3, y0 + 40);
-  c.lineTo(cx + 3, y0 + 60);
-  c.lineTo(cx + 24, y0 + 74);
-  c.lineTo(cx + 31, y0 + 62);
-  c.lineTo(cx + 14, y0 + 40);
-  c.closePath();
-  c.fillStyle = lin(c, cx, cx + 30, ['#1b1d22', '#3d424b']);
-  c.fill();
-  c.strokeStyle = '#08090b';
-  c.lineWidth = 1.5;
-  c.stroke();
-  c.beginPath();
-  c.arc(cx + 10, y0 + 42, 7, -Math.PI * 0.5, Math.PI * 0.5);
-  c.strokeStyle = '#2a2e35';
-  c.lineWidth = 2.5;
-  c.stroke();
-  // body
-  c.beginPath();
-  c.roundRect(cx - 11, y0 + 12, 22, 34, [4, 4, 8, 8]);
-  c.fillStyle = chrome(c, cx - 11, cx + 11);
-  c.fill();
-  c.strokeStyle = '#2a2e35';
-  c.lineWidth = 1.5;
-  c.stroke();
-  // ridges
-  c.strokeStyle = 'rgba(0,0,0,0.45)';
-  c.lineWidth = 1;
-  for (let i = 0; i < 4; i++) {
-    c.beginPath();
-    c.moveTo(cx - 11, y0 + 20 + i * 6);
-    c.lineTo(cx - 6, y0 + 20 + i * 6);
-    c.moveTo(cx + 6, y0 + 20 + i * 6);
-    c.lineTo(cx + 11, y0 + 20 + i * 6);
-    c.stroke();
+  c.moveTo(cx + 8, y0 + 82); c.lineTo(cx + 24, y0 + 79);
+  c.lineTo(cx + 31, y0 + 94); c.lineTo(cx + 49, y0 + 137);
+  c.lineTo(cx + 43, y0 + 148); c.lineTo(cx + 29, y0 + 154);
+  c.lineTo(cx + 15, y0 + 146); c.lineTo(cx + 2, y0 + 99); c.closePath();
+  c.fillStyle = lin(c, cx + 2, cx + 49, ['#05070a', '#22262c', '#111419', '#040506']);
+  c.fill(); c.strokeStyle = '#08090b'; c.lineWidth = 2.5; c.stroke();
+  // Deep rubber palm panel with fine, diagonal grip checkering.
+  c.beginPath(); c.moveTo(cx + 13, y0 + 96); c.lineTo(cx + 27, y0 + 91);
+  c.lineTo(cx + 42, y0 + 135); c.lineTo(cx + 37, y0 + 143);
+  c.lineTo(cx + 26, y0 + 147); c.lineTo(cx + 20, y0 + 139); c.closePath();
+  c.fillStyle = lin(c, cx + 13, cx + 42, ['#101216', '#30343a', '#08090c']); c.fill();
+  c.strokeStyle = '#666d74'; c.lineWidth = 1.2; c.stroke();
+  c.save(); c.beginPath(); c.moveTo(cx + 13, y0 + 96); c.lineTo(cx + 27, y0 + 91);
+  c.lineTo(cx + 42, y0 + 135); c.lineTo(cx + 37, y0 + 143);
+  c.lineTo(cx + 26, y0 + 147); c.lineTo(cx + 20, y0 + 139); c.closePath(); c.clip();
+  c.strokeStyle = 'rgba(210,220,228,0.22)'; c.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    c.beginPath(); c.moveTo(cx + 10 + i * 4, y0 + 100); c.lineTo(cx + 26 + i * 4, y0 + 139); c.stroke();
   }
-  // hammer
-  c.fillStyle = chrome(c, cx - 4, cx + 4);
-  c.beginPath();
-  c.roundRect(cx - 4, y0 + 44, 8, 8, 2);
-  c.fill();
-  // bulb emitter
-  c.beginPath();
-  c.arc(cx, y0 + 7, 10, 0, TAU);
-  c.fillStyle = chrome(c, cx - 10, cx + 10);
-  c.fill();
-  c.strokeStyle = '#2a2e35';
-  c.stroke();
-  c.beginPath();
-  c.arc(cx, y0 + 7, 6.5, 0, TAU);
-  c.fillStyle = '#0d1a2b';
-  c.fill();
-  glowDot(c, cx, y0 + 7, 3.5 * pulse + 1, '#7cc8ff', 16);
-  c.beginPath();
-  c.arc(cx, y0 + 7, 8.5, 0, TAU);
-  c.strokeStyle = 'rgba(124,200,255,0.6)';
-  c.lineWidth = 1;
-  c.stroke();
+  c.restore();
+  for (const [sx, sy] of [[cx + 20, y0 + 105], [cx + 34, y0 + 139]]) {
+    c.beginPath(); c.arc(sx, sy, 2.2, 0, TAU); c.fillStyle = chrome(c, sx - 2, sx + 2); c.fill();
+    c.strokeStyle = '#111'; c.lineWidth = 0.8; c.stroke();
+  }
+  // Oversized open trigger loop, a defining feature of the miniature prop.
+  c.beginPath(); c.moveTo(cx - 2, y0 + 82);
+  c.bezierCurveTo(cx - 25, y0 + 74, cx - 42, y0 + 88, cx - 41, y0 + 111);
+  c.bezierCurveTo(cx - 40, y0 + 132, cx - 23, y0 + 141, cx - 8, y0 + 132);
+  c.quadraticCurveTo(cx + 1, y0 + 126, cx + 4, y0 + 116);
+  c.strokeStyle = '#6f7880'; c.lineWidth = 4; c.stroke();
+  c.strokeStyle = '#eef1f3'; c.lineWidth = 1.4; c.stroke();
+  // Curved trigger sits inside the loop, clear of the grip.
+  c.beginPath(); c.moveTo(cx + 4, y0 + 87);
+  c.quadraticCurveTo(cx + 12, y0 + 101, cx + 7, y0 + 115);
+  c.quadraticCurveTo(cx + 4, y0 + 121, cx - 1, y0 + 123);
+  c.strokeStyle = '#17191c'; c.lineWidth = 2.4; c.stroke();
+  c.strokeStyle = '#c4c9ce'; c.lineWidth = 0.8; c.stroke();
+  // Beveled chrome breech and vented side plate.
+  c.beginPath(); c.moveTo(cx - 17, y0 + 57); c.lineTo(cx - 11, y0 + 51);
+  c.lineTo(cx + 20, y0 + 51); c.lineTo(cx + 27, y0 + 58);
+  c.lineTo(cx + 24, y0 + 82); c.lineTo(cx + 14, y0 + 91);
+  c.lineTo(cx - 14, y0 + 87); c.lineTo(cx - 19, y0 + 78); c.closePath();
+  c.fillStyle = chrome(c, cx - 19, cx + 27); c.fill();
+  c.strokeStyle = '#242a30'; c.lineWidth = 2.2; c.stroke();
+  // Black ejection slot with raised steel rails.
+  c.beginPath(); c.roundRect(cx - 10, y0 + 61, 29, 15, 4);
+  c.fillStyle = lin(c, cx - 10, cx + 19, ['#050709', '#252a30', '#080a0c']); c.fill();
+  c.strokeStyle = '#707982'; c.lineWidth = 1; c.stroke();
+  c.fillStyle = 'rgba(255,255,255,0.75)'; c.fillRect(cx - 7, y0 + 63, 1.5, 10);
+  // Three small heat vents on the upper chrome shell.
+  for (let i = 0; i < 3; i++) {
+    c.beginPath(); c.roundRect(cx + 3 + i * 5, y0 + 54, 2.5, 5, 1);
+    c.fillStyle = '#20252a'; c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.72)'; c.fillRect(cx + 3.6 + i * 5, y0 + 54.5, 0.7, 3.5);
+  }
+  // Breech pivot and cocking hammer.
+  c.beginPath(); c.arc(cx + 20, y0 + 80, 5.5, 0, TAU);
+  c.fillStyle = chrome(c, cx + 14, cx + 26); c.fill();
+  c.strokeStyle = '#262b30'; c.lineWidth = 1.4; c.stroke();
+  c.beginPath(); c.arc(cx + 20, y0 + 80, 2.1, 0, TAU); c.fillStyle = '#20252a'; c.fill();
+  c.beginPath(); c.moveTo(cx + 19, y0 + 54); c.lineTo(cx + 24, y0 + 46);
+  c.lineTo(cx + 31, y0 + 48); c.lineTo(cx + 27, y0 + 57); c.closePath();
+  c.fillStyle = chrome(c, cx + 19, cx + 31); c.fill(); c.strokeStyle = '#242a30'; c.lineWidth = 1.5; c.stroke();
+  // Long, narrow barrel aligned precisely to the existing muzzle coordinate.
+  c.beginPath(); c.roundRect(cx - 3.3, y0 + 1, 6.6, 56, 3.3);
+  c.fillStyle = chrome(c, cx - 3.3, cx + 3.3); c.fill();
+  c.strokeStyle = '#30363c'; c.lineWidth = 1.2; c.stroke();
+  c.fillStyle = '#15191e'; c.fillRect(cx - 1.2, y0 + 7, 2.4, 43);
+  c.fillStyle = 'rgba(255,255,255,0.85)'; c.fillRect(cx - 2.4, y0 + 7, 0.9, 43);
+  c.beginPath(); c.ellipse(cx, y0 + 2, 5.2, 2.4, 0, 0, TAU);
+  c.fillStyle = '#181c20'; c.fill(); c.strokeStyle = '#d7dce0'; c.lineWidth = 1.2; c.stroke();
+  // Small cyan aperture glows at the muzzle without changing the shot rules.
+  glowDot(c, cx, y0 + 2, 1.7 + pulse * 0.7, '#8edfff', 7);
+  c.fillStyle = '#d4d8db'; c.beginPath(); c.roundRect(cx - 15, y0 + 84, 11, 4, 1); c.fill();
 }
 
 function electro(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
-  angledGrip(c, cx, y0 + 108, '#1f2a33', '#3b4d5c', 0.85);
-  triggerGuard(c, cx, y0 + 100);
+  const charge = 0.55 + 0.45 * Math.sin(t * 8);
+  drawElectroGrip(c, cx, y0 + 100);
+  // Forged graphite receiver with swept shoulders around the capacitor tube.
   c.beginPath();
-  c.roundRect(cx - 18, y0 + 40, 36, 92, 8);
-  c.fillStyle = lin(c, cx - 18, cx + 18, ['#0f161d', '#465a6b', '#2b3a47', '#0f161d']);
-  c.fill();
-  c.strokeStyle = '#05080b';
-  c.lineWidth = 2;
-  c.stroke();
-  // glass tube
-  c.beginPath();
-  c.roundRect(cx - 9, y0 + 50, 18, 72, 9);
-  c.fillStyle = '#061520';
-  c.fill();
-  c.save();
-  c.globalCompositeOperation = 'lighter';
-  c.shadowColor = '#5ad1ff';
-  c.shadowBlur = 8;
-  c.strokeStyle = '#9be8ff';
-  c.lineWidth = 1.4;
-  for (let i = 0; i < 2; i++) jagged(c, cx, y0 + 54, cx + rand(-4, 4), y0 + 118, 4, 7);
-  c.restore();
-  c.fillStyle = 'rgba(255,255,255,0.15)';
-  c.fillRect(cx - 6, y0 + 54, 2, 64);
-  // copper coils
-  c.strokeStyle = '#c47a35';
-  c.lineWidth = 3;
-  for (let i = 0; i < 9; i++) {
-    c.beginPath();
-    c.moveTo(cx - 18, y0 + 50 + i * 8);
-    c.lineTo(cx - 10, y0 + 52 + i * 8);
-    c.moveTo(cx + 10, y0 + 52 + i * 8);
-    c.lineTo(cx + 18, y0 + 50 + i * 8);
-    c.stroke();
+  c.moveTo(cx - 12, y0 + 40); c.lineTo(cx - 18, y0 + 48);
+  c.lineTo(cx - 18, y0 + 119); c.lineTo(cx - 11, y0 + 135);
+  c.lineTo(cx + 11, y0 + 135); c.lineTo(cx + 18, y0 + 119);
+  c.lineTo(cx + 18, y0 + 48); c.lineTo(cx + 12, y0 + 40); c.closePath();
+  c.fillStyle = lin(c, cx - 18, cx + 18, ['#080f16', '#354b59', '#536979', '#182733', '#070e14']);
+  c.fill(); c.strokeStyle = '#05080b'; c.lineWidth = 2.5; c.stroke();
+  // Recessed glass capacitor, cyan-lit core, and clean specular edge.
+  c.beginPath(); c.roundRect(cx - 8, y0 + 50, 16, 70, 8);
+  c.fillStyle = '#04131d'; c.fill(); c.strokeStyle = '#8ba6b4'; c.lineWidth = 1.4; c.stroke();
+  c.save(); c.shadowColor = '#48d7ff'; c.shadowBlur = 10 * charge;
+  c.fillStyle = `rgba(50,194,244,${0.28 + charge * 0.26})`;
+  c.beginPath(); c.roundRect(cx - 5, y0 + 55, 10, 60, 5); c.fill(); c.restore();
+  c.fillStyle = 'rgba(230,251,255,0.78)'; c.fillRect(cx - 3, y0 + 58, 1.5, 52);
+  // Four copper windings, spaced as deliberate coils rather than busy ribs.
+  for (const y of [y0 + 61, y0 + 78, y0 + 95, y0 + 112]) {
+    c.strokeStyle = '#d08b48'; c.lineWidth = 2.5;
+    c.beginPath(); c.moveTo(cx - 17, y); c.lineTo(cx - 8, y + 2);
+    c.moveTo(cx + 8, y + 2); c.lineTo(cx + 17, y); c.stroke();
+    c.strokeStyle = 'rgba(255,220,164,0.6)'; c.lineWidth = 0.8;
+    c.beginPath(); c.moveTo(cx - 16, y - 1); c.lineTo(cx - 9, y + 1);
+    c.moveTo(cx + 9, y + 1); c.lineTo(cx + 16, y - 1); c.stroke();
   }
-  // electrodes
-  for (const s of [-1, 1]) {
-    c.fillStyle = steel(c, cx + s * 10 - 2, cx + s * 10 + 2);
-    c.fillRect(cx + s * 10 - 2, y0 + 10, 4, 32);
-    c.beginPath();
-    c.arc(cx + s * 10, y0 + 10, 4.5, 0, TAU);
-    c.fillStyle = '#e09a50';
-    c.fill();
+  // Insulated outer rails and top-mounted fork electrodes.
+  for (const side of [-1, 1]) {
+    c.beginPath(); c.moveTo(cx + side * 13, y0 + 43); c.lineTo(cx + side * 13, y0 + 31);
+    c.lineTo(cx + side * 18, y0 + 18); c.lineTo(cx + side * 14, y0 + 8);
+    c.strokeStyle = '#c47a35'; c.lineWidth = 3.2; c.lineJoin = 'round'; c.stroke();
+    c.strokeStyle = '#f4c277'; c.lineWidth = 1; c.stroke();
+    c.fillStyle = steel(c, cx + side * 10 - 2, cx + side * 10 + 2);
+    c.beginPath(); c.roundRect(cx + side * 10 - 2, y0 + 8, 4, 35, 2); c.fill();
+    c.beginPath(); c.arc(cx + side * 10, y0 + 8, 4, 0, TAU);
+    c.fillStyle = '#f0b45d'; c.fill(); c.strokeStyle = '#683b1d'; c.lineWidth = 1; c.stroke();
   }
-  c.fillStyle = steel(c, cx - 2.5, cx + 2.5);
-  c.fillRect(cx - 2.5, y0 + 2, 5, 40);
-  c.save();
-  c.globalCompositeOperation = 'lighter';
-  c.strokeStyle = `rgba(155,232,255,${0.6 + 0.4 * Math.sin(t * 30)})`;
-  c.lineWidth = 1.5;
-  jagged(c, cx - 10, y0 + 10, cx, y0 + 2, 3, 4);
-  jagged(c, cx + 10, y0 + 10, cx, y0 + 2, 3, 4);
+  c.beginPath(); c.roundRect(cx - 4, y0 + 2, 8, 43, 3);
+  c.fillStyle = steel(c, cx - 4, cx + 4); c.fill(); c.strokeStyle = '#3b2518'; c.lineWidth = 1.2; c.stroke();
+  // Short animated arc jumps between the fork and the center electrode.
+  c.save(); c.globalCompositeOperation = 'lighter';
+  c.strokeStyle = `rgba(155,232,255,${0.48 + 0.45 * charge})`; c.lineWidth = 1.8;
+  jagged(c, cx - 10, y0 + 10, cx, y0 + 2, 3, 5);
+  jagged(c, cx + 10, y0 + 10, cx, y0 + 2, 3, 5);
   c.restore();
-  glowDot(c, cx, y0 + 1, 3.5, '#bff1ff', 16);
+  c.fillStyle = '#fbbf24'; c.beginPath(); c.arc(cx, y0 + 3, 2.2, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.36)'; c.fillRect(cx - 15, y0 + 50, 2, 64);
 }
 
 function nailGun(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
@@ -552,7 +589,7 @@ function nailGun(c: CanvasRenderingContext2D, cx: number, y0: number, t: number)
 }
 
 function fishGun(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
-  angledGrip(c, cx, y0 + 112, '#0d4a7a', '#1f7fc0', 0.85);
+  drawFishGrip(c, cx, y0 + 98);
   triggerGuard(c, cx, y0 + 104, '#0b2f4d');
   // stock cap
   c.beginPath();
@@ -883,7 +920,7 @@ function rpg(c: CanvasRenderingContext2D, cx: number, y0: number, ready: boolean
 
 function freeze(c: CanvasRenderingContext2D, cx: number, y0: number, t: number) {
   const pulse = 0.6 + 0.4 * Math.sin(t * 5);
-  angledGrip(c, cx, y0 + 108, '#cfe8f5', '#7aa6c2', 0.85);
+  drawFreezeGrip(c, cx, y0 + 98);
   triggerGuard(c, cx, y0 + 100, '#36576b');
   // coolant tank
   c.beginPath();
