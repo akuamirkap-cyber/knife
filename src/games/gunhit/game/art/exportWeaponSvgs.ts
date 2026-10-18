@@ -16,6 +16,8 @@ type SvgContextPrototype = {
   clip?: () => void;
   __currentElement?: Element;
   __lastPathElement?: Element;
+  __currentDefaultPath?: string;
+  __applyCurrentDefaultPath?: () => void;
   restore?: () => void;
   __defs?: Element;
   __createElement?: (name: string, props?: Record<string, string>, resetFill?: boolean) => Element;
@@ -26,10 +28,9 @@ type SvgContextPrototype = {
   __parseFont?: () => { style: string; size: string; family: string; weight: string; decoration: string; href: string | null };
   __fontUnderline?: string;
   __fontHref?: string;
-}
+};
 
 let extensionsInstalled = false;
-
 /** canvas2svg predates Canvas roundRect/ellipse; add cubic-path equivalents so gun art stays vector. */
 function installSvgCanvasExtensions() {
   if (extensionsInstalled) return;
@@ -89,40 +90,49 @@ function installSvgCanvasExtensions() {
   }
   if (!proto.setLineDash) proto.setLineDash = function () { /* decorative dash patterns are omitted by SVG fallback */ };
 
-  // canvas2svg assumes the current path is inside the current group. Canvas keeps
-  // the path across save(), so retain the last path and apply it to the saved group.
-  const beginPath = proto.beginPath;
-  if (beginPath) {
-    proto.beginPath = function (this: CanvasRenderingContext2D & SvgContextPrototype) {
-      beginPath.call(this);
-      this.__lastPathElement = this.__currentElement;
-    };
-  }
-  proto.clip = function (this: CanvasRenderingContext2D & SvgContextPrototype) {
-    const path = this.__lastPathElement;
-    const current = this.__currentElement;
-    if (!path || !this.__defs || !this.__createElement) return;
-    const target = current && (current.nodeName === 'g' || current.nodeName === 'svg')
-      ? current
-      : this.__closestGroupOrSvg?.(path.parentNode ?? undefined);
-    if (!target) return;
-
-    const id = `gun-hit-clip-${Math.random().toString(36).slice(2)}`;
-    const clip = this.__createElement('clipPath', { id, clipPathUnits: 'userSpaceOnUse' });
-    clip.appendChild(path.cloneNode(true));
-    this.__defs.appendChild(clip);
-    target.setAttribute('clip-path', `url(#${id})`);
-    const childGroup = this.__createElement('g');
-    target.appendChild(childGroup);
-    this.__currentElement = childGroup;
+  proto.__applyCurrentDefaultPath = function (this: CanvasRenderingContext2D & SvgContextPrototype) {
+    if (!this.__currentDefaultPath || !this.__createElement) return;
+    if (!this.__currentElement || this.__currentElement.nodeName !== 'path') {
+      const path = this.__createElement('path', {}, true);
+      const parent = this.__closestGroupOrSvg?.();
+      parent?.appendChild(path);
+      this.__currentElement = path;
+    }
+    this.__currentElement.setAttribute('d', this.__currentDefaultPath);
   };
-  const restore = proto.restore;
-  if (restore) {
-    proto.restore = function (this: CanvasRenderingContext2D & SvgContextPrototype) {
-      restore.call(this);
-      if (this.__lastPathElement?.parentNode) this.__currentElement = this.__lastPathElement;
-    };
-  }
+
+  proto.clip = function (this: CanvasRenderingContext2D & SvgContextPrototype) {
+    const d = this.__currentDefaultPath;
+    if (!d || !this.__defs || !this.__createElement) return;
+
+    if (this.__currentElement && this.__currentElement.nodeName === 'path' && !this.__currentElement.getAttribute('fill') && !this.__currentElement.getAttribute('stroke')) {
+      const p = this.__currentElement;
+      const parent = p.parentNode;
+      this.__currentElement = (parent as Element) || this.__closestGroupOrSvg?.();
+      if (parent) {
+        try { parent.removeChild(p); } catch { /* ignore */ }
+      }
+    }
+
+    const parent = this.__closestGroupOrSvg?.();
+    if (!parent) return;
+
+    const id = `gun-clip-${Math.random().toString(36).slice(2, 9)}`;
+    const clipPath = this.__createElement('clipPath', { id, clipPathUnits: 'userSpaceOnUse' });
+    const pathElem = this.__createElement('path', { d });
+    clipPath.appendChild(pathElem);
+    this.__defs.appendChild(clipPath);
+
+    const clipGroup = this.__createElement('g', { 'clip-path': `url(#${id})` });
+    parent.appendChild(clipGroup);
+    this.__currentElement = clipGroup;
+  };
+
+  const origRestore = proto.restore;
+  proto.restore = function (this: CanvasRenderingContext2D & SvgContextPrototype) {
+    if (origRestore) origRestore.call(this);
+  };
+
   const applyStyle = proto.__applyStyleToCurrentElement;
   if (applyStyle) {
     proto.__applyStyleToCurrentElement = function (this: CanvasRenderingContext2D & SvgContextPrototype, type: string) {
@@ -131,8 +141,8 @@ function installSvgCanvasExtensions() {
       const gradientRoot = previous && typeof previous !== 'string'
         ? (previous as unknown as { __root?: Element }).__root : undefined;
       let opacity: string | null = null;
-      if (type === 'stroke' && gradientRoot?.getAttribute('id')) {
-        this.strokeStyle = `url(#${gradientRoot.getAttribute('id')})`;
+      if (gradientRoot && gradientRoot.getAttribute('id')) {
+        this[property] = `url(#${gradientRoot.getAttribute('id')})`;
       } else if (typeof previous === 'string') {
         const rgba = previous.match(/^rgba?\(\s*([\d.]+)(%)?\s*[, ]\s*([\d.]+)(%)?\s*[, ]\s*([\d.]+)(%)?\s*(?:[,/]\s*([\d.]+)(%)?)?\s*\)$/i);
         if (rgba) {
@@ -149,23 +159,21 @@ function installSvgCanvasExtensions() {
       } finally { this[property] = previous as never; }
     };
   }
-  const parseFont = proto.__parseFont;
-  if (parseFont) {
-    proto.__parseFont = function (this: CanvasRenderingContext2D & SvgContextPrototype) {
-      try { return parseFont.call(this); }
-      catch {
-        const raw = this.font || '';
-        const size = raw.match(/([\d.]+px)/i)?.[1] ?? '10px';
-        const family = raw.match(/['\"]([^'\"]+)['\"]/i)?.[1] ?? 'sans-serif';
-        return {
-          style: /\bitalic\b/i.test(raw) ? 'italic' : 'normal', size, family,
-          weight: /\bbold\b|\b[6-9]00\b/i.test(raw) ? 'bold' : 'normal',
-          decoration: this.__fontUnderline === 'underline' ? 'underline' : 'normal',
-          href: this.__fontHref ?? null,
-        };
-      }
+
+  proto.__parseFont = function (this: CanvasRenderingContext2D & SvgContextPrototype) {
+    const raw = this.font || '';
+    const size = raw.match(/([\d.]+px)/i)?.[1] ?? '12px';
+    const family = raw.match(/[\d.]+px\s+(.+)$/i)?.[1]?.replace(/['"]/g, '') || 'sans-serif';
+    return {
+      style: /\bitalic\b/i.test(raw) ? 'italic' : 'normal',
+      size,
+      family,
+      weight: /\bbold\b|\b[6-9]00\b/i.test(raw) ? 'bold' : 'normal',
+      decoration: this.__fontUnderline === 'underline' ? 'underline' : 'normal',
+      href: this.__fontHref ?? null,
     };
-  }
+  };
+
   extensionsInstalled = true;
 }
 
@@ -176,14 +184,21 @@ function weaponToSvg(id: (typeof WEAPONS)[number]['id'], name: string, rarity: s
   installSvgCanvasExtensions();
   const size = 512;
   const ctx = new C2S(size, size) as unknown as SvgContext;
-  const metrics = getGunMetrics(id, getGunVariant(id));
+  const variant = getGunVariant(id);
+  const metrics = getGunMetrics(id, variant);
   ctx.translate(size / 2, size / 2);
   ctx.rotate(Math.PI / 4);
-  ctx.scale((size * 0.86) / Math.max(metrics.span, 130), (size * 0.86) / Math.max(metrics.span, 130));
-  drawGunCentered(ctx, id, 0.7, 0, true, getGunVariant(id), false);
-  const svg = ctx.getSerializedSvg();
+  const scale = (size * 0.74) / Math.max(metrics.span, 130);
+  ctx.scale(scale, scale);
+  drawGunCentered(ctx, id, 0.7, 0, true, variant, false);
+  let svg = ctx.getSerializedSvg();
+
   const title = `<title>${escapeXml(name)} — ${escapeXml(rarity)}</title>`;
-  return svg.replace(/(<svg\b[^>]*>)/, `$1${title}`);
+  svg = svg.replace(/(<svg\b[^>]*>)/, `$1${title}`);
+  if (!svg.includes('viewBox=')) {
+    svg = svg.replace('<svg ', '<svg viewBox="0 0 512 512" ');
+  }
+  return svg;
 }
 
 /** Creates one ZIP containing one real, editable vector SVG per catalog weapon. */
