@@ -22,6 +22,8 @@ interface ArsenalProps {
   highestLevel: number;
   totalCoins: number;
   diamonds: number;
+  /** Naik saat cheat key C dipakai — memaksa sinkron ulang koleksi dari localStorage. */
+  refreshKey: number;
   onBuyRare: (id: WeaponId) => boolean;
   onUnlockAll: () => WeaponId[];
   onPick: (id: WeaponId) => void;
@@ -216,6 +218,7 @@ export default function Arsenal({
   highestLevel,
   totalCoins,
   diamonds,
+  refreshKey,
   onBuyRare,
   onUnlockAll,
   onPick,
@@ -238,6 +241,16 @@ export default function Arsenal({
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (gridRef.current) gridRef.current.scrollTop = 0; }, [page, tab]);
+
+  // Cheat key C menulis langsung ke localStorage; sinkron ulang koleksi
+  // LANGKA supaya gembok hilang seketika meski Arsenal sedang terbuka.
+  useEffect(() => {
+    if (refreshKey === 0) return;
+    try {
+      const ids = JSON.parse(localStorage.getItem('gunhit_rare_owned') || '[]');
+      setOwnedRare(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []);
+    } catch { /* collection save is optional */ }
+  }, [refreshKey]);
 
   useEffect(() => {
     const handleSpace = (event: KeyboardEvent) => {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AchievementScreen, AdScreen, ArmoryScreen, BoxScreen, RewardScreen, SkippedScreen, StageScreen } from "./components/Screens";
 import { BonusStageScreen, DestroyStageScreen, StageSelectScreen, TreasureStageScreen } from "./components/SpecialStages";
 import { FailScreen } from "./components/FlowScreens";
@@ -7,7 +7,7 @@ import { BOSSES, getBoss, type BossId } from "./components/Bosses";
 import { WEAPONS, WEAPON_PRICE, getWeaponStats, rollByRarity, rollWeaponUnique, type WeaponDef } from "./weapons";
 import { WeaponArt } from "./weapons";
 import { ACHIEVEMENTS } from "./achievements";
-import { BONUS_COIN_VALUE, bossesDefeated, completionPct, useSave } from "./progress";
+import { BONUS_COIN_VALUE, bossesDefeated, completionPct, unlockEverythingPatch, useSave } from "./progress";
 import { MAX_LEVEL, STAGE_META, bossReward, destroyHP, destroyReward, getStage, normalReward } from "./stages";
 import { audio, sfx } from "./sfx";
 import { SunburstToggle } from "./sunburstState";
@@ -225,6 +225,23 @@ export default function App({ onExit }: { onExit?: () => void }) {
     setFailSnap([]);
     go("challenges");
   }, [go]);
+
+  /* ---------- cheat key: C = semua gembok otomatis terbuka ---------- */
+  const unlockAll = useCallback(() => {
+    update(unlockEverythingPatch());
+    sfx.reveal();
+    showToast("🔓 SEMUA GEMBOK TERBUKA!");
+  }, [update, showToast]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.toLowerCase() !== "c") return;
+      unlockAll();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [unlockAll]);
 
 
 

@@ -1,5 +1,7 @@
 import { useCallback, useState } from "react";
 import { MAX_LEVEL } from "./stages";
+import { WEAPONS } from "./weapons";
+import { ACHIEVEMENTS, MILESTONES } from "./achievements";
 
 export interface LevelResult {
   done: boolean;
@@ -142,4 +144,17 @@ export function completionPct(completed: Record<string, LevelResult>): number {
 
 export function bossesDefeated(completed: Record<string, LevelResult>): number {
   return Object.keys(completed).filter((k) => Number(k) % 5 === 0).length;
+}
+
+/**
+ * Cheat key "C": buka SEMUA gembok sekaligus — seluruh level (1..100),
+ * seluruh senjata, seluruh achievement, dan seluruh milestone.
+ */
+export function unlockEverythingPatch(): Partial<SaveData> {
+  return {
+    highestUnlocked: MAX_LEVEL,
+    unlockedWeapons: WEAPONS.map((w) => w.id),
+    claimedAch: ACHIEVEMENTS.map((a) => a.id),
+    milestonesClaimed: MILESTONES.map((m) => m.count),
+  };
 }
