@@ -14,6 +14,7 @@ import { getGunMetrics } from './game/art/metrics';
 import DiamondSprite from '../shared/DiamondSprite';
 import CoinSprite from '../shared/CoinSprite';
 import { MILESTONES, QUESTS, type Quest, type QuestState } from './game/quests';
+import { GUN_HIT_MAP_MAX_LEVEL } from './game/stageMap';
 import Arsenal from './components/Arsenal';
 import QuestModal from './components/QuestModal';
 import LeaderboardModal from './components/LeaderboardModal';
@@ -164,6 +165,33 @@ export default function App({ onExit }: { onExit?: () => void }) {
     localStorage.setItem(LS.playerXp, String(Math.max(0, num(LS.playerXp))));
     localStorage.setItem(LS.playerLevel, String(progress.level));
   }, []);
+
+  // ---------- cheat key: C = semua gembok otomatis terbuka ----------
+  const [cheatToast, setCheatToast] = useState<string | null>(null);
+  const [cheatNonce, setCheatNonce] = useState(0);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.toLowerCase() !== 'c') return;
+      const normal = WEAPONS.filter((w) => w.rarity !== 'LANGKA').map((w) => w.id);
+      const rare = WEAPONS.filter((w) => w.rarity === 'LANGKA').map((w) => w.id);
+      localStorage.setItem(LS.owned, JSON.stringify(normal));
+      localStorage.setItem(LS.rareOwned, JSON.stringify(rare));
+      localStorage.setItem(LS.bestLevel, String(GUN_HIT_MAP_MAX_LEVEL));
+      setBestLevel(GUN_HIT_MAP_MAX_LEVEL);
+      saveQuests({
+        ...questStateRef.current,
+        claimed: QUESTS.map((q) => q.id),
+        milestonesClaimed: MILESTONES.map((m) => m.count),
+      });
+      setCheatNonce((n) => n + 1);
+      sfx.unlock();
+      setCheatToast('🔓 SEMUA GEMBOK TERBUKA!');
+      window.setTimeout(() => setCheatToast(null), 2400);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   // Sync quests to LS
   const saveQuests = (qs: QuestState) => {
@@ -657,6 +685,13 @@ export default function App({ onExit }: { onExit?: () => void }) {
             </div>
           </div>
         )}
+        {cheatToast && (
+          <div className="pointer-events-none absolute inset-x-0 top-[34%] z-40 flex flex-col items-center diamond-reward-pop" aria-live="polite">
+            <div className="rounded-full border border-emerald-200/70 bg-slate-950/90 px-5 py-2 text-lg font-black text-emerald-100 shadow-[0_0_30px_rgba(52,211,153,0.75)]">
+              {cheatToast}
+            </div>
+          </div>
+        )}
         {stageClearBurst && (
           <div
             className="pointer-events-none absolute z-35"
@@ -968,6 +1003,7 @@ export default function App({ onExit }: { onExit?: () => void }) {
             highestLevel={bestLevel}
             totalCoins={totalCoins}
             diamonds={diamonds}
+            refreshKey={cheatNonce}
             onBuyRare={buyRareWeapon}
             onUnlockAll={unlockAllAffordableWeapons}
             onPick={chooseWeapon}
