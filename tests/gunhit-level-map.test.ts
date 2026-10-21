@@ -67,12 +67,17 @@ test('map boss portraits follow the submitted five-boss faction groups while SGA
   assert.deepEqual([5, 10, 15, 20, 25].map(stage => makeLevel(stage).style), ['knight', 'oni', 'cyborg', 'pirate', 'knight']);
 });
 
-test('the SGB slide is removed and its map entrance/active-node effects are reused in SGA QUEST', () => {
+test('all arcade slides are wired in the hub and the QUEST map keeps the SGB entrance effects', () => {
   const app = read('src/App.tsx');
   const map = read('src/games/gunhit/components/LevelMap.tsx');
-  assert.ok(app.includes("type SlideId = 'gunhit'"));
-  assert.ok(!app.includes('KnifeHitGame'));
-  assert.ok(!app.includes("id: 'knife'"));
+  // Hub ini memang "Arcade Hub": setiap game di src/games punya slide sendiri.
+  assert.ok(app.includes("type SlideId = 'gunhit' | 'knife-hit' | 'rifle-rock' | 'sunburst'"));
+  assert.ok(app.includes('KnifeHitGame'));
+  assert.ok(app.includes('RifleRockGame'));
+  assert.ok(app.includes('SunburstGame'));
+  for (const id of ["id: 'gunhit'", "id: 'knife-hit'", "id: 'rifle-rock'", "id: 'sunburst'"]) {
+    assert.ok(app.includes(id), `slide ${id} harus terdaftar di hub`);
+  }
   for (const effect of ['fade-in', 'fade-up', 'tap-hint', 'ring-ping', 'thin-scroll']) {
     assert.ok(map.includes(effect), `SGA QUEST map reuses the ${effect} effect from SGB's map`);
   }

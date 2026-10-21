@@ -5,6 +5,9 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // Path relatif wajib untuk WebView APK (Capacitor) — asset harus bisa
+    // dimuat dari file:// maupun https://localhost tanpa absolute path.
+    base: './',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
