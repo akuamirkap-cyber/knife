@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Game Arcade Hub</string>
+    <string name="title_activity_main">Game Arcade Hub</string>
+    <string name="package_name">com.gamearcade.hub</string>
+    <string name="custom_url_scheme">com.gamearcade.hub</string>
+</resources>
