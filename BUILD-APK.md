@@ -69,6 +69,10 @@ BUILD-APK.bat debug
 release/GameArcadeHub-v1.0.0-release.apk
 ```
 
+> **Isi game di dalam APK saat ini: 1 game - Gun Hit Arcade (SGA).**
+> Game Knife Boss & Rifle Rock masih ada di source (`src/games/`), tapi memang
+> tidak ditampilkan di halaman utama app, jadi tidak ikut terbawa ke APK.
+
 **Cara install manual**
 1. Copy file APK ke HP (kabel USB / WhatsApp / Google Drive).
 2. Buka file APK di HP -> izinkan "Install unknown apps" -> Install.
